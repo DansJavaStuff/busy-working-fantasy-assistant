@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ data.league.name }} Draft Assistant</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<header class="topbar">
+    <div>
+        <div class="eyebrow">YAHOO FANTASY FOOTBALL</div>
+        <h1>🏈 {{ data.league.name }}</h1>
+        <div class="subtitle">{{ data.league.season }} Draft Assistant</div>
+    </div>
+
+    <div class="league-badge">
+        {{ data.league.teams }} Teams
+    </div>
+</header>
+
+<main class="container">
+
+    {% if data.draft.is_your_pick %}
+    <div class="on-clock">
+        🚨 YOU'RE ON THE CLOCK
+    </div>
+    {% endif %}
+
+    <section class="summary-grid">
+        <div class="summary-card">
+            <span>Round</span>
+            <strong>{{ data.draft.round }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>Overall Pick</span>
+            <strong>{{ data.draft.current_pick }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>Current Slot</span>
+            <strong>{{ data.draft.current_slot }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>Your Next Pick</span>
+            <strong>{{ data.draft.your_next_pick }}</strong>
+        </div>
+    </section>
+
+    {% if data.recommendation %}
+    <section class="recommendation">
+        <div class="recommendation-label">RECOMMENDED PICK</div>
+
+        <div class="recommendation-player">
+            {{ data.recommendation.name }}
+        </div>
+
+        <div class="recommendation-position">
+            {{ data.recommendation.position }}
+            ·
+            {{ data.recommendation.team }}
+        </div>
+
+        <p>
+            Highest-rated player currently available.
+            Smarter roster and positional-scarcity logic comes next.
+        </p>
+    </section>
+    {% endif %}
+
+    <div class="dashboard-grid">
+
+        <section class="panel">
+            <div class="panel-header">
+                <h2>Your Roster</h2>
+            </div>
+
+            {% if data.your_roster %}
+
+                {% for player in data.your_roster %}
+                <div class="roster-row">
+                    <div class="position">
+                        {{ player.position }}
+                    </div>
+
+                    <div class="player-name">
+                        {{ player.name }}
+                    </div>
+                </div>
+                {% endfor %}
+
+            {% else %}
+                <div class="empty-panel">
+                    No players drafted yet.
+                </div>
+            {% endif %}
+        </section>
+
+
+        <section class="panel">
+            <div class="panel-header">
+                <h2>Best Available</h2>
+            </div>
+
+            {% for player in data.available %}
+            <div class="player-row">
+
+                <div class="rank">
+                    {{ loop.index }}
+                </div>
+
+                <div class="player-details">
+                    <strong>{{ player.name }}</strong>
+
+                    <span>
+                        {{ player.position }} · {{ player.team }}
+                    </span>
+                </div>
+
+                <div class="score">
+                    {{ player.score }}
+                </div>
+
+                <form
+                    method="post"
+                    action="{{ url_for('make_pick', player_id=player.id) }}"
+                >
+                    <button class="draft-button">
+                        Draft
+                    </button>
+                </form>
+
+            </div>
+            {% endfor %}
+        </section>
+
+
+        <section class="panel recent-panel">
+
+            <div class="panel-header">
+                <h2>Recent Picks</h2>
+            </div>
+
+            {% if data.recent_picks %}
+
+                {% for pick in data.recent_picks %}
+                <div class="pick-row">
+
+                    <span class="pick-number">
+                        {{ pick.round }}.{{ "%02d"|format(pick.slot) }}
+                    </span>
+
+                    <strong>
+                        {{ pick.player.name }}
+                    </strong>
+
+                    <span class="pick-position">
+                        {{ pick.player.position }}
+                    </span>
+
+                </div>
+                {% endfor %}
+
+            {% else %}
+                <div class="empty-panel">
+                    Draft hasn't started yet.
+                </div>
+            {% endif %}
+
+        </section>
+
+    </div>
+
+    <div class="controls">
+
+        <form method="post" action="{{ url_for('undo') }}">
+            <button class="secondary-button">
+                Undo Last Pick
+            </button>
+        </form>
+
+        <form method="post" action="{{ url_for('reset') }}">
+            <button class="danger-button">
+                Reset Draft
+            </button>
+        </form>
+
+    </div>
+
+</main>
+
+<footer>
+    Busy Working Fantasy Assistant · Development Version
+</footer>
+
+</body>
+</html>

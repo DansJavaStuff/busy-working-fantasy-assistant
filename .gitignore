@@ -4,3 +4,13 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
+
+draft_state.json
+
+fantasypros_test.json
+fantasypros_cache.json
+*.v1
+*.v2
+fantasypros_test.json
+fantasypros_cache.json
+draft_state.json
