@@ -8,16 +8,16 @@ from draft_engine import (
     pick_to_round_and_slot,
     reset_state,
     undo_last_pick,
+    update_settings,
 )
-from mock_data import get_players
+from player_database import load_players
 
 app = Flask(__name__)
-
 
 @app.route("/")
 def dashboard():
     state = load_state()
-    players = get_players()
+    players = load_players()
 
     drafted_ids = {
         item["player"]["id"]
@@ -30,19 +30,16 @@ def dashboard():
             for player in players
             if player["id"] not in drafted_ids
         ],
-        key=lambda player: player["score"],
-        reverse=True,
+        key=lambda player: player["adp_rank"],
     )
+
     round_number, slot = pick_to_round_and_slot(
         state["current_pick"],
         state["teams"],
     )
 
-    recommendation = (
-        max(available, key=lambda player: player["score"])
-        if available
-        else None
-    )
+    recommendation = available[0] if available else None
+
     data = {
         "league": {
             "name": "Busy Working",
@@ -63,15 +60,21 @@ def dashboard():
         "recommendation": recommendation,
     }
 
-    return render_template("dashboard.html", data=data)
-
-
-@app.post("/draft/<int:player_id>")
+    return render_template(
+        "dashboard.html",
+        data=data,
+    )
+      
+@app.post("/draft/<string:player_id>")
 def make_pick(player_id):
     state = load_state()
 
     player = next(
-        (p for p in get_players() if p["id"] == player_id),
+        (
+            p
+            for p in load_players()
+            if str(p["id"]) == str(player_id)
+        ),
         None,
     )
 
@@ -80,7 +83,6 @@ def make_pick(player_id):
 
     return redirect(url_for("dashboard"))
 
-
 @app.post("/undo")
 def undo():
     state = load_state()
@@ -88,13 +90,26 @@ def undo():
 
     return redirect(url_for("dashboard"))
 
+@app.post("/settings")
+def settings():
+    teams = request.form.get("teams", type=int)
+    your_slot = request.form.get("your_slot", type=int)
+
+    if teams is None or your_slot is None:
+        return redirect(url_for("dashboard"))
+
+    try:
+        update_settings(teams, your_slot)
+    except ValueError:
+        pass
+
+    return redirect(url_for("dashboard"))
 
 @app.post("/reset")
 def reset():
     reset_state()
 
     return redirect(url_for("dashboard"))
-
 
 @app.route("/health")
 def health():

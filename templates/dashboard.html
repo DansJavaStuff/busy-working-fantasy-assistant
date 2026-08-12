@@ -126,9 +126,9 @@
                 </div>
 
                 <div class="score">
-                    {{ player.score }}
-                </div>
-
+        <small>ADP</small>
+        {{ player.adp }}
+    </div>
                 <form
                     method="post"
                     action="{{ url_for('make_pick', player_id=player.id) }}"
@@ -178,22 +178,70 @@
         </section>
 
     </div>
+<div class="draft-settings">
 
-    <div class="controls">
+    <h3>Draft Settings</h3>
 
-        <form method="post" action="{{ url_for('undo') }}">
-            <button class="secondary-button">
-                Undo Last Pick
-            </button>
-        </form>
+    <form
+        method="post"
+        action="{{ url_for('settings') }}"
+        class="settings-form"
+    >
 
-        <form method="post" action="{{ url_for('reset') }}">
-            <button class="danger-button">
-                Reset Draft
-            </button>
-        </form>
+        <label>
+            Number of Teams
 
-    </div>
+            <select name="teams">
+                {% for teams in [8, 10, 12, 14, 16] %}
+                    <option
+                        value="{{ teams }}"
+                        {% if teams == data.league.teams %}selected{% endif %}
+                    >
+                        {{ teams }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            Your Draft Slot
+
+            <select name="your_slot">
+                {% for slot in range(1, data.league.teams + 1) %}
+                    <option
+                        value="{{ slot }}"
+                        {% if slot == data.draft.your_slot %}selected{% endif %}
+                    >
+                        {{ slot }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <button type="submit">
+            Apply &amp; Reset Draft
+        </button>
+
+    </form>
+
+</div>
+
+
+<div class="controls">
+
+    <form method="post" action="{{ url_for('undo') }}">
+        <button class="secondary-button">
+            Undo Last Pick
+        </button>
+    </form>
+
+    <form method="post" action="{{ url_for('reset') }}">
+        <button class="danger-button">
+            Reset Draft
+        </button>
+    </form>
+
+</div>
 
 </main>
 

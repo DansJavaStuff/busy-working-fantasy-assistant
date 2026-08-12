@@ -103,3 +103,23 @@ def undo_last_pick(state):
     save_state(state)
 
     return state
+
+def update_settings(teams, your_slot):
+    teams = int(teams)
+    your_slot = int(your_slot)
+
+    if teams < 2:
+        raise ValueError("Number of teams must be at least 2")
+
+    if your_slot < 1 or your_slot > teams:
+        raise ValueError(
+            "Draft slot must be between 1 and the number of teams"
+        )
+
+    state = default_state()
+    state["teams"] = teams
+    state["your_slot"] = your_slot
+
+    save_state(state)
+
+    return state

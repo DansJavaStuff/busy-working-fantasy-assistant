@@ -17,6 +17,12 @@ BASE_URL = (
     "nfl/2026/consensus-rankings"
 )
 
+POSITIONS = [
+    "QB",
+    "RB",
+    "WR",
+    "TE",
+]
 
 def fetch_rankings():
     if not API_KEY:
@@ -67,43 +73,51 @@ def convert_player(player):
 
 
 def refresh_cache():
-    print("Downloading FantasyPros 2026 rankings...")
+    if not API_KEY:
+        raise RuntimeError(
+            "FANTASYPROS_API_KEY missing from .env"
+        )
 
-    data = fetch_rankings()
+    players = []
 
-    players = [
-        convert_player(player)
-        for player in data.get("players", [])
-    ]
+    for position in POSITIONS:
+        print(f"Downloading {position} rankings...")
 
-    # Ignore unusual positions for now.
-    wanted_positions = {
-        "QB",
-        "RB",
-        "WR",
-        "TE",
+        response = requests.get(
+            BASE_URL,
+            headers={
+                "x-api-key": API_KEY,
+            },
+            params={
+                "position": position,
+                "scoring": "HALF",
+            },
+            timeout=30,
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        print(
+            f"  {data.get('count')} available, "
+            f"{len(data.get('players', []))} returned"
+        )
+
+        for player in data.get("players", []):
+            players.append(convert_player(player))
+
+    # Deduplicate by FantasyPros ID
+    unique = {
+        player["id"]: player
+        for player in players
     }
 
-    players = [
-        player
-        for player in players
-        if player["position"] in wanted_positions
-    ]
-
-    players.sort(
-        key=lambda player: (
-            player["ecr"]
-            if player["ecr"] is not None
-            else 9999
-        )
-    )
+    players = list(unique.values())
 
     cache = {
         "season": 2026,
         "scoring": "HALF",
         "updated": datetime.now().isoformat(),
-        "fantasypros_last_updated": data.get("last_updated"),
-        "public_api_limited": data.get("public_api_limited"),
         "players": players,
     }
 
@@ -111,6 +125,7 @@ def refresh_cache():
         json.dumps(cache, indent=2)
     )
 
+    print()
     print(
         f"Saved {len(players)} players "
         f"to {CACHE_FILE}"
