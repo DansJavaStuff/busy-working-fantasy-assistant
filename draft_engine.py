@@ -3,7 +3,6 @@ from pathlib import Path
 
 STATE_FILE = Path("draft_state.json")
 
-
 def default_state():
     return {
         "teams": 12,
@@ -28,8 +27,14 @@ def save_state(state):
 
 
 def reset_state():
+    current = load_state()
+
     state = default_state()
+    state["teams"] = current.get("teams", state["teams"])
+    state["your_slot"] = current.get("your_slot", state["your_slot"])
+
     save_state(state)
+
     return state
 
 

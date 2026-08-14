@@ -24,29 +24,6 @@ POSITIONS = [
     "TE",
 ]
 
-def fetch_rankings():
-    if not API_KEY:
-        raise RuntimeError(
-            "FANTASYPROS_API_KEY missing from .env"
-        )
-
-    response = requests.get(
-        BASE_URL,
-        headers={
-            "x-api-key": API_KEY,
-        },
-        params={
-            "position": "OP",
-            "scoring": "HALF",
-        },
-        timeout=30,
-    )
-
-    response.raise_for_status()
-
-    return response.json()
-
-
 def convert_player(player):
     return {
         "id": player["player_id"],
