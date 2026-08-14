@@ -11,6 +11,7 @@ from draft_engine import (
     update_settings,
 )
 from player_database import load_players
+from recommendation_engine import get_recommendations
 
 app = Flask(__name__)
 
@@ -38,8 +39,10 @@ def dashboard():
         state["teams"],
     )
 
-    recommendation = available[0] if available else None
-
+    recommendations = get_recommendations(
+        available,
+        state,
+    )
     data = {
         "league": {
             "name": "Busy Working",
@@ -57,7 +60,7 @@ def dashboard():
         "available": available,
         "recent_picks": list(reversed(state["drafted"][-8:])),
         "your_roster": state["your_roster"],
-        "recommendation": recommendation,
+        "recommendations": recommendations,
     }
 
     return render_template(

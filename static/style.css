@@ -24,8 +24,7 @@ body {
     justify-content: space-between;
     align-items: center;
 
-    padding: 24px 32px;
-}
+    padding: 24px 32px;}
 
 .topbar h1 {
     margin: 3px 0;
@@ -246,6 +245,63 @@ footer {
     font-size: 12px;
 }
 
+.recommendation-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.recommendation-stats span {
+    background: #f4f6f8;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #697586;
+}
+
+.recommendation-stats strong {
+    display: block;
+    margin-top: 2px;
+    font-size: 16px;
+    color: #18202a;
+}
+
+.recommendation-reasons {
+    margin-top: 18px;
+}
+
+.reason {
+    margin-top: 6px;
+    font-size: 14px;
+}
+
+.recommendation-option {
+    display: flex;
+    gap: 16px;
+    padding: 18px 0;
+    border-bottom: 1px solid #eceff3;
+}
+
+.recommendation-option:last-child {
+    border-bottom: 0;
+}
+
+.recommendation-rank {
+    min-width: 42px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #4f46e5;
+}
+
+.recommendation-main {
+    flex: 1;
+}
+
+.recommendation-option:not(:first-of-type)
+.recommendation-player {
+    font-size: 22px;
+}
 
 /* Phone / tablet */
 

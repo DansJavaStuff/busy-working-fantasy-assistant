@@ -55,26 +55,66 @@
         </div>
     </section>
 
-    {% if data.recommendation %}
-    <section class="recommendation">
-        <div class="recommendation-label">RECOMMENDED PICK</div>
+{% if data.recommendations %}
 
-        <div class="recommendation-player">
-            {{ data.recommendation.name }}
+<section class="recommendation">
+    <div class="recommendation-label">
+        TOP DRAFT OPTIONS
+    </div>
+    {% for recommendation in data.recommendations %}
+    <div class="recommendation-option">
+        <div class="recommendation-rank">
+            #{{ loop.index }}
         </div>
-
-        <div class="recommendation-position">
-            {{ data.recommendation.position }}
-            ·
-            {{ data.recommendation.team }}
+        <div class="recommendation-main">
+            <div class="recommendation-player">
+                {{ recommendation.player.name }}
+            </div>
+            <div class="recommendation-position">
+                {{ recommendation.player.position }}
+                ·
+                {{ recommendation.player.team }}
+            </div>
+            <div class="recommendation-stats">
+                <span>
+                    ADP
+                    <strong>
+                        {{ recommendation.player.adp }}
+                    </strong>
+                </span>
+                <span>
+                    Yahoo ADP
+                    <strong>
+                        {{ recommendation.player.yahoo_adp }}
+                    </strong>
+                </span>
+                <span>
+                    Next Pick
+                    <strong>
+                        {{ recommendation.next_pick }}
+                    </strong>
+                </span>
+                <span>
+                    Draft Score
+                    <strong>
+                        {{ recommendation.score }}
+                    </strong>
+                </span>
+            </div>
+            {% if recommendation.reasons %}
+            <div class="recommendation-reasons">
+                {% for reason in recommendation.reasons %}
+                <div class="reason">
+                    ✓ {{ reason }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
-
-        <p>
-            Highest-rated player currently available.
-            Smarter roster and positional-scarcity logic comes next.
-        </p>
-    </section>
-    {% endif %}
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
 
     <div class="dashboard-grid">
 
