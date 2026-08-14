@@ -37,7 +37,7 @@ def convert_player(player):
 
         "bye": player.get("player_bye_week"),
 
-        # Overall FantasyPros ranking from OP feed
+        # Position-specific FantasyPros ECR from the QB/RB/WR/TE feeds
         "ecr": player.get("rank_ecr"),
 
         "position_rank": player.get("pos_rank"),
