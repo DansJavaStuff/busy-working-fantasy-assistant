@@ -230,23 +230,18 @@ def score_player(
     # ---------------------------------------------------------
 
     if waiting_for_turn:
-
+    
         # We're NOT on the clock.
-        # The only question is:
         #
-        # "Is this player realistically likely to reach us?"
-
+        # Rank players based on how desirable they would be
+        # IF they reach our decision pick.
+        #
+        # Survival risk is communicated separately by the
+        # WATCH / WATCH CLOSELY badge.
+    
         if yahoo_adp < decision_pick:
-
             survival_gap = decision_pick - yahoo_adp
-
-            penalty = min(
-                survival_gap * 2.0,
-                30,
-            )
-
-            score -= penalty
-
+    
             if survival_gap >= 5:
                 reasons.append(
                     f"Yahoo ADP {yahoo_adp:.1f}: unlikely to "
@@ -257,16 +252,12 @@ def score_player(
                     f"Yahoo ADP {yahoo_adp:.1f}: could go "
                     f"before pick {decision_pick}"
                 )
-
+    
         else:
-
-            score += 3
-
             reasons.append(
                 f"Yahoo ADP {yahoo_adp:.1f}: realistic "
                 f"candidate for pick {decision_pick}"
             )
-
     else:
 
         # We're ON THE CLOCK.
