@@ -287,7 +287,13 @@
             Reset Draft
         </button>
     </form>
-
+    {% if not data.draft.is_your_pick %}
+    <form method="post" action="{{ url_for('simulate_to_my_pick') }}">
+        <button class="primary-button">
+            Simulate to My Pick
+        </button>
+    </form>
+    {% endif %}
 </div>
 
 </main>

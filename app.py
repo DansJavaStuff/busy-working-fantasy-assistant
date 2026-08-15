@@ -122,6 +122,37 @@ def reset():
 def health():
     return {"status": "ok"}
 
+@app.post("/simulate-to-my-pick")
+def simulate_to_my_pick():
+    state = load_state()
+    players = load_players()
+
+    while not is_your_pick(state):
+        drafted_ids = {
+            str(item["player"]["id"])
+            for item in state["drafted"]
+        }
+
+        available = sorted(
+            [
+                player
+                for player in players
+                if str(player["id"]) not in drafted_ids
+            ],
+            key=lambda player: player["adp_rank"],
+        )
+
+        if not available:
+            break
+
+        # v1 opponent logic:
+        # take the best available player by consensus ADP.
+        draft_player(
+            state,
+            available[0],
+        )
+
+    return redirect(url_for("dashboard"))
 
 if __name__ == "__main__":
     app.run(
