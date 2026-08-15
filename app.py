@@ -56,7 +56,11 @@ def dashboard():
             "your_slot": state["your_slot"],
             "your_next_pick": next_your_pick(state),
             "is_your_pick": is_your_pick(state),
-        },
+            "decision_pick": (
+                state["current_pick"]
+                if is_your_pick(state)
+                else next_your_pick(state)
+            ),},
         "available": available,
         "recent_picks": list(reversed(state["drafted"][-8:])),
         "your_roster": state["your_roster"],

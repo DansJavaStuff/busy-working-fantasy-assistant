@@ -92,6 +92,49 @@ def roster_bonus(position, counts, round_number):
 
     return 0, None
 
+def recommendation_action(
+    player,
+    current_pick,
+    decision_pick,
+    next_pick,
+    waiting_for_turn,
+):
+    """
+    Give the recommendation a simple draft-night action label.
+    """
+
+    adp = player.get("adp")
+
+    if adp is None:
+        adp = player.get("adp_rank", 999)
+
+    yahoo_adp = player.get("yahoo_adp")
+
+    if yahoo_adp is None:
+        yahoo_adp = adp
+
+    # While waiting, these aren't actionable picks yet.
+    if waiting_for_turn:
+        if yahoo_adp <= decision_pick:
+            return "WATCH CLOSELY"
+
+        return "WATCH"
+
+    # We're on the clock.
+    # A player at/beyond market value who is unlikely to
+    # survive until our following pick is a strong take-now.
+    if (
+        yahoo_adp <= current_pick
+        and adp <= current_pick + 2
+    ):
+        return "TAKE NOW"
+
+    # Player is expected to go well before our following pick.
+    if yahoo_adp < next_pick:
+        return "CONSIDER"
+
+    # Market suggests we have a reasonable chance of waiting.
+    return "COULD WAIT"
 
 def score_player(
     player,
@@ -337,12 +380,21 @@ def score_player(
     elif tier == 2:
         score += 1
 
+    action = recommendation_action(
+        player,
+        current_pick,
+        decision_pick,
+        next_pick,
+        waiting_for_turn,
+    )
+
     return {
         "player": player,
         "score": round(score, 1),
         "value": round(value, 1),
         "decision_pick": decision_pick,
         "next_pick": next_pick,
+        "action": action,
         "reasons": reasons,
     }
 

@@ -454,6 +454,43 @@ footer {
     cursor: pointer;
 }
 
+.action-label {
+    display: inline-block;
+    margin-top: 4px;
+    margin-bottom: 3px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1;
+}
+
+.action-take-now {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.action-consider {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.action-could-wait {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.action-watch-closely {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.action-watch {
+    background: #e5e7eb;
+    color: #374151;
+}
+
 @media (max-width: 750px) {
 
     .player-row {

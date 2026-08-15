@@ -29,7 +29,7 @@
 
     {% if data.draft.is_your_pick %}
     <div class="on-clock">
-        🚨 YOU'RE ON THE CLOCK
+        🚨 YOU'RE ON THE CLOCK — PICK {{ data.draft.current_pick }}
     </div>
     {% endif %}
 
@@ -59,7 +59,11 @@
 
 <section class="recommendation">
     <div class="recommendation-label">
-        TOP DRAFT OPTIONS
+        {% if data.draft.is_your_pick %}
+            TOP DRAFT OPTIONS — PICK {{ data.draft.current_pick }}
+        {% else %}
+            WATCHLIST FOR PICK {{ data.draft.decision_pick }}
+        {% endif %}
     </div>
     {% for recommendation in data.recommendations %}
     <div class="recommendation-option">
@@ -69,6 +73,9 @@
         <div class="recommendation-main">
             <div class="recommendation-player">
                 {{ recommendation.player.name }}
+            </div>
+            <div class="action-label action-{{ recommendation.action|lower|replace(' ', '-') }}">
+                {{ recommendation.action }}
             </div>
             <div class="recommendation-position">
                 {{ recommendation.player.position }}
@@ -89,7 +96,7 @@
                     </strong>
                 </span>
                 <span>
-                    Next Pick
+                    Following Pick
                     <strong>
                         {{ recommendation.next_pick }}
                     </strong>
