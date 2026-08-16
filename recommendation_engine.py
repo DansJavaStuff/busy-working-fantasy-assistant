@@ -6,6 +6,8 @@ from draft_engine import (
     pick_to_round_and_slot,
 )
 
+from league_config import BUSY_WORKING_ROSTER, FLEX_ELIGIBLE
+
 def next_pick_for_slot_after(current_pick, teams, your_slot):
     """
     Find YOUR next pick after the current selection.
@@ -35,60 +37,219 @@ def roster_counts(roster):
         for player in roster
     )
 
-
 def roster_bonus(position, counts, round_number):
     """
-    Simple roster-construction rules for v1.
+    Busy Working roster-construction rules.
 
-    Positive = position is useful.
-    Negative = we're getting over-invested or drafting it too early.
+    Starting lineup:
+        QB
+        RB
+        RB
+        WR
+        WR
+        TE
+        W/R/T
+        K
+        DEF
+
+    Plus 5 bench and 1 IR.
     """
 
     count = counts.get(position, 0)
 
+    # ---------------------------------------------------------
+    # Work out whether the FLEX position is already covered.
+    #
+    # Any RB/WR/TE beyond their normal starting allocation
+    # can occupy the W/R/T FLEX slot.
+    # ---------------------------------------------------------
+
+    rb_extra = max(
+        counts.get("RB", 0) - BUSY_WORKING_ROSTER["RB"],
+        0,
+    )
+
+    wr_extra = max(
+        counts.get("WR", 0) - BUSY_WORKING_ROSTER["WR"],
+        0,
+    )
+
+    te_extra = max(
+        counts.get("TE", 0) - BUSY_WORKING_ROSTER["TE"],
+        0,
+    )
+
+    flex_filled = (rb_extra + wr_extra + te_extra) >= 1
+
+    # ---------------------------------------------------------
+    # RB
+    # ---------------------------------------------------------
+
     if position == "RB":
-        if count == 0:
-            return 6, "You have no RB yet"
-        if count == 1:
-            return 4, "A second RB fills an important starting spot"
-        if count == 2:
-            return 0, None
-        if count >= 3 and round_number <= 6:
-            return -5, "You already have good early RB depth"
+        starters = BUSY_WORKING_ROSTER["RB"]
+
+        if count < starters:
+            slot_number = count + 1
+
+            return (
+                6,
+                f"Fills your RB{slot_number} starting position",
+            )
+
+        if not flex_filled:
+            return (
+                3,
+                "Strong candidate for your W/R/T FLEX position",
+            )
+
+        if count >= 4 and round_number <= 6:
+            return (
+                -5,
+                "Starting RB slots and FLEX are already well covered",
+            )
+
+        return (
+            1,
+            "Adds useful RB bench depth",
+        )
+
+    # ---------------------------------------------------------
+    # WR
+    # ---------------------------------------------------------
 
     if position == "WR":
-        if count == 0:
-            return 6, "You have no WR yet"
-        if count == 1:
-            return 4, "A second WR fills an important starting spot"
-        if count == 2:
-            return 1, "Extra WR depth is useful for FLEX"
+        starters = BUSY_WORKING_ROSTER["WR"]
+
+        if count < starters:
+            slot_number = count + 1
+
+            return (
+                6,
+                f"Fills your WR{slot_number} starting position",
+            )
+
+        if not flex_filled:
+            return (
+                3,
+                "Strong candidate for your W/R/T FLEX position",
+            )
+
         if count >= 4 and round_number <= 6:
-            return -4, "You already have substantial WR depth"
+            return (
+                -4,
+                "Starting WR slots and FLEX are already well covered",
+            )
+
+        return (
+            1,
+            "Adds useful WR bench depth",
+        )
+
+    # ---------------------------------------------------------
+    # QB
+    # ---------------------------------------------------------
 
     if position == "QB":
-        if count >= 1:
-            return -12, "You already have a starting QB"
+        starters = BUSY_WORKING_ROSTER["QB"]
 
-        if round_number <= 3:
-            return -7, "QB is usually less urgent this early"
-
-        if round_number <= 5:
-            return 1, None
-
-        return 5, "This is a reasonable stage to address QB"
-
-    if position == "TE":
-        if count >= 1:
-            return -8, "You already have a starting TE"
+        if count >= starters:
+            return (
+                -12,
+                "Your starting QB position is already filled",
+            )
 
         if round_number <= 2:
-            return -4, "TE is normally less urgent this early"
+            return (
+                -5,
+                "Only one QB starts, so the position is less urgent this early",
+            )
 
-        if round_number <= 4:
-            return 1, None
+        if round_number == 3:
+            return (
+                -2,
+                "QB is becoming viable, although RB/WR starters still matter",
+            )
 
-        return 4, "This is a reasonable stage to address TE"
+        if round_number <= 5:
+            return (
+                2,
+                "Reasonable stage to fill your starting QB position",
+            )
+
+        return (
+            5,
+            "Starting QB is now an important roster need",
+        )
+
+    # ---------------------------------------------------------
+    # TE
+    # ---------------------------------------------------------
+
+    if position == "TE":
+        starters = BUSY_WORKING_ROSTER["TE"]
+
+        if count < starters:
+            if round_number <= 2:
+                return (
+                    -3,
+                    "TE is normally less urgent in the opening rounds",
+                )
+
+            if round_number <= 4:
+                return (
+                    2,
+                    "Would fill your starting TE position",
+                )
+
+            return (
+                4,
+                "Fills an open starting TE position",
+            )
+
+        # We already have our starting TE.
+        # A second TE can technically use FLEX, but we don't
+        # want to encourage that as strongly as RB/WR.
+        if not flex_filled and position in FLEX_ELIGIBLE:
+            return (
+                -2,
+                "Starting TE is filled; a second TE would mainly be FLEX/depth",
+            )
+
+        return (
+            -8,
+            "Your starting TE position is already filled",
+        )
+
+    # ---------------------------------------------------------
+    # Kicker / Defence
+    #
+    # They are required starters, but we deliberately avoid
+    # encouraging them until the closing rounds.
+    # ---------------------------------------------------------
+
+    if position in ("K", "DEF", "DST"):
+        if count >= 1:
+            return (
+                -20,
+                f"You already have a starting {position}",
+            )
+
+        if round_number <= 10:
+            return (
+                -40,
+                f"Wait until the late rounds to draft {position}",
+            )
+
+        if round_number <= 12:
+            return (
+                -10,
+                f"{position} can usually still wait",
+            )
+
+        return (
+            2,
+            f"Reasonable stage to fill your starting {position}",
+        )
 
     return 0, None
 
