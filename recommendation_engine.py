@@ -253,6 +253,124 @@ def roster_bonus(position, counts, round_number):
 
     return 0, None
 
+def consensus_adp(player):
+    """
+    Best available consensus ADP for comparing player quality.
+    """
+    adp = player.get("adp")
+
+    if adp is None:
+        adp = player.get("adp_rank", 999)
+
+    return float(adp)
+
+
+def market_adp(player):
+    """
+    Yahoo ADP is our best guide to when players may actually
+    disappear in the Busy Working draft.
+    """
+    adp = player.get("yahoo_adp")
+
+    if adp is None:
+        adp = consensus_adp(player)
+
+    return float(adp)
+
+
+def positional_scarcity_bonus(
+    player,
+    available,
+    counts,
+    next_pick,
+):
+    """
+    Measure QB/TE scarcity based on what is likely to remain
+    at our FOLLOWING pick.
+
+    The important draft question is not simply:
+
+        "Who is the next player at this position?"
+
+    It is:
+
+        "If we pass now, what quality of player is likely
+         to still be available when we pick again?"
+    """
+
+    position = player["position"]
+
+    if position not in ("QB", "TE"):
+        return 0, None
+
+    starters = BUSY_WORKING_ROSTER[position]
+
+    # No scarcity bonus if we've already filled the starter.
+    if counts.get(position, 0) >= starters:
+        return 0, None
+
+    player_market = market_adp(player)
+
+    # If this player is expected to survive until our next pick,
+    # there is no reason to create urgency now.
+    if player_market >= next_pick:
+        return 0, None
+
+    same_position = sorted(
+        [
+            candidate
+            for candidate in available
+            if candidate["position"] == position
+        ],
+        key=consensus_adp,
+    )
+
+    # Find the best player at this position whose Yahoo ADP
+    # suggests they may still be available at our next pick.
+    fallback = next(
+        (
+            candidate
+            for candidate in same_position
+            if market_adp(candidate) >= next_pick
+        ),
+        None,
+    )
+
+    if fallback is None:
+        return (
+            5,
+            f"{position} scarcity: no comparable option is "
+            f"projected to last until pick {next_pick}",
+        )
+
+    quality_gap = (
+        consensus_adp(fallback)
+        - consensus_adp(player)
+    )
+
+    if quality_gap >= 15:
+        return (
+            5,
+            f"Major {position} drop-off if you wait: "
+            f"{fallback['name']} is the best likely option "
+            f"around pick {next_pick}",
+        )
+
+    if quality_gap >= 8:
+        return (
+            4,
+            f"Strong {position} drop-off if you wait: "
+            f"{fallback['name']} may be the next realistic option",
+        )
+
+    if quality_gap >= 4:
+        return (
+            2,
+            f"Some {position} drop-off before your next pick",
+        )
+
+    return 0, None
+
 def recommendation_action(
     player,
     current_pick,
@@ -304,6 +422,7 @@ def score_player(
     next_pick,
     round_number,
     counts,
+    available,
 ):
     """
     Produce an explainable draft score.
@@ -539,7 +658,25 @@ def score_player(
         next_pick,
         waiting_for_turn,
     )
+    # ---------------------------------------------------------
+    # 6. Positional scarcity.
+    #
+    # QB and TE are one-starter positions, so the value of
+    # taking one depends heavily on the quality drop to the
+    # next available option.
+    # ---------------------------------------------------------
 
+    scarcity_bonus, scarcity_reason = positional_scarcity_bonus(
+        player,
+        available,
+        counts,
+        next_pick,
+    )
+
+    score += scarcity_bonus
+
+    if scarcity_reason:
+        reasons.append(scarcity_reason)
     return {
         "player": player,
         "score": round(score, 1),
@@ -594,6 +731,7 @@ def get_recommendations(
             next_pick,
             round_number,
             counts,
+            available,
         )
         for player in candidates
     ]
