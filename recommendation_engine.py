@@ -253,6 +253,78 @@ def roster_bonus(position, counts, round_number):
 
     return 0, None
 
+def bench_balance_bonus(
+    position,
+    counts,
+):
+    """
+    Encourage balanced RB/WR bench construction.
+
+    Busy Working starts two RB and two WR, so comparing the
+    number rostered at each position is a useful indication of
+    where our depth is becoming thin or excessive.
+
+    This only applies once the W/R/T FLEX spot is already covered.
+    """
+
+    if position not in ("RB", "WR"):
+        return 0, None
+
+    rb_extra = max(
+        counts.get("RB", 0) - BUSY_WORKING_ROSTER["RB"],
+        0,
+    )
+
+    wr_extra = max(
+        counts.get("WR", 0) - BUSY_WORKING_ROSTER["WR"],
+        0,
+    )
+
+    te_extra = max(
+        counts.get("TE", 0) - BUSY_WORKING_ROSTER["TE"],
+        0,
+    )
+
+    flex_filled = (
+        rb_extra
+        + wr_extra
+        + te_extra
+    ) >= 1
+
+    if not flex_filled:
+        return 0, None
+
+    rb_count = counts.get("RB", 0)
+    wr_count = counts.get("WR", 0)
+
+    if position == "RB":
+        position_count = rb_count
+        other_count = wr_count
+        other_position = "WR"
+    else:
+        position_count = wr_count
+        other_count = rb_count
+        other_position = "RB"
+
+    # Give a small bonus to the thinner side of the roster.
+    if other_count >= position_count + 2:
+        return (
+            2,
+            f"Balances your RB/WR depth: {position} is substantially "
+            f"thinner than {other_position}",
+    )
+
+    # Don't keep piling players into one position if we're
+    # already substantially deeper there.
+    if position_count >= other_count + 2:
+        return (
+            -2,
+            f"You already have substantially more {position} "
+            f"depth than {other_position}",
+        )
+
+    return 0, None
+
 def consensus_adp(player):
     """
     Best available consensus ADP for comparing player quality.
@@ -729,7 +801,21 @@ def score_player(
         reasons.append(roster_reason)
 
     # ---------------------------------------------------------
-    # 5. FantasyPros positional tier.
+    # 5. Bench balance.
+    # ---------------------------------------------------------
+
+    bench_bonus, bench_reason = bench_balance_bonus(
+        player["position"],
+        counts,
+    )
+
+    score += bench_bonus
+
+    if bench_reason:
+        reasons.append(bench_reason)
+
+    # ---------------------------------------------------------
+    # 6. FantasyPros positional tier.
     # ---------------------------------------------------------
 
     tier = player.get("tier")
@@ -746,7 +832,7 @@ def score_player(
         score += 1
 
     # ---------------------------------------------------------
-    # 6. Positional scarcity.
+    # 7. Positional scarcity.
     #
     # QB and TE are one-starter positions, so the value of
     # taking one depends heavily on the quality drop to the
