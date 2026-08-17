@@ -287,12 +287,13 @@ def positional_scarcity_bonus(
     """
     Identify QB/TE positional drop-offs.
 
-    We only apply scarcity when:
-      - we still need a starter at the position
-      - this player is the best remaining player at that position
+    Availability is estimated using Yahoo ADP.
 
-    We compare the player with the best option that is
-    realistically likely to survive until our following pick.
+    The size of the quality drop is measured primarily using
+    positional rank rather than overall ADP.
+
+    FantasyPros tier is used as an additional signal only when
+    both players have tier data.
     """
 
     position = player["position"]
@@ -317,20 +318,20 @@ def positional_scarcity_bonus(
     if len(same_position) < 2:
         return 0, None
 
-    # Scarcity bonus only applies to the best remaining
-    # player at the position.
+    # Only apply scarcity to the best remaining player
+    # at the position.
     if str(same_position[0]["id"]) != str(player["id"]):
         return 0, None
 
     player_market = market_adp(player)
 
-    # If this player is expected to survive until our next pick,
-    # there is no urgency to take him now.
+    # If this player is likely to survive until our next pick,
+    # there is little reason to pay a scarcity premium now.
     if player_market >= next_pick:
         return 0, None
 
-    # Find the best positional alternative that Yahoo ADP says
-    # has a reasonable chance of still being there next time.
+    # Find the best player at this position that Yahoo ADP
+    # suggests has a reasonable chance of surviving.
     likely_survivors = [
         candidate
         for candidate in same_position[1:]
@@ -340,40 +341,61 @@ def positional_scarcity_bonus(
     if not likely_survivors:
         return (
             5,
-            f"Major {position} scarcity: no comparable option "
-            f"is likely to reach pick {next_pick}",
+            f"Major {position} scarcity: no likely starter-level "
+            f"option is expected to reach pick {next_pick}",
         )
 
     fallback = likely_survivors[0]
 
-    quality_gap = (
-        consensus_adp(fallback)
-        - consensus_adp(player)
+    player_rank = player.get("position_rank")
+    fallback_rank = fallback.get("position_rank")
+
+    # If positional rank data is unavailable, don't invent
+    # a quality gap from overall ADP.
+    if player_rank is None or fallback_rank is None:
+        return 0, None
+
+    rank_gap = fallback_rank - player_rank
+
+    # Base scarcity bonus from positional-rank drop.
+    if rank_gap >= 6:
+        bonus = 5
+    elif rank_gap >= 4:
+        bonus = 4
+    elif rank_gap >= 2:
+        bonus = 2
+    else:
+        bonus = 0
+
+    # FantasyPros tier can strengthen the signal, but only
+    # when both players actually have tier information.
+    player_tier = player.get("tier")
+    fallback_tier = fallback.get("tier")
+
+    tier_drop = (
+        player_tier is not None
+        and fallback_tier is not None
+        and fallback_tier > player_tier
     )
 
-    if quality_gap >= 15:
-        return (
-            5,
-            f"Major {position} drop-off if you wait: "
-            f"{fallback['name']} is the best likely option "
-            f"around pick {next_pick}",
+    if tier_drop and bonus > 0:
+        bonus = min(bonus + 1, 5)
+
+    if bonus == 0:
+        return 0, None
+
+    reason = (
+        f"{position} drop-off if you wait: "
+        f"{player['name']} {position}{player_rank} → "
+        f"{fallback['name']} {position}{fallback_rank}"
+    )
+
+    if tier_drop:
+        reason += (
+            f" (Tier {player_tier} → Tier {fallback_tier})"
         )
 
-    if quality_gap >= 8:
-        return (
-            4,
-            f"Significant {position} drop-off if you wait: "
-            f"{fallback['name']} is the best likely option "
-            f"around pick {next_pick}",
-        )
-
-    if quality_gap >= 4:
-        return (
-            2,
-            f"Noticeable {position} drop-off if you wait",
-        )
-
-    return 0, None
+    return bonus, reason
 
 def recommendation_action(
     player,
