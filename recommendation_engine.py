@@ -406,27 +406,36 @@ def recommendation_action(
     score,
 ):
     """
-    Turn the recommendation score and market timing into
+    Convert recommendation strength and market timing into
     a simple draft-night action.
 
-    The score answers:
+    Draft score answers:
         "How much do we want this player?"
 
     Yahoo ADP answers:
-        "Do we need to act now?"
+        "How urgently do we need to act?"
     """
 
     adp = consensus_adp(player)
     yahoo_adp = market_adp(player)
 
     # ---------------------------------------------------------
-    # We're waiting for our turn.
+    # Waiting for our turn.
     #
-    # These are watchlist labels rather than draft actions.
+    # WATCH CLOSELY should mean:
+    #   - we genuinely like the player
+    #   - AND there is a meaningful risk he disappears
+    #
+    # Otherwise he simply remains on the watchlist.
     # ---------------------------------------------------------
 
     if waiting_for_turn:
-        if yahoo_adp <= decision_pick:
+        likely_gone_before_turn = yahoo_adp < decision_pick
+
+        if (
+            score >= 105
+            and likely_gone_before_turn
+        ):
             return "WATCH CLOSELY"
 
         return "WATCH"
@@ -439,14 +448,20 @@ def recommendation_action(
     already_at_value = yahoo_adp <= current_pick
     near_consensus_value = adp <= current_pick + 2
 
-    # A genuinely strong recommendation that is unlikely
-    # to survive until our next selection.
-    if score >= 110 and likely_gone:
+    # ---------------------------------------------------------
+    # TAKE NOW
+    #
+    # Strong recommendation + significant risk of losing him.
+    # ---------------------------------------------------------
+
+    if (
+        score >= 110
+        and likely_gone
+    ):
         return "TAKE NOW"
 
-    # Also allow TAKE NOW for a strong player who has already
-    # fallen to/past market value, even if the overall score
-    # doesn't quite reach 110.
+    # Strong player who has already fallen to/past his
+    # expected market value.
     if (
         score >= 106
         and already_at_value
@@ -454,12 +469,44 @@ def recommendation_action(
     ):
         return "TAKE NOW"
 
-    # Good player, but not strong enough to call mandatory.
-    if likely_gone:
+    # ---------------------------------------------------------
+    # CONSIDER
+    #
+    # Good recommendation and likely unavailable next time.
+    # ---------------------------------------------------------
+
+    if (
+        score >= 101
+        and likely_gone
+    ):
         return "CONSIDER"
 
-    # Market suggests there is a reasonable chance that
-    # we can wait until our following selection.
+    # A decent recommendation that has already reached
+    # market value is also worth considering.
+    if (
+        score >= 100
+        and already_at_value
+        and near_consensus_value
+    ):
+        return "CONSIDER"
+
+    # ---------------------------------------------------------
+    # LOW PRIORITY
+    #
+    # Player may disappear, but our recommendation score
+    # isn't strong enough to chase him just because of ADP.
+    # ---------------------------------------------------------
+
+    if likely_gone:
+        return "LOW PRIORITY"
+
+    # ---------------------------------------------------------
+    # COULD WAIT
+    #
+    # We like the player enough to show him, but market timing
+    # suggests there is a reasonable chance he survives.
+    # ---------------------------------------------------------
+
     return "COULD WAIT"
 
 def score_player(
