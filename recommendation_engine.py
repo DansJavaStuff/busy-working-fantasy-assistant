@@ -285,17 +285,14 @@ def positional_scarcity_bonus(
     next_pick,
 ):
     """
-    Measure QB/TE scarcity based on what is likely to remain
-    at our FOLLOWING pick.
+    Identify QB/TE positional drop-offs.
 
-    The important draft question is not simply:
+    We only apply scarcity when:
+      - we still need a starter at the position
+      - this player is the best remaining player at that position
 
-        "Who is the next player at this position?"
-
-    It is:
-
-        "If we pass now, what quality of player is likely
-         to still be available when we pick again?"
+    We compare the player with the best option that is
+    realistically likely to survive until our following pick.
     """
 
     position = player["position"]
@@ -305,15 +302,7 @@ def positional_scarcity_bonus(
 
     starters = BUSY_WORKING_ROSTER[position]
 
-    # No scarcity bonus if we've already filled the starter.
     if counts.get(position, 0) >= starters:
-        return 0, None
-
-    player_market = market_adp(player)
-
-    # If this player is expected to survive until our next pick,
-    # there is no reason to create urgency now.
-    if player_market >= next_pick:
         return 0, None
 
     same_position = sorted(
@@ -325,23 +314,37 @@ def positional_scarcity_bonus(
         key=consensus_adp,
     )
 
-    # Find the best player at this position whose Yahoo ADP
-    # suggests they may still be available at our next pick.
-    fallback = next(
-        (
-            candidate
-            for candidate in same_position
-            if market_adp(candidate) >= next_pick
-        ),
-        None,
-    )
+    if len(same_position) < 2:
+        return 0, None
 
-    if fallback is None:
+    # Scarcity bonus only applies to the best remaining
+    # player at the position.
+    if str(same_position[0]["id"]) != str(player["id"]):
+        return 0, None
+
+    player_market = market_adp(player)
+
+    # If this player is expected to survive until our next pick,
+    # there is no urgency to take him now.
+    if player_market >= next_pick:
+        return 0, None
+
+    # Find the best positional alternative that Yahoo ADP says
+    # has a reasonable chance of still being there next time.
+    likely_survivors = [
+        candidate
+        for candidate in same_position[1:]
+        if market_adp(candidate) >= next_pick
+    ]
+
+    if not likely_survivors:
         return (
             5,
-            f"{position} scarcity: no comparable option is "
-            f"projected to last until pick {next_pick}",
+            f"Major {position} scarcity: no comparable option "
+            f"is likely to reach pick {next_pick}",
         )
+
+    fallback = likely_survivors[0]
 
     quality_gap = (
         consensus_adp(fallback)
@@ -359,14 +362,15 @@ def positional_scarcity_bonus(
     if quality_gap >= 8:
         return (
             4,
-            f"Strong {position} drop-off if you wait: "
-            f"{fallback['name']} may be the next realistic option",
+            f"Significant {position} drop-off if you wait: "
+            f"{fallback['name']} is the best likely option "
+            f"around pick {next_pick}",
         )
 
     if quality_gap >= 4:
         return (
             2,
-            f"Some {position} drop-off before your next pick",
+            f"Noticeable {position} drop-off if you wait",
         )
 
     return 0, None
@@ -377,42 +381,63 @@ def recommendation_action(
     decision_pick,
     next_pick,
     waiting_for_turn,
+    score,
 ):
     """
-    Give the recommendation a simple draft-night action label.
+    Turn the recommendation score and market timing into
+    a simple draft-night action.
+
+    The score answers:
+        "How much do we want this player?"
+
+    Yahoo ADP answers:
+        "Do we need to act now?"
     """
 
-    adp = player.get("adp")
+    adp = consensus_adp(player)
+    yahoo_adp = market_adp(player)
 
-    if adp is None:
-        adp = player.get("adp_rank", 999)
+    # ---------------------------------------------------------
+    # We're waiting for our turn.
+    #
+    # These are watchlist labels rather than draft actions.
+    # ---------------------------------------------------------
 
-    yahoo_adp = player.get("yahoo_adp")
-
-    if yahoo_adp is None:
-        yahoo_adp = adp
-
-    # While waiting, these aren't actionable picks yet.
     if waiting_for_turn:
         if yahoo_adp <= decision_pick:
             return "WATCH CLOSELY"
 
         return "WATCH"
 
-    # We're on the clock.
-    # A player at/beyond market value who is unlikely to
-    # survive until our following pick is a strong take-now.
+    # ---------------------------------------------------------
+    # We're ON THE CLOCK.
+    # ---------------------------------------------------------
+
+    likely_gone = yahoo_adp < next_pick
+    already_at_value = yahoo_adp <= current_pick
+    near_consensus_value = adp <= current_pick + 2
+
+    # A genuinely strong recommendation that is unlikely
+    # to survive until our next selection.
+    if score >= 110 and likely_gone:
+        return "TAKE NOW"
+
+    # Also allow TAKE NOW for a strong player who has already
+    # fallen to/past market value, even if the overall score
+    # doesn't quite reach 110.
     if (
-        yahoo_adp <= current_pick
-        and adp <= current_pick + 2
+        score >= 106
+        and already_at_value
+        and near_consensus_value
     ):
         return "TAKE NOW"
 
-    # Player is expected to go well before our following pick.
-    if yahoo_adp < next_pick:
+    # Good player, but not strong enough to call mandatory.
+    if likely_gone:
         return "CONSIDER"
 
-    # Market suggests we have a reasonable chance of waiting.
+    # Market suggests there is a reasonable chance that
+    # we can wait until our following selection.
     return "COULD WAIT"
 
 def score_player(
@@ -651,13 +676,6 @@ def score_player(
     elif tier == 2:
         score += 1
 
-    action = recommendation_action(
-        player,
-        current_pick,
-        decision_pick,
-        next_pick,
-        waiting_for_turn,
-    )
     # ---------------------------------------------------------
     # 6. Positional scarcity.
     #
@@ -677,6 +695,16 @@ def score_player(
 
     if scarcity_reason:
         reasons.append(scarcity_reason)
+        
+    action = recommendation_action(
+        player,
+        current_pick,
+        decision_pick,
+        next_pick,
+        waiting_for_turn,
+        score,
+    )
+    
     return {
         "player": player,
         "score": round(score, 1),
