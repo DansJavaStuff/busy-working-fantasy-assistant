@@ -192,6 +192,11 @@ def update_draft_settings():
 def draft_order():
     state = load_state()
 
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("settings_page")
+        )
+
     order = {}
 
     for slot in range(
@@ -232,6 +237,12 @@ def start_draft_night():
 
 @app.post("/season/create")
 def create_season():
+    state = load_state()
+
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("settings_page")
+        )
     season = request.form.get(
         "season",
         type=int,
@@ -260,6 +271,13 @@ def create_season():
 
 @app.post("/season/switch")
 def change_season():
+    state = load_state()
+
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("settings_page")
+        )
+
     season = request.form.get(
         "season",
         type=int,
@@ -280,7 +298,7 @@ def simulate_to_my_pick():
 
     if state["session_type"] != "mock":
         return redirect(
-            url_for("settings_page")
+            url_for("dashboard")
         )
 
     if next_your_pick(state) is None:

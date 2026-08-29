@@ -31,7 +31,7 @@
         </h1>
 
         <div class="subtitle">
-            {{ data.league.season }} League Settings
+            {{ data.league.season }} Season Settings
         </div>
     </div>
 
@@ -77,11 +77,135 @@
     </div>
 
     {% else %}
+<section class="settings-panel">
+
+    <h2>
+        Season
+    </h2>
+
+    <div class="season-current">
+        Current Season:
+        <strong>
+            {{ data.league.season }}
+        </strong>
+    </div>
+
+    <form
+        method="post"
+        action="{{ url_for('change_season') }}"
+        class="settings-form season-form"
+    >
+        <label>
+            Existing Season
+
+            <select name="season">
+                {% for season in data.seasons %}
+                <option
+                    value="{{ season.season }}"
+                    {% if season.season == data.league.season %}
+                    selected
+                    {% endif %}
+                >
+                    {{ season.season }}
+                    · {{ season.session_count }} drafts
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <button
+            type="submit"
+            class="secondary-button"
+        >
+            Switch Season
+        </button>
+    </form>
+
+    <div class="season-divider"></div>
+
+    <form
+        method="post"
+        action="{{ url_for('create_season') }}"
+        class="settings-form season-form"
+        onsubmit="
+            return confirm(
+                'Create this season and make it active? '
+                + 'The current season will remain saved.'
+            );
+        "
+    >
+        <label>
+            New Season
+
+            <input
+                type="number"
+                name="season"
+                min="2000"
+                max="2100"
+                value="{{ data.league.season + 1 }}"
+                required
+            >
+        </label>
+
+        <label>
+            Number of Teams
+
+            <select name="teams">
+                {% for teams in [8, 10, 12, 14, 16] %}
+                <option
+                    value="{{ teams }}"
+                    {% if teams == data.league.teams %}
+                    selected
+                    {% endif %}
+                >
+                    {{ teams }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            Your Draft Slot
+
+            <select name="your_slot">
+                {% for slot in range(
+                    1,
+                    data.league.teams + 1
+                ) %}
+                <option
+                    value="{{ slot }}"
+                    {% if slot == data.draft.your_slot %}
+                    selected
+                    {% endif %}
+                >
+                    {{ slot }}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <button
+            type="submit"
+            class="primary-button"
+        >
+            Create New Season
+        </button>
+    </form>
+
+    {% if data.league.season != 2026 %}
+    <div class="season-data-warning">
+        ⚠ Player rankings and ADP are still using
+        2026 data. Other seasons are currently for
+        setup/testing only.
+    </div>
+    {% endif %}
+
+</section>
 
     <section class="settings-panel">
 
         <h2>
-            Draft Settings
+            {{ data.league.season }} Draft Settings
         </h2>
 
         <form
