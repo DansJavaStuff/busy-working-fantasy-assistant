@@ -14,7 +14,10 @@ from draft_engine import (
 from player_database import load_players
 from recommendation_engine import get_recommendations
 from simulator import choose_opponent_pick
-from league_config import BUSY_WORKING_DRAFT_ORDER
+from database import (
+    load_current_draft_order,
+    save_current_draft_order,
+)
 
 app = Flask(__name__)
 
@@ -22,6 +25,8 @@ app = Flask(__name__)
 def dashboard():
     state = load_state()
     players = load_players()
+
+    draft_order = load_current_draft_order()
 
     drafted_ids = {
         item["player"]["id"]
@@ -57,7 +62,7 @@ def dashboard():
             "current_pick": state["current_pick"],
             "current_slot": slot,
             "current_manager": (
-                BUSY_WORKING_DRAFT_ORDER.get(
+                draft_order.get(
                     slot,
                     f"Slot {slot}",
                 )
@@ -72,12 +77,13 @@ def dashboard():
                 if is_your_pick(state)
                 else next_your_pick(state)
             ),},
+        "draft_order": draft_order,
         "available": available,
         "recent_picks": [
             {
                 **pick,
                 "manager":
-                    BUSY_WORKING_DRAFT_ORDER.get(
+                    draft_order.get(
                         pick["slot"],
                         f'Slot {pick["slot"]}',
                     ),
@@ -134,6 +140,30 @@ def settings():
         pass
 
     return redirect(url_for("dashboard"))
+
+@app.post("/draft-order")
+def draft_order():
+    state = load_state()
+
+    order = {}
+
+    for slot in range(
+        1,
+        state["teams"] + 1,
+    ):
+        manager_name = request.form.get(
+            f"manager_{slot}",
+            "",
+        ).strip()
+
+        if manager_name:
+            order[slot] = manager_name
+
+    save_current_draft_order(order)
+
+    return redirect(
+        url_for("dashboard")
+    )
 
 @app.post("/reset")
 def reset():

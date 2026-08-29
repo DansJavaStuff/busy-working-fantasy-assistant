@@ -27,18 +27,3 @@ DRAFT_ROSTER_SIZE = (
     + BUSY_WORKING_ROSTER["BN"]
 )
 
-BUSY_WORKING_DRAFT_ORDER = {
-    1: "Chris",
-    2: "Andrew",
-    3: "Mark",
-    4: "Craig",
-    5: "David",
-    6: "Cole",
-    7: "Geraint",
-    8: "Daniel",
-    9: "Callum",
-    10: "Rhys",
-    11: "Tom",
-    12: "Robbie",
-}
-

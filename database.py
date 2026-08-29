@@ -13,7 +13,7 @@ CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 CURRENT_SEASON = 2026
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def connect():
@@ -60,6 +60,21 @@ def initialise_database():
                     REFERENCES leagues(id),
 
                 UNIQUE (league_id, season)
+            );
+
+            CREATE TABLE IF NOT EXISTS season_draft_order (
+                season_id INTEGER NOT NULL,
+                slot INTEGER NOT NULL,
+                manager_name TEXT NOT NULL,
+
+                PRIMARY KEY (
+                    season_id,
+                    slot
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS draft_sessions (
@@ -218,6 +233,83 @@ def get_or_create_season(db):
 
     return season["id"]
 
+def load_current_draft_order():
+    """
+    Return the draft order for the current season as:
+
+        {
+            1: "Chris",
+            2: "Andrew",
+            ...
+        }
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(db)
+
+        rows = db.execute(
+            """
+            SELECT
+                slot,
+                manager_name
+            FROM season_draft_order
+            WHERE season_id = ?
+            ORDER BY slot
+            """,
+            (season_id,),
+        ).fetchall()
+
+    return {
+        row["slot"]: row["manager_name"]
+        for row in rows
+    }
+
+
+def save_current_draft_order(order):
+    """
+    Replace the current season's draft order.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(db)
+
+        db.execute(
+            """
+            DELETE FROM season_draft_order
+            WHERE season_id = ?
+            """,
+            (season_id,),
+        )
+
+        for slot, manager_name in sorted(
+            order.items()
+        ):
+            manager_name = str(
+                manager_name
+            ).strip()
+
+            if not manager_name:
+                continue
+
+            db.execute(
+                """
+                INSERT INTO season_draft_order (
+                    season_id,
+                    slot,
+                    manager_name
+                )
+                VALUES (?, ?, ?)
+                """,
+                (
+                    season_id,
+                    int(slot),
+                    manager_name,
+                ),
+            )
 
 def active_draft_session(db):
     return db.execute(

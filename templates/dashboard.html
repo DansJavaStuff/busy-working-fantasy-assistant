@@ -397,6 +397,50 @@
     </form>
 
 </div>
+
+<div class="draft-order-settings">
+    <h3>2026 Draft Order</h3>
+
+    <form
+        method="post"
+        action="{{ url_for('draft_order') }}"
+        class="draft-order-form"
+    >
+        <div class="draft-order-grid">
+
+            {% for slot in range(1, data.league.teams + 1) %}
+
+            <label class="draft-order-row">
+                <span class="draft-order-slot">
+                    {{ slot }}
+                </span>
+
+                <input
+                    type="text"
+                    name="manager_{{ slot }}"
+                    value="{{ data.draft_order.get(slot, '') }}"
+                    autocomplete="off"
+                >
+
+                {% if slot == data.draft.your_slot %}
+                <span class="draft-order-you">
+                    You
+                </span>
+                {% endif %}
+            </label>
+
+            {% endfor %}
+
+        </div>
+
+        <button
+            type="submit"
+            class="secondary-button"
+        >
+            Save Draft Order
+        </button>
+    </form>
+</div>
 {% endif %}
 
 {% if data.draft.session_type == "mock" %}

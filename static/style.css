@@ -668,6 +668,56 @@ footer {
     border: 1px solid #c7d2fe;
 }
 
+.draft-order-settings {
+    margin-top: 24px;
+}
+
+.draft-order-settings h3 {
+    margin-bottom: 12px;
+}
+
+.draft-order-form {
+    max-width: 500px;
+}
+
+.draft-order-grid {
+    display: grid;
+    gap: 7px;
+    margin-bottom: 12px;
+}
+
+.draft-order-row {
+    display: grid;
+    grid-template-columns:
+        32px minmax(0, 1fr) 45px;
+
+    align-items: center;
+    gap: 8px;
+}
+
+.draft-order-slot {
+    font-weight: 800;
+    color: #697586;
+    text-align: center;
+}
+
+.draft-order-row input {
+    width: 100%;
+    padding: 9px 11px;
+
+    border: 1px solid #d7dce5;
+    border-radius: 8px;
+
+    background: white;
+    font-size: 14px;
+}
+
+.draft-order-you {
+    font-size: 12px;
+    font-weight: 800;
+    color: #4f46e5;
+}
+
 @media (max-width: 750px) {
 
     .mode-banner {
