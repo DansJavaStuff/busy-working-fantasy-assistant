@@ -19,3 +19,4 @@ fantasy_assistant.db
 fantasy_assistant.db-shm
 fantasy_assistant.db-wal
 draft_state.json.retired
+ffc_cache.json
