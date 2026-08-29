@@ -8,6 +8,7 @@ from database import (
     initialise_database,
 )
 
+from league_config import DRAFT_ROSTER_SIZE
 
 DEFAULT_TEAMS = 12
 DEFAULT_YOUR_SLOT = 8
@@ -289,8 +290,28 @@ def pick_to_round_and_slot(
 
     return round_number, slot
 
+def total_draft_picks(state):
+    """
+    Total number of selections in the normal draft.
+
+    IR is not an intentionally drafted roster slot, so the
+    number of draft rounds comes from DRAFT_ROSTER_SIZE.
+    """
+    return (
+        state["teams"]
+        * DRAFT_ROSTER_SIZE
+    )
+
+def draft_is_complete(state):
+    return (
+        state["current_pick"]
+        > total_draft_picks(state)
+    )
 
 def is_your_pick(state):
+    if draft_is_complete(state):
+        return False
+
     _, slot = pick_to_round_and_slot(
         state["current_pick"],
         state["teams"],
@@ -298,11 +319,11 @@ def is_your_pick(state):
 
     return slot == state["your_slot"]
 
-
 def next_your_pick(state):
     pick = state["current_pick"]
+    last_pick = total_draft_picks(state)
 
-    while True:
+    while pick <= last_pick:
         _, slot = pick_to_round_and_slot(
             pick,
             state["teams"],
@@ -313,11 +334,14 @@ def next_your_pick(state):
 
         pick += 1
 
+    return None
 
 def draft_player(
     state,
     player,
 ):
+    if draft_is_complete(state):
+        return state
     """
     Record one draft selection in SQLite and update the
     in-memory state supplied by the caller.

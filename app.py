@@ -125,6 +125,10 @@ def health():
 @app.post("/simulate-to-my-pick")
 def simulate_to_my_pick():
     state = load_state()
+
+    if next_your_pick(state) is None:
+        return redirect(url_for("dashboard"))
+
     players = load_players()
 
     while not is_your_pick(state):

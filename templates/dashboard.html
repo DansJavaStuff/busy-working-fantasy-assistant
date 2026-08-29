@@ -51,7 +51,13 @@
 
         <div class="summary-card">
             <span>Your Next Pick</span>
-            <strong>{{ data.draft.your_next_pick }}</strong>
+            <strong>
+                {% if data.draft.your_next_pick %}
+                    {{ data.draft.your_next_pick }}
+                {% else %}
+                    Complete
+                {% endif %}
+            </strong>
         </div>
     </section>
 
@@ -98,7 +104,11 @@
                 <span>
                     Following Pick
                     <strong>
-                        {{ recommendation.next_pick }}
+                       {% if recommendation.next_pick %}
+                           {{ recommendation.next_pick }}
+                       {% else %}
+                           —
+                       {% endif %}
                     </strong>
                 </span>
                 <span>
@@ -287,7 +297,7 @@
             Reset Draft
         </button>
     </form>
-    {% if not data.draft.is_your_pick %}
+    {% if not data.draft.is_your_pick and data.draft.your_next_pick %}
     <form method="post" action="{{ url_for('simulate_to_my_pick') }}">
         <button class="primary-button">
             Simulate to My Pick

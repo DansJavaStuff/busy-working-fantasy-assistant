@@ -6,7 +6,11 @@ from draft_engine import (
     pick_to_round_and_slot,
 )
 
-from league_config import BUSY_WORKING_ROSTER, FLEX_ELIGIBLE
+from league_config import (
+    BUSY_WORKING_ROSTER,
+    DRAFT_ROSTER_SIZE,
+    FLEX_ELIGIBLE,
+)
 
 def next_pick_for_slot_after(current_pick, teams, your_slot):
     """
@@ -36,6 +40,189 @@ def roster_counts(roster):
         player["position"]
         for player in roster
     )
+
+def roster_completion_state(counts):
+    """
+    Work out how many required starting positions are still
+    empty and how many normal draft roster spots remain.
+    """
+
+    rb_count = counts.get("RB", 0)
+    wr_count = counts.get("WR", 0)
+    te_count = counts.get("TE", 0)
+
+    flex_players = (
+        max(rb_count - BUSY_WORKING_ROSTER["RB"], 0)
+        + max(wr_count - BUSY_WORKING_ROSTER["WR"], 0)
+        + max(te_count - BUSY_WORKING_ROSTER["TE"], 0)
+    )
+
+    defence_count = (
+        counts.get("DEF", 0)
+        + counts.get("DST", 0)
+    )
+
+    missing = {
+        "QB": max(
+            BUSY_WORKING_ROSTER["QB"]
+            - counts.get("QB", 0),
+            0,
+        ),
+        "RB": max(
+            BUSY_WORKING_ROSTER["RB"]
+            - rb_count,
+            0,
+        ),
+        "WR": max(
+            BUSY_WORKING_ROSTER["WR"]
+            - wr_count,
+            0,
+        ),
+        "TE": max(
+            BUSY_WORKING_ROSTER["TE"]
+            - te_count,
+            0,
+        ),
+        "FLEX": (
+            0
+            if flex_players >= BUSY_WORKING_ROSTER["FLEX"]
+            else 1
+        ),
+        "K": max(
+            BUSY_WORKING_ROSTER["K"]
+            - counts.get("K", 0),
+            0,
+        ),
+        "DEF": max(
+            BUSY_WORKING_ROSTER["DEF"]
+            - defence_count,
+            0,
+        ),
+    }
+
+    rostered = sum(counts.values())
+
+    spots_left = max(
+        DRAFT_ROSTER_SIZE - rostered,
+        0,
+    )
+
+    missing_starters = sum(missing.values())
+
+    return {
+        "missing": missing,
+        "spots_left": spots_left,
+        "missing_starters": missing_starters,
+    }
+
+
+def fills_required_start(position, missing):
+    """
+    Does drafting this position fill a currently empty
+    starting slot?
+    """
+
+    if position in ("DEF", "DST"):
+        return missing["DEF"] > 0
+
+    if position in ("QB", "K"):
+        return missing[position] > 0
+
+    if position in FLEX_ELIGIBLE:
+        if missing.get(position, 0) > 0:
+            return True
+
+        if missing["FLEX"] > 0:
+            return True
+
+    return False
+
+
+def roster_completion_bonus(
+    position,
+    counts,
+    round_number,
+):
+    """
+    Protect the end of the draft from leaving required
+    starting positions empty.
+    """
+
+    state = roster_completion_state(counts)
+
+    missing = state["missing"]
+    spots_left = state["spots_left"]
+    missing_starters = state["missing_starters"]
+
+    required = fills_required_start(
+        position,
+        missing,
+    )
+
+    if spots_left <= 0:
+        return (
+            -100,
+            "Your normal draft roster is already full",
+        )
+
+    # Every remaining roster spot is needed for an
+    # unfilled starter. Do not draft another bench player.
+    if spots_left <= missing_starters:
+        if required:
+            return (
+                20,
+                "Remaining roster spots must now fill "
+                "open starting positions",
+            )
+
+        return (
+            -50,
+            "Must reserve the remaining roster spots "
+            "for unfilled starters",
+        )
+
+    # Only one discretionary roster position remains.
+    if spots_left == missing_starters + 1:
+        if required:
+            return (
+                4,
+                "Starting lineup still needs completing",
+            )
+
+        if position in ("RB", "WR"):
+            return (
+                2,
+                "Only one discretionary bench spot remains; "
+                "prefer RB/WR depth",
+            )
+
+        if position in ("QB", "TE"):
+            return (
+                -2,
+                "Only one discretionary bench spot remains; "
+                "backup QB/TE is lower priority than RB/WR depth",
+            )
+
+    # Kicker and defence should naturally become viable
+    # near the end rather than being forced too early.
+    if position == "K" and missing["K"] > 0:
+        if round_number >= 13:
+            return (
+                6,
+                "Late-round stage to fill your kicker slot",
+            )
+
+    if (
+        position in ("DEF", "DST")
+        and missing["DEF"] > 0
+    ):
+        if round_number >= 13:
+            return (
+                6,
+                "Late-round stage to fill your defence slot",
+            )
+
+    return 0, None
 
 def roster_bonus(position, counts, round_number):
     """
@@ -153,9 +340,21 @@ def roster_bonus(position, counts, round_number):
         starters = BUSY_WORKING_ROSTER["QB"]
 
         if count >= starters:
+            if round_number <= 9:
+                return (
+                    -12,
+                    "Starting QB is filled; prioritise RB/WR depth",
+                )
+
+            if round_number <= 11:
+                return (
+                    -8,
+                    "Backup QB is still a lower-priority roster need",
+                )
+
             return (
-                -12,
-                "Your starting QB position is already filled",
+                -3,
+                "A backup QB is now reasonable if the value is strong",
             )
 
         if round_number <= 2:
@@ -215,10 +414,23 @@ def roster_bonus(position, counts, round_number):
                 "Starting TE is filled; a second TE would mainly be FLEX/depth",
             )
 
+        if round_number <= 9:
+            return (
+                -8,
+                "Starting TE is filled; prioritise RB/WR depth",
+            )
+
+        if round_number <= 11:
+            return (
+                -5,
+                "Backup TE is still a lower-priority roster need",
+            )
+
         return (
-            -8,
-            "Your starting TE position is already filled",
+            -2,
+            "A backup TE is now reasonable if the value is strong",
         )
+
 
     # ---------------------------------------------------------
     # Kicker / Defence
@@ -339,9 +551,17 @@ def consensus_adp(player):
 
 def market_adp(player):
     """
-    Yahoo ADP is our best guide to when players may actually
-    disappear in the Busy Working draft.
+    Yahoo ADP is our best guide to when normal skill players
+    may actually disappear in the Busy Working draft.
+
+    Kicker and defence are handled primarily through roster
+    completion rather than Yahoo market timing, because their
+    ADP can be unusually volatile.
     """
+
+    if player["position"] in ("K", "DEF", "DST"):
+        return consensus_adp(player)
+
     adp = player.get("yahoo_adp")
 
     if adp is None:
@@ -349,6 +569,113 @@ def market_adp(player):
 
     return float(adp)
 
+def normalised_position(position):
+    if position == "DEF":
+        return "DST"
+
+    return position
+
+def special_teams_run_bonus(
+    player,
+    available,
+    state,
+    round_number,
+):
+    """
+    Notice meaningful K/DST runs without blindly following them.
+
+    We only care when:
+      - at least 3 have gone in the last 8 picks
+      - we're already in the later rounds
+      - the candidate is one of the top four at the position
+
+    Even then the bonus is deliberately small.
+    """
+
+    position = normalised_position(
+        player["position"]
+    )
+
+    if position not in ("K", "DST"):
+        return 0, None
+
+    if round_number < 11:
+        return 0, None
+
+    recent = state["drafted"][-8:]
+
+    recent_at_position = [
+        item
+        for item in recent
+        if normalised_position(
+            item["player"]["position"]
+        ) == position
+    ]
+
+    run_size = len(recent_at_position)
+
+    if run_size < 3:
+        return 0, None
+
+    elite_remaining = sorted(
+        [
+            candidate
+            for candidate in available
+            if normalised_position(
+                candidate["position"]
+            ) == position
+            and candidate.get(
+                "position_rank"
+            ) is not None
+            and candidate[
+                "position_rank"
+            ] <= 4
+        ],
+        key=lambda candidate:
+            candidate["position_rank"],
+    )
+
+    player_rank = player.get(
+        "position_rank"
+    )
+
+    # Top tier has already gone.
+    # Don't manufacture urgency for the next tier.
+    if not elite_remaining:
+        return (
+            0,
+            f"{position} run detected, but the top tier "
+            f"has already gone — don't chase it",
+        )
+
+    # Only an elite option should benefit from run awareness.
+    if (
+        player_rank is None
+        or player_rank > 4
+    ):
+        return 0, None
+
+    # Several elite options remain, so merely note the run.
+    if len(elite_remaining) > 1:
+        return (
+            0,
+            f"{position} run developing: {run_size} taken "
+            f"in the last 8 picks, but multiple top-four "
+            f"options remain",
+        )
+
+    # Last elite option.
+    if (
+        str(elite_remaining[0]["id"])
+        == str(player["id"])
+    ):
+        return (
+            2,
+            f"{position} run: {run_size} taken in the last "
+            f"8 picks and this is the last top-four option",
+        )
+
+    return 0, None
 
 def positional_scarcity_bonus(
     player,
@@ -589,6 +916,8 @@ def score_player(
     round_number,
     counts,
     available,
+    state,
+    final_roster_pick,
 ):
     """
     Produce an explainable draft score.
@@ -603,14 +932,15 @@ def score_player(
         Our selection after decision_pick.
     """
 
-    adp = player.get("adp")
-    yahoo_adp = player.get("yahoo_adp")
+    adp = consensus_adp(player)
+    yahoo_adp = market_adp(player)
 
-    if adp is None:
-        adp = player.get("adp_rank", 999)
-
-    if yahoo_adp is None:
-        yahoo_adp = adp
+    if normalised_position(
+        player["position"]
+    ) in ("K", "DST"):
+        market_label = "Consensus ADP"
+    else:
+        market_label = "Yahoo ADP"
 
     score = 100.0
     reasons = []
@@ -672,11 +1002,20 @@ def score_player(
         )
 
     # ---------------------------------------------------------
-    # 3. Yahoo availability logic.
+    # 3. Market availability logic.
     # ---------------------------------------------------------
 
-    if waiting_for_turn:
-    
+    if final_roster_pick:
+
+        # There is no following selection after this one.
+        # Market survival therefore no longer matters.
+        reasons.append(
+            "Final roster pick: choose the best remaining "
+            "required starter"
+        )
+
+    elif waiting_for_turn:
+
         # We're NOT on the clock.
         #
         # Rank players based on how desirable they would be
@@ -684,26 +1023,29 @@ def score_player(
         #
         # Survival risk is communicated separately by the
         # WATCH / WATCH CLOSELY badge.
-    
+
         if yahoo_adp < decision_pick:
-            survival_gap = decision_pick - yahoo_adp
-    
+            survival_gap = (
+                decision_pick - yahoo_adp
+            )
+
             if survival_gap >= 5:
                 reasons.append(
-                    f"Yahoo ADP {yahoo_adp:.1f}: unlikely to "
+                    f"{market_label} {yahoo_adp:.1f}: unlikely to "
                     f"reach pick {decision_pick}"
                 )
             else:
                 reasons.append(
-                    f"Yahoo ADP {yahoo_adp:.1f}: could go "
+                    f"{market_label} {yahoo_adp:.1f}: could go "
                     f"before pick {decision_pick}"
                 )
-    
+
         else:
             reasons.append(
-                f"Yahoo ADP {yahoo_adp:.1f}: realistic "
+                f"{market_label} {yahoo_adp:.1f}: realistic "
                 f"candidate for pick {decision_pick}"
             )
+
     else:
 
         # We're ON THE CLOCK.
@@ -713,12 +1055,18 @@ def score_player(
         # "If we don't take him now, is he likely to survive
         # until our following pick?"
 
-        picks_until_next = next_pick - current_pick
+        picks_until_next = (
+            next_pick - current_pick
+        )
 
         if yahoo_adp < current_pick:
 
-            # The player has already fallen beyond Yahoo ADP.
-            value_gap = current_pick - yahoo_adp
+            # The player has already fallen beyond expected
+            # market value.
+
+            value_gap = (
+                current_pick - yahoo_adp
+            )
 
             bonus = min(
                 5 + value_gap * 0.75,
@@ -728,8 +1076,8 @@ def score_player(
             score += bonus
 
             reasons.append(
-                f"Yahoo ADP {yahoo_adp:.1f}: already available "
-                f"later than expected"
+                f"{market_label} {yahoo_adp:.1f}: already "
+                f"available later than expected"
             )
 
         elif yahoo_adp == current_pick:
@@ -737,8 +1085,8 @@ def score_player(
             score += 5
 
             reasons.append(
-                f"Yahoo ADP {yahoo_adp:.1f}: right at expected "
-                f"draft value"
+                f"{market_label} {yahoo_adp:.1f}: right at "
+                f"expected draft value"
             )
 
         elif yahoo_adp < next_pick:
@@ -747,7 +1095,10 @@ def score_player(
             #
             # Give an urgency bonus, but don't massively reward
             # players simply because their ADP is slightly later.
-            picks_after_current = yahoo_adp - current_pick
+
+            picks_after_current = (
+                yahoo_adp - current_pick
+            )
 
             if picks_after_current <= 3:
                 bonus = 4
@@ -760,18 +1111,20 @@ def score_player(
 
             if picks_until_next <= 4:
                 reasons.append(
-                    f"Yahoo ADP {yahoo_adp:.1f}: may survive the "
-                    f"short turn to pick {next_pick}"
+                    f"{market_label} {yahoo_adp:.1f}: may "
+                    f"survive the short turn to pick {next_pick}"
                 )
             else:
                 reasons.append(
-                    f"Yahoo ADP {yahoo_adp:.1f}: unlikely to "
-                    f"survive until pick {next_pick}"
+                    f"{market_label} {yahoo_adp:.1f}: unlikely "
+                    f"to survive until pick {next_pick}"
                 )
 
         else:
 
-            gap = yahoo_adp - next_pick
+            gap = (
+                yahoo_adp - next_pick
+            )
 
             penalty = min(
                 gap * 0.35,
@@ -781,8 +1134,8 @@ def score_player(
             score -= penalty
 
             reasons.append(
-                f"Yahoo ADP {yahoo_adp:.1f}: reasonable chance "
-                f"he survives to pick {next_pick}"
+                f"{market_label} {yahoo_adp:.1f}: reasonable "
+                f"chance he survives to pick {next_pick}"
             )
 
     # ---------------------------------------------------------
@@ -815,7 +1168,42 @@ def score_player(
         reasons.append(bench_reason)
 
     # ---------------------------------------------------------
-    # 6. FantasyPros positional tier.
+    # 6. Late-round roster completion.
+    # ---------------------------------------------------------
+
+    completion_bonus, completion_reason = (
+        roster_completion_bonus(
+            player["position"],
+            counts,
+            round_number,
+        )
+    )
+
+    score += completion_bonus
+
+    if completion_reason:
+        reasons.append(completion_reason)
+
+    # ---------------------------------------------------------
+    # Special-teams draft-run awareness.
+    # ---------------------------------------------------------
+
+    run_bonus, run_reason = (
+        special_teams_run_bonus(
+            player,
+            available,
+            state,
+            round_number,
+        )
+    )
+
+    score += run_bonus
+
+    if run_reason:
+        reasons.append(run_reason)
+
+    # ---------------------------------------------------------
+    # 7. FantasyPros positional tier.
     # ---------------------------------------------------------
 
     tier = player.get("tier")
@@ -832,7 +1220,7 @@ def score_player(
         score += 1
 
     # ---------------------------------------------------------
-    # 7. Positional scarcity.
+    # 8. Positional scarcity.
     #
     # QB and TE are one-starter positions, so the value of
     # taking one depends heavily on the quality drop to the
@@ -851,24 +1239,103 @@ def score_player(
     if scarcity_reason:
         reasons.append(scarcity_reason)
         
-    action = recommendation_action(
-        player,
-        current_pick,
-        decision_pick,
-        next_pick,
-        waiting_for_turn,
-        score,
-    )
+    if final_roster_pick:
+        completion = roster_completion_state(
+            counts
+        )
+
+        if fills_required_start(
+            player["position"],
+            completion["missing"],
+        ):
+            action = "TAKE NOW"
+        else:
+            action = "LOW PRIORITY"
+    else:
+        action = recommendation_action(
+            player,
+            current_pick,
+            decision_pick,
+            next_pick,
+            waiting_for_turn,
+            score,
+        )
     
     return {
         "player": player,
         "score": round(score, 1),
         "value": round(value, 1),
         "decision_pick": decision_pick,
-        "next_pick": next_pick,
+        "next_pick": (
+            None
+            if final_roster_pick
+            else next_pick
+        ),
         "action": action,
         "reasons": reasons,
     }
+
+def build_candidate_pool(
+    available,
+    counts,
+    base_limit=50,
+):
+    """
+    Start with the best 50 overall players, but make sure
+    positions needed to complete the starting lineup aren't
+    accidentally excluded late in the draft.
+    """
+
+    candidates = list(
+        available[:base_limit]
+    )
+
+    existing_ids = {
+        str(player["id"])
+        for player in candidates
+    }
+
+    state = roster_completion_state(counts)
+    missing = state["missing"]
+
+    needed_positions = set()
+
+    if missing["QB"]:
+        needed_positions.add("QB")
+
+    if missing["TE"]:
+        needed_positions.add("TE")
+
+    if missing["K"]:
+        needed_positions.add("K")
+
+    if missing["DEF"]:
+        needed_positions.update(
+            {"DEF", "DST"}
+        )
+
+    added_by_position = {
+        position: 0
+        for position in needed_positions
+    }
+
+    for player in available:
+        position = player["position"]
+
+        if position not in needed_positions:
+            continue
+
+        if str(player["id"]) in existing_ids:
+            continue
+
+        if added_by_position[position] >= 10:
+            continue
+
+        candidates.append(player)
+        existing_ids.add(str(player["id"]))
+        added_by_position[position] += 1
+
+    return candidates
 
 def get_recommendations(
     available,
@@ -876,6 +1343,9 @@ def get_recommendations(
     limit=5,
 ):
     if not available:
+        return []
+
+    if len(state["your_roster"]) >= DRAFT_ROSTER_SIZE:
         return []
 
     current_pick = state["current_pick"]
@@ -904,7 +1374,16 @@ def get_recommendations(
         state["your_roster"]
     )
 
-    candidates = available[:50]
+    final_roster_pick = (
+        is_your_pick(state)
+        and len(state["your_roster"])
+            == DRAFT_ROSTER_SIZE - 1
+    )
+
+    candidates = build_candidate_pool(
+        available,
+        counts,
+    )
 
     scored = [
         score_player(
@@ -915,6 +1394,8 @@ def get_recommendations(
             round_number,
             counts,
             available,
+            state,
+            final_roster_pick,
         )
         for player in candidates
     ]
