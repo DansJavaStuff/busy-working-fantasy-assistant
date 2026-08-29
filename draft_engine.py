@@ -30,6 +30,7 @@ def _create_draft_session(
     your_slot,
     name=None,
     session_type="mock",
+    season_id=None,
 ):
     """
     Create a new active draft session.
@@ -38,7 +39,8 @@ def _create_draft_session(
     marked inactive.
     """
 
-    season_id = get_or_create_season(db)
+    if season_id is None:
+        season_id = get_or_create_season(db)
 
     db.execute(
         """
@@ -124,6 +126,15 @@ def load_state():
     with connect() as db:
         session = _ensure_active_session(db)
 
+        season = db.execute(
+            """
+            SELECT season
+            FROM seasons
+            WHERE id = ?
+            """,
+            (session["season_id"],),
+        ).fetchone()
+
         rows = db.execute(
             """
             SELECT
@@ -167,6 +178,7 @@ def load_state():
         "session_id": session["id"],
         "session_type": session["session_type"],
         "session_name": session["name"],
+        "season": season["season"],
         "teams": session["teams"],
         "your_slot": session["your_slot"],
         "current_pick":
@@ -274,6 +286,7 @@ def start_actual_draft():
                 )
             ),
             session_type="actual",
+            season_id=current["season_id"],
         )
 
     return load_state()
@@ -295,6 +308,7 @@ def reset_state():
             db,
             current["teams"],
             current["your_slot"],
+            season_id=current["season_id"],
         )
 
     return load_state()
@@ -546,6 +560,7 @@ def update_settings(
             db,
             teams,
             your_slot,
+            season_id=current["season_id"],
         )
 
     return load_state()

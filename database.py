@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from pathlib import Path
-
+from datetime import date
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -11,7 +11,6 @@ LEGACY_STATE_FILE = BASE_DIR / "draft_state.json"
 CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
-CURRENT_SEASON = 2026
 
 SCHEMA_VERSION = 2
 
@@ -166,72 +165,22 @@ def initialise_database():
         )
 
 
-def get_or_create_season(db):
+def get_or_create_season(
+    db,
+    season=None,
+):
     """
-    Make sure the Busy Working league and the 2026 season
-    exist and return the season ID.
+    Return the requested Busy Working season,
+    creating it if necessary.
+
+    If no year is supplied, use the current
+    calendar year.
     """
 
-    db.execute(
-        """
-        INSERT INTO leagues (
-            league_key,
-            name,
-            yahoo_league_id
-        )
-        VALUES (?, ?, ?)
-        ON CONFLICT(league_key)
-        DO UPDATE SET
-            name = excluded.name,
-            yahoo_league_id =
-                excluded.yahoo_league_id
-        """,
-        (
-            CURRENT_LEAGUE_KEY,
-            CURRENT_LEAGUE_NAME,
-            CURRENT_YAHOO_LEAGUE_ID,
-        ),
-    )
+    if season is None:
+        season = date.today().year
 
-    league = db.execute(
-        """
-        SELECT id
-        FROM leagues
-        WHERE league_key = ?
-        """,
-        (CURRENT_LEAGUE_KEY,),
-    ).fetchone()
-
-    db.execute(
-        """
-        INSERT INTO seasons (
-            league_id,
-            season
-        )
-        VALUES (?, ?)
-        ON CONFLICT(league_id, season)
-        DO NOTHING
-        """,
-        (
-            league["id"],
-            CURRENT_SEASON,
-        ),
-    )
-
-    season = db.execute(
-        """
-        SELECT id
-        FROM seasons
-        WHERE league_id = ?
-          AND season = ?
-        """,
-        (
-            league["id"],
-            CURRENT_SEASON,
-        ),
-    ).fetchone()
-
-    return season["id"]
+    season = int(season)
 
 def load_current_draft_order():
     """
@@ -247,7 +196,12 @@ def load_current_draft_order():
     initialise_database()
 
     with connect() as db:
-        season_id = get_or_create_season(db)
+        session = active_draft_session(db)
+
+        if session:
+            season_id = session["season_id"]
+        else:
+            season_id = get_or_create_season(db)
 
         rows = db.execute(
             """
@@ -275,7 +229,12 @@ def save_current_draft_order(order):
     initialise_database()
 
     with connect() as db:
-        season_id = get_or_create_season(db)
+        session = active_draft_session(db)
+
+        if session:
+            season_id = session["season_id"]
+        else:
+            season_id = get_or_create_season(db)
 
         db.execute(
             """

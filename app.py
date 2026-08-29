@@ -54,7 +54,7 @@ def dashboard():
     data = {
         "league": {
             "name": "Busy Working",
-            "season": 2026,
+            "season": state["season"],
             "teams": state["teams"],
         },
         "draft": {
