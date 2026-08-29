@@ -309,12 +309,17 @@ footer {
 
     .topbar {
         padding: 18px;
-
+        gap: 16px;
         align-items: flex-start;
     }
 
     .topbar h1 {
         font-size: 23px;
+    }
+
+    .topbar-actions {
+        flex-direction: column;
+        align-items: flex-end;
     }
 
     .league-badge {
@@ -342,7 +347,38 @@ footer {
         font-size: 25px;
     }
 
+    .mode-banner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .quick-record-header {
+        align-items: flex-start;
+    }
+
+    .search-result {
+        align-items: center;
+    }
+
+    .search-result .primary-button {
+        padding: 9px 11px;
+        white-space: nowrap;
+    }
+
+    .player-row {
+        gap: 6px;
+    }
+
+    .draft-button {
+        margin-left: 4px;
+    }
+
+    .controls {
+        flex-direction: column;
+    }
+
 }
+
 .on-clock {
     background: #fff3cd;
     border: 1px solid #ffe69c;
@@ -412,14 +448,6 @@ footer {
     font-size: 8px;
     font-weight: 700;
     opacity: 0.65;
-}
-
-.draft-settings {
-    margin-bottom: 20px;
-}
-
-.draft-settings h3 {
-    margin-bottom: 12px;
 }
 
 .settings-form {
@@ -668,14 +696,6 @@ footer {
     border: 1px solid #c7d2fe;
 }
 
-.draft-order-settings {
-    margin-top: 24px;
-}
-
-.draft-order-settings h3 {
-    margin-bottom: 12px;
-}
-
 .draft-order-form {
     max-width: 500px;
 }
@@ -834,56 +854,4 @@ footer {
 
     font-size: 13px;
     font-weight: 600;
-}
-
-@media (max-width: 750px) {
-
-    .topbar {
-        gap: 16px;
-    }
-
-    .topbar-actions {
-        flex-direction: column;
-        align-items: flex-end;
-    }
-}
-
-@media (max-width: 750px) {
-
-    .mode-banner {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-}
-
-@media (max-width: 750px) {
-
-    .quick-record-header {
-        align-items: flex-start;
-    }
-
-    .search-result {
-        align-items: center;
-    }
-
-    .search-result .primary-button {
-        padding: 9px 11px;
-        white-space: nowrap;
-    }
-}
-
-@media (max-width: 750px) {
-
-    .player-row {
-        gap: 6px;
-    }
-
-    .draft-button {
-        margin-left: 4px;
-    }
-
-    .controls {
-        flex-direction: column;
-    }
-
 }
