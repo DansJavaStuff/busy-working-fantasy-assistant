@@ -61,6 +61,53 @@
         </div>
     </section>
 
+<section class="quick-record">
+    <div class="quick-record-header">
+        <div>
+            <div class="quick-record-label">
+                RECORD YAHOO PICK
+            </div>
+
+            <h2>
+                Pick {{ data.draft.current_pick }}
+                · Slot {{ data.draft.current_slot }}
+            </h2>
+        </div>
+
+        {% if data.recent_picks %}
+        <form
+            method="post"
+            action="{{ url_for('undo') }}"
+        >
+            <button
+                class="secondary-button"
+                type="submit"
+            >
+                Undo Last Pick
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <input
+        type="search"
+        id="player-search"
+        class="player-search"
+        placeholder="Type player name, team or position…"
+        autocomplete="off"
+        spellcheck="false"
+    >
+
+    <div
+        id="player-search-results"
+        class="player-search-results"
+    >
+        <div class="search-hint">
+            Start typing to find an undrafted player.
+        </div>
+    </div>
+</section>
+
 {% if data.recommendations %}
 
 <section class="recommendation">
@@ -324,6 +371,203 @@
 <footer>
     Busy Working Fantasy Assistant · Development Version
 </footer>
+
+<script>
+const availablePlayers = {{ data.available | tojson }};
+
+const searchInput = document.getElementById(
+    "player-search"
+);
+
+const searchResults = document.getElementById(
+    "player-search-results"
+);
+
+function normalise(value) {
+    return String(value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+}
+
+function searchScore(player, query) {
+    const name = normalise(player.name);
+    const team = normalise(player.team);
+    const position = normalise(player.position);
+
+    const words = String(player.name || "")
+        .toLowerCase()
+        .split(/\s+/)
+        .map(normalise);
+
+    if (name === query) {
+        return 0;
+    }
+
+    if (name.startsWith(query)) {
+        return 1;
+    }
+
+    if (
+        words.some(
+            word => word.startsWith(query)
+        )
+    ) {
+        return 2;
+    }
+
+    if (name.includes(query)) {
+        return 3;
+    }
+
+    if (
+        team === query
+        || position === query
+    ) {
+        return 4;
+    }
+
+    if (
+        team.includes(query)
+        || position.includes(query)
+    ) {
+        return 5;
+    }
+
+    return null;
+}
+
+function renderResults() {
+    const query = normalise(
+        searchInput.value
+    );
+
+    searchResults.replaceChildren();
+
+    if (!query) {
+        const hint = document.createElement(
+            "div"
+        );
+
+        hint.className = "search-hint";
+        hint.textContent =
+            "Start typing to find an undrafted player.";
+
+        searchResults.appendChild(hint);
+        return;
+    }
+
+    const matches = availablePlayers
+        .map(player => ({
+            player,
+            score: searchScore(
+                player,
+                query
+            ),
+        }))
+        .filter(
+            item => item.score !== null
+        )
+        .sort((a, b) => {
+            if (a.score !== b.score) {
+                return a.score - b.score;
+            }
+
+            return (
+                Number(
+                    a.player.adp_rank || 999
+                )
+                -
+                Number(
+                    b.player.adp_rank || 999
+                )
+            );
+        })
+        .slice(0, 5);
+
+    if (!matches.length) {
+        const empty = document.createElement(
+            "div"
+        );
+
+        empty.className = "search-hint";
+        empty.textContent =
+            "No undrafted players found.";
+
+        searchResults.appendChild(empty);
+        return;
+    }
+
+    for (const match of matches) {
+        const player = match.player;
+
+        const row = document.createElement(
+            "div"
+        );
+
+        row.className = "search-result";
+
+        const details = document.createElement(
+            "div"
+        );
+
+        details.className =
+            "search-result-details";
+
+        const name = document.createElement(
+            "strong"
+        );
+
+        name.textContent = player.name;
+
+        const meta = document.createElement(
+            "span"
+        );
+
+        meta.textContent =
+            `${player.position} · `
+            + `${player.team || "-"} · `
+            + `ADP ${player.adp ?? "-"}`;
+
+        details.appendChild(name);
+        details.appendChild(meta);
+
+        const form = document.createElement(
+            "form"
+        );
+
+        form.method = "post";
+        form.action =
+            "/draft/"
+            + encodeURIComponent(
+                player.id
+            );
+
+        const button = document.createElement(
+            "button"
+        );
+
+        button.type = "submit";
+        button.className =
+            "primary-button";
+        button.textContent =
+            "Record Pick";
+
+        form.appendChild(button);
+
+        row.appendChild(details);
+        row.appendChild(form);
+
+        searchResults.appendChild(row);
+    }
+}
+
+searchInput.addEventListener(
+    "input",
+    renderResults
+);
+</script>
 
 </body>
 </html>
