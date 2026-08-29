@@ -165,6 +165,8 @@ def load_state():
 
     return {
         "session_id": session["id"],
+        "session_type": session["session_type"],
+        "session_name": session["name"],
         "teams": session["teams"],
         "your_slot": session["your_slot"],
         "current_pick":
@@ -249,6 +251,32 @@ def save_state(state):
                 ),
             )
 
+def start_actual_draft():
+    """
+    Start a new actual draft session.
+
+    The current mock remains in SQLite as historical data.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        current = _ensure_active_session(db)
+
+        _create_draft_session(
+            db,
+            current["teams"],
+            current["your_slot"],
+            name=(
+                "Actual draft "
+                + datetime.now().strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            ),
+            session_type="actual",
+        )
+
+    return load_state()
 
 def reset_state():
     """

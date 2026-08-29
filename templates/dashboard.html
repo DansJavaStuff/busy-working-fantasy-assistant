@@ -27,6 +27,32 @@
 
 <main class="container">
 
+{% if data.draft.session_type == "actual" %}
+
+<div class="mode-banner mode-live">
+    <strong>
+        🟢 DRAFT NIGHT
+    </strong>
+
+    <span>
+        Manual Yahoo sync · Actual draft
+    </span>
+</div>
+
+{% else %}
+
+<div class="mode-banner mode-mock">
+    <strong>
+        🧪 MOCK DRAFT
+    </strong>
+
+    <span>
+        Simulator enabled
+    </span>
+</div>
+
+{% endif %}
+
     {% if data.draft.is_your_pick %}
     <div class="on-clock">
         🚨 YOU'RE ON THE CLOCK — PICK {{ data.draft.current_pick }}
@@ -79,7 +105,12 @@
 
             <h2>
                 Pick {{ data.draft.current_pick }}
-                · {{ data.draft.current_manager }}
+                ·
+                {% if data.draft.current_slot == data.draft.your_slot %}
+                    Me
+                {% else %}
+                    {{ data.draft.current_manager }}
+                {% endif %}
                 · Slot {{ data.draft.current_slot }}
             </h2>
         </div>
@@ -106,6 +137,9 @@
         placeholder="Type player name, team or position…"
         autocomplete="off"
         spellcheck="false"
+        {% if data.draft.session_type == "actual" %}
+        autofocus
+        {% endif %}
     >
 
     <div
@@ -315,6 +349,7 @@
         </section>
 
     </div>
+{% if data.draft.session_type == "mock" %}
 <div class="draft-settings">
 
     <h3>Draft Settings</h3>
@@ -362,30 +397,60 @@
     </form>
 
 </div>
+{% endif %}
 
+{% if data.draft.session_type == "mock" %}
 
 <div class="controls">
 
-    <form method="post" action="{{ url_for('undo') }}">
+    <form
+        method="post"
+        action="{{ url_for('undo') }}"
+    >
         <button class="secondary-button">
             Undo Last Pick
         </button>
     </form>
 
-    <form method="post" action="{{ url_for('reset') }}">
+    <form
+        method="post"
+        action="{{ url_for('reset') }}"
+    >
         <button class="danger-button">
             Reset Draft
         </button>
     </form>
-    {% if not data.draft.is_your_pick and data.draft.your_next_pick %}
-    <form method="post" action="{{ url_for('simulate_to_my_pick') }}">
+
+    {% if not data.draft.is_your_pick
+          and data.draft.your_next_pick %}
+    <form
+        method="post"
+        action="{{ url_for('simulate_to_my_pick') }}"
+    >
         <button class="primary-button">
             Simulate to My Pick
         </button>
     </form>
     {% endif %}
+
+    <form
+        method="post"
+        action="{{ url_for('start_draft_night') }}"
+        onsubmit="
+            return confirm(
+                'Start the actual draft? '
+                + 'Your current mock will be archived.'
+            );
+        "
+    >
+        <button class="primary-button">
+            Start Draft Night
+        </button>
+    </form>
+
 </div>
 
+{% endif %}
 </main>
 
 <footer>

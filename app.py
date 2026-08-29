@@ -7,6 +7,7 @@ from draft_engine import (
     next_your_pick,
     pick_to_round_and_slot,
     reset_state,
+    start_actual_draft,
     undo_last_pick,
     update_settings,
 )
@@ -64,6 +65,8 @@ def dashboard():
             "your_slot": state["your_slot"],
             "your_next_pick": next_your_pick(state),
             "is_your_pick": is_your_pick(state),
+            "session_type": state["session_type"],
+            "session_name": state["session_name"],
             "decision_pick": (
                 state["current_pick"]
                 if is_your_pick(state)
@@ -142,9 +145,22 @@ def reset():
 def health():
     return {"status": "ok"}
 
+@app.post("/start-draft-night")
+def start_draft_night():
+    start_actual_draft()
+
+    return redirect(
+        url_for("dashboard")
+    )
+
 @app.post("/simulate-to-my-pick")
 def simulate_to_my_pick():
     state = load_state()
+
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("dashboard")
+        )
 
     if next_your_pick(state) is None:
         return redirect(url_for("dashboard"))
