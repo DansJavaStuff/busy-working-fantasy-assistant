@@ -1404,5 +1404,21 @@ def get_recommendations(
         key=lambda item: item["score"],
         reverse=True,
     )
+    
+    # TAKE NOW should be a decisive draft-night recommendation,
+    # not a badge applied to several alternatives at once.
+    #
+    # Keep the highest-scoring TAKE NOW candidate and demote
+    # any additional ones to CONSIDER.
+    take_now_seen = False
+
+    for item in scored:
+        if item["action"] != "TAKE NOW":
+            continue
+
+        if not take_now_seen:
+            take_now_seen = True
+        else:
+            item["action"] = "CONSIDER"
 
     return scored[:limit]
