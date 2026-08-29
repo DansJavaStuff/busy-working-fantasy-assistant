@@ -243,6 +243,43 @@ def get_or_create_season(
 
     return season_row["id"]
 
+def list_seasons():
+    """
+    Return Busy Working seasons newest first.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        rows = db.execute(
+            """
+            SELECT
+                s.id,
+                s.season,
+                COUNT(ds.id) AS session_count
+            FROM seasons s
+            JOIN leagues l
+              ON l.id = s.league_id
+            LEFT JOIN draft_sessions ds
+              ON ds.season_id = s.id
+            WHERE l.league_key = ?
+            GROUP BY
+                s.id,
+                s.season
+            ORDER BY s.season DESC
+            """,
+            (CURRENT_LEAGUE_KEY,),
+        ).fetchall()
+
+    return [
+        {
+            "id": row["id"],
+            "season": row["season"],
+            "session_count": row["session_count"],
+        }
+        for row in rows
+    ]
+
 def load_current_draft_order():
     """
     Return the draft order for the current season as:

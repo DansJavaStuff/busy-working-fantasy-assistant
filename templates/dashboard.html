@@ -20,8 +20,19 @@
         <div class="subtitle">{{ data.league.season }} Draft Assistant</div>
     </div>
 
-    <div class="league-badge">
-        {{ data.league.teams }} Teams
+    <div class="topbar-actions">
+
+        <div class="league-badge">
+            {{ data.league.teams }} Teams
+        </div>
+
+        <a
+            class="topbar-link"
+            href="{{ url_for('settings_page') }}"
+        >
+            ⚙ Settings
+        </a>
+
     </div>
 </header>
 
@@ -349,99 +360,6 @@
         </section>
 
     </div>
-{% if data.draft.session_type == "mock" %}
-<div class="draft-settings">
-
-    <h3>Draft Settings</h3>
-
-    <form
-        method="post"
-        action="{{ url_for('settings') }}"
-        class="settings-form"
-    >
-
-        <label>
-            Number of Teams
-
-            <select name="teams">
-                {% for teams in [8, 10, 12, 14, 16] %}
-                    <option
-                        value="{{ teams }}"
-                        {% if teams == data.league.teams %}selected{% endif %}
-                    >
-                        {{ teams }}
-                    </option>
-                {% endfor %}
-            </select>
-        </label>
-
-        <label>
-            Your Draft Slot
-
-            <select name="your_slot">
-                {% for slot in range(1, data.league.teams + 1) %}
-                    <option
-                        value="{{ slot }}"
-                        {% if slot == data.draft.your_slot %}selected{% endif %}
-                    >
-                        {{ slot }}
-                    </option>
-                {% endfor %}
-            </select>
-        </label>
-
-        <button type="submit">
-            Apply &amp; Reset Draft
-        </button>
-
-    </form>
-
-</div>
-
-<div class="draft-order-settings">
-    <h3>{{ data.league.season }} Draft Order</h3>
-
-    <form
-        method="post"
-        action="{{ url_for('draft_order') }}"
-        class="draft-order-form"
-    >
-        <div class="draft-order-grid">
-
-            {% for slot in range(1, data.league.teams + 1) %}
-
-            <label class="draft-order-row">
-                <span class="draft-order-slot">
-                    {{ slot }}
-                </span>
-
-                <input
-                    type="text"
-                    name="manager_{{ slot }}"
-                    value="{{ data.draft_order.get(slot, '') }}"
-                    autocomplete="off"
-                >
-
-                {% if slot == data.draft.your_slot %}
-                <span class="draft-order-you">
-                    You
-                </span>
-                {% endif %}
-            </label>
-
-            {% endfor %}
-
-        </div>
-
-        <button
-            type="submit"
-            class="secondary-button"
-        >
-            Save Draft Order
-        </button>
-    </form>
-</div>
-{% endif %}
 
 {% if data.draft.session_type == "mock" %}
 

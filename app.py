@@ -1,6 +1,7 @@
 from flask import Flask, redirect, render_template, request, url_for
 
 from draft_engine import (
+    create_new_season,
     draft_player,
     is_your_pick,
     load_state,
@@ -8,6 +9,7 @@ from draft_engine import (
     pick_to_round_and_slot,
     reset_state,
     start_actual_draft,
+    switch_season,
     undo_last_pick,
     update_settings,
 )
@@ -15,6 +17,7 @@ from player_database import load_players
 from recommendation_engine import get_recommendations
 from simulator import choose_opponent_pick
 from database import (
+    list_seasons,
     load_current_draft_order,
     save_current_draft_order,
 )
@@ -77,7 +80,6 @@ def dashboard():
                 if is_your_pick(state)
                 else next_your_pick(state)
             ),},
-        "draft_order": draft_order,
         "available": available,
         "recent_picks": [
             {
@@ -98,6 +100,31 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
+        data=data,
+    )
+
+@app.get("/settings")
+def settings_page():
+    state = load_state()
+
+    data = {
+        "league": {
+            "name": "Busy Working",
+            "season": state["season"],
+            "teams": state["teams"],
+        },
+        "draft": {
+            "your_slot": state["your_slot"],
+            "session_type": state["session_type"],
+        },
+        "draft_order":
+            load_current_draft_order(),
+        "seasons":
+            list_seasons(),
+    }
+
+    return render_template(
+        "settings.html",
         data=data,
     )
       
@@ -126,20 +153,40 @@ def undo():
 
     return redirect(url_for("dashboard"))
 
-@app.post("/settings")
-def settings():
-    teams = request.form.get("teams", type=int)
-    your_slot = request.form.get("your_slot", type=int)
+@app.post("/settings/draft")
+def update_draft_settings():
+    state = load_state()
+
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("settings_page")
+        )
+
+    teams = request.form.get(
+        "teams",
+        type=int,
+    )
+    your_slot = request.form.get(
+        "your_slot",
+        type=int,
+    )
 
     if teams is None or your_slot is None:
-        return redirect(url_for("dashboard"))
+        return redirect(
+            url_for("settings_page")
+        )
 
     try:
-        update_settings(teams, your_slot)
+        update_settings(
+            teams,
+            your_slot,
+        )
     except ValueError:
         pass
 
-    return redirect(url_for("dashboard"))
+    return redirect(
+        url_for("settings_page")
+    )
 
 @app.post("/draft-order")
 def draft_order():
@@ -162,7 +209,7 @@ def draft_order():
     save_current_draft_order(order)
 
     return redirect(
-        url_for("dashboard")
+        url_for("settings_page")
     )
 
 @app.post("/reset")
@@ -183,13 +230,57 @@ def start_draft_night():
         url_for("dashboard")
     )
 
+@app.post("/season/create")
+def create_season():
+    season = request.form.get(
+        "season",
+        type=int,
+    )
+    teams = request.form.get(
+        "teams",
+        type=int,
+    )
+    your_slot = request.form.get(
+        "your_slot",
+        type=int,
+    )
+
+    try:
+        create_new_season(
+            season,
+            teams,
+            your_slot,
+        )
+    except (TypeError, ValueError):
+        pass
+
+    return redirect(
+        url_for("settings_page")
+    )
+
+@app.post("/season/switch")
+def change_season():
+    season = request.form.get(
+        "season",
+        type=int,
+    )
+
+    try:
+        switch_season(season)
+    except (TypeError, ValueError):
+        pass
+
+    return redirect(
+        url_for("settings_page")
+    )
+
 @app.post("/simulate-to-my-pick")
 def simulate_to_my_pick():
     state = load_state()
 
     if state["session_type"] != "mock":
         return redirect(
-            url_for("dashboard")
+            url_for("settings_page")
         )
 
     if next_your_pick(state) is None:

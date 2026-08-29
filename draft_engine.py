@@ -6,6 +6,7 @@ from database import (
     connect,
     get_or_create_season,
     initialise_database,
+    list_seasons,
 )
 
 from league_config import DRAFT_ROSTER_SIZE
@@ -22,7 +23,6 @@ def default_state():
         "drafted": [],
         "your_roster": [],
     }
-
 
 def _create_draft_session(
     db,
@@ -83,7 +83,6 @@ def _create_draft_session(
     )
 
     return cursor.lastrowid
-
 
 def _ensure_active_session(db):
     """
@@ -524,6 +523,164 @@ def undo_last_pick(state):
 
     return load_state()
 
+def create_new_season(
+    season,
+    teams,
+    your_slot,
+):
+    """
+    Create a fresh season and make its first mock active.
+
+    The previous season and all of its sessions remain stored.
+    Draft-order names are copied forward as a starting point.
+    """
+
+    season = int(season)
+    teams = int(teams)
+    your_slot = int(your_slot)
+
+    if season < 2000 or season > 2100:
+        raise ValueError("Invalid season")
+
+    if teams < 2:
+        raise ValueError("Invalid team count")
+
+    if your_slot < 1 or your_slot > teams:
+        raise ValueError("Invalid draft slot")
+
+    initialise_database()
+
+    with connect() as db:
+        current = _ensure_active_session(db)
+
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        existing = db.execute(
+            """
+            SELECT id
+            FROM draft_sessions
+            WHERE season_id = ?
+            LIMIT 1
+            """,
+            (season_id,),
+        ).fetchone()
+
+        if existing:
+            raise ValueError(
+                "Season already exists"
+            )
+
+        old_order = db.execute(
+            """
+            SELECT
+                slot,
+                manager_name
+            FROM season_draft_order
+            WHERE season_id = ?
+            ORDER BY slot
+            """,
+            (current["season_id"],),
+        ).fetchall()
+
+        for row in old_order:
+            if row["slot"] > teams:
+                continue
+
+            db.execute(
+                """
+                INSERT INTO season_draft_order (
+                    season_id,
+                    slot,
+                    manager_name
+                )
+                VALUES (?, ?, ?)
+                """,
+                (
+                    season_id,
+                    row["slot"],
+                    row["manager_name"],
+                ),
+            )
+
+        _create_draft_session(
+            db,
+            teams,
+            your_slot,
+            name=f"{season} initial mock draft",
+            season_id=season_id,
+        )
+
+    return load_state()
+
+def switch_season(season):
+    """
+    Make the newest draft session for an existing season active.
+    """
+
+    season = int(season)
+
+    initialise_database()
+
+    with connect() as db:
+        season_row = db.execute(
+            """
+            SELECT s.id
+            FROM seasons s
+            JOIN leagues l
+              ON l.id = s.league_id
+            WHERE l.league_key = ?
+              AND s.season = ?
+            """,
+            (
+                "busy-working",
+                season,
+            ),
+        ).fetchone()
+
+        if not season_row:
+            raise ValueError(
+                "Season does not exist"
+            )
+
+        session = db.execute(
+            """
+            SELECT id
+            FROM draft_sessions
+            WHERE season_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (season_row["id"],),
+        ).fetchone()
+
+        if not session:
+            raise ValueError(
+                "Season has no draft sessions"
+            )
+
+        db.execute(
+            """
+            UPDATE draft_sessions
+            SET is_active = 0
+            WHERE is_active = 1
+            """
+        )
+
+        db.execute(
+            """
+            UPDATE draft_sessions
+            SET
+                is_active = 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (session["id"],),
+        )
+
+    return load_state()
 
 def update_settings(
     teams,
