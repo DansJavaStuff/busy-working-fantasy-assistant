@@ -164,6 +164,7 @@ def load_state():
             your_roster.append(player)
 
     return {
+        "session_id": session["id"],
         "teams": session["teams"],
         "your_slot": session["your_slot"],
         "current_pick":

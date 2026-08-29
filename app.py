@@ -12,6 +12,7 @@ from draft_engine import (
 )
 from player_database import load_players
 from recommendation_engine import get_recommendations
+from simulator import choose_opponent_pick
 
 app = Flask(__name__)
 
@@ -151,9 +152,17 @@ def simulate_to_my_pick():
 
         # v1 opponent logic:
         # take the best available player by consensus ADP.
+        opponent_pick = choose_opponent_pick(
+            available,
+            state,
+        )
+
+        if opponent_pick is None:
+            break
+
         draft_player(
             state,
-            available[0],
+            opponent_pick,
         )
 
     return redirect(url_for("dashboard"))
