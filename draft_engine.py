@@ -556,6 +556,8 @@ def update_settings(
     initialise_database()
 
     with connect() as db:
+        current = _ensure_active_session(db)
+
         _create_draft_session(
             db,
             teams,

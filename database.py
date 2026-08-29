@@ -182,6 +182,67 @@ def get_or_create_season(
 
     season = int(season)
 
+    db.execute(
+        """
+        INSERT INTO leagues (
+            league_key,
+            name,
+            yahoo_league_id
+        )
+        VALUES (?, ?, ?)
+        ON CONFLICT(league_key)
+        DO UPDATE SET
+            name = excluded.name,
+            yahoo_league_id =
+                excluded.yahoo_league_id
+        """,
+        (
+            CURRENT_LEAGUE_KEY,
+            CURRENT_LEAGUE_NAME,
+            CURRENT_YAHOO_LEAGUE_ID,
+        ),
+    )
+
+    league = db.execute(
+        """
+        SELECT id
+        FROM leagues
+        WHERE league_key = ?
+        """,
+        (CURRENT_LEAGUE_KEY,),
+    ).fetchone()
+
+    db.execute(
+        """
+        INSERT INTO seasons (
+            league_id,
+            season
+        )
+        VALUES (?, ?)
+        ON CONFLICT(league_id, season)
+        DO NOTHING
+        """,
+        (
+            league["id"],
+            season,
+        ),
+    )
+
+    season_row = db.execute(
+        """
+        SELECT id
+        FROM seasons
+        WHERE league_id = ?
+          AND season = ?
+        """,
+        (
+            league["id"],
+            season,
+        ),
+    ).fetchone()
+
+    return season_row["id"]
+
 def load_current_draft_order():
     """
     Return the draft order for the current season as:
