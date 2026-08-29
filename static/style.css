@@ -610,6 +610,33 @@ footer {
     color: #8a94a3;
 }
 
+.summary-card small {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: #697586;
+    font-weight: 600;
+}
+
+.pick-info {
+    width: 105px;
+    flex-shrink: 0;
+}
+
+.pick-number {
+    display: block;
+    width: auto;
+}
+
+.pick-manager {
+    display: block;
+    margin-top: 2px;
+
+    font-size: 11px;
+    color: #8a94a3;
+    font-weight: 600;
+}
+
 @media (max-width: 750px) {
 
     .quick-record-header {

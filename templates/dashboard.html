@@ -45,8 +45,17 @@
         </div>
 
         <div class="summary-card">
-            <span>Current Slot</span>
-            <strong>{{ data.draft.current_slot }}</strong>
+            <span>Current Drafter</span>
+            <strong>
+                {% if data.draft.current_slot == data.draft.your_slot %}
+                    Me
+                {% else %}
+                    {{ data.draft.current_manager }}
+                {% endif %}
+            </strong>
+            <small>
+                Slot {{ data.draft.current_slot }}
+            </small>
         </div>
 
         <div class="summary-card">
@@ -70,6 +79,7 @@
 
             <h2>
                 Pick {{ data.draft.current_pick }}
+                · {{ data.draft.current_manager }}
                 · Slot {{ data.draft.current_slot }}
             </h2>
         </div>
@@ -271,9 +281,19 @@
                 {% for pick in data.recent_picks %}
                 <div class="pick-row">
 
-                    <span class="pick-number">
-                        {{ pick.round }}.{{ "%02d"|format(pick.slot) }}
-                    </span>
+                    <div class="pick-info">
+                        <span class="pick-number">
+                            {{ pick.round }}.{{ "%02d"|format(pick.slot) }}
+                        </span>
+
+                        <span class="pick-manager">
+                            {% if pick.slot == data.draft.your_slot %}
+                                Me
+                            {% else %}
+                                {{ pick.manager }}
+                            {% endif %}
+                        </span>
+                    </div>
 
                     <strong>
                         {{ pick.player.name }}

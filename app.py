@@ -13,6 +13,7 @@ from draft_engine import (
 from player_database import load_players
 from recommendation_engine import get_recommendations
 from simulator import choose_opponent_pick
+from league_config import BUSY_WORKING_DRAFT_ORDER
 
 app = Flask(__name__)
 
@@ -54,6 +55,12 @@ def dashboard():
             "round": round_number,
             "current_pick": state["current_pick"],
             "current_slot": slot,
+            "current_manager": (
+                BUSY_WORKING_DRAFT_ORDER.get(
+                    slot,
+                    f"Slot {slot}",
+                )
+            ),
             "your_slot": state["your_slot"],
             "your_next_pick": next_your_pick(state),
             "is_your_pick": is_your_pick(state),
@@ -63,7 +70,19 @@ def dashboard():
                 else next_your_pick(state)
             ),},
         "available": available,
-        "recent_picks": list(reversed(state["drafted"][-8:])),
+        "recent_picks": [
+            {
+                **pick,
+                "manager":
+                    BUSY_WORKING_DRAFT_ORDER.get(
+                        pick["slot"],
+                        f'Slot {pick["slot"]}',
+                    ),
+            }
+            for pick in reversed(
+                state["drafted"][-8:]
+            )
+        ],
         "your_roster": state["your_roster"],
         "recommendations": recommendations,
     }
