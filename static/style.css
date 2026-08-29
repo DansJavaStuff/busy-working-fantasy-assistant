@@ -506,6 +506,12 @@ footer {
     color: #6b7280;
 }
 
+.recommendation-draft-form {
+    margin: 0;
+    align-self: center;
+    flex-shrink: 0;
+}
+
 @media (max-width: 750px) {
 
     .player-row {

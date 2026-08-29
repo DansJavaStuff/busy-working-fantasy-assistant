@@ -128,6 +128,19 @@
             </div>
             {% endif %}
         </div>
+
+        {% if data.draft.is_your_pick %}
+        <form
+            method="post"
+            action="{{ url_for('make_pick', player_id=recommendation.player.id) }}"
+            class="recommendation-draft-form"
+        >
+            <button class="primary-button">
+                Draft
+            </button>
+        </form>
+        {% endif %}
+
     </div>
     {% endfor %}
 </section>
