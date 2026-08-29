@@ -1,46 +1,286 @@
 import json
-from pathlib import Path
+from datetime import datetime
 
-STATE_FILE = Path("draft_state.json")
+from database import (
+    active_draft_session,
+    connect,
+    get_or_create_season,
+    initialise_database,
+)
+
+
+DEFAULT_TEAMS = 12
+DEFAULT_YOUR_SLOT = 8
+
 
 def default_state():
     return {
-        "teams": 12,
-        "your_slot": 2,
+        "teams": DEFAULT_TEAMS,
+        "your_slot": DEFAULT_YOUR_SLOT,
         "current_pick": 1,
         "drafted": [],
         "your_roster": [],
     }
 
 
-def load_state():
-    if not STATE_FILE.exists():
-        state = default_state()
-        save_state(state)
-        return state
+def _create_draft_session(
+    db,
+    teams,
+    your_slot,
+    name=None,
+    session_type="mock",
+):
+    """
+    Create a new active draft session.
 
-    return json.loads(STATE_FILE.read_text())
+    Any existing active session is retained as history but
+    marked inactive.
+    """
+
+    season_id = get_or_create_season(db)
+
+    db.execute(
+        """
+        UPDATE draft_sessions
+        SET
+            is_active = 0,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE is_active = 1
+        """
+    )
+
+    if name is None:
+        name = (
+            "Mock draft "
+            + datetime.now().strftime(
+                "%Y-%m-%d %H:%M"
+            )
+        )
+
+    cursor = db.execute(
+        """
+        INSERT INTO draft_sessions (
+            season_id,
+            name,
+            session_type,
+            teams,
+            your_slot,
+            current_pick,
+            is_active
+        )
+        VALUES (?, ?, ?, ?, ?, 1, 1)
+        """,
+        (
+            season_id,
+            name,
+            session_type,
+            teams,
+            your_slot,
+        ),
+    )
+
+    return cursor.lastrowid
+
+
+def _ensure_active_session(db):
+    """
+    Return the active session, creating a fresh mock if
+    necessary.
+    """
+
+    session = active_draft_session(db)
+
+    if session:
+        return session
+
+    session_id = _create_draft_session(
+        db,
+        DEFAULT_TEAMS,
+        DEFAULT_YOUR_SLOT,
+    )
+
+    return db.execute(
+        """
+        SELECT *
+        FROM draft_sessions
+        WHERE id = ?
+        """,
+        (session_id,),
+    ).fetchone()
+
+
+def load_state():
+    """
+    Rebuild the current draft state from SQLite.
+
+    The returned structure intentionally matches the old
+    draft_state.json format so the rest of the application
+    does not need to know storage has changed.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        session = _ensure_active_session(db)
+
+        rows = db.execute(
+            """
+            SELECT
+                overall_pick,
+                round_number,
+                slot,
+                is_yours,
+                player_json
+            FROM draft_picks
+            WHERE draft_session_id = ?
+            ORDER BY overall_pick
+            """,
+            (session["id"],),
+        ).fetchall()
+
+    drafted = []
+    your_roster = []
+
+    for row in rows:
+        player = json.loads(
+            row["player_json"]
+        )
+
+        drafted.append(
+            {
+                "overall_pick":
+                    row["overall_pick"],
+                "round":
+                    row["round_number"],
+                "slot":
+                    row["slot"],
+                "player":
+                    player,
+            }
+        )
+
+        if row["is_yours"]:
+            your_roster.append(player)
+
+    return {
+        "teams": session["teams"],
+        "your_slot": session["your_slot"],
+        "current_pick":
+            session["current_pick"],
+        "drafted": drafted,
+        "your_roster": your_roster,
+    }
 
 
 def save_state(state):
-    STATE_FILE.write_text(json.dumps(state, indent=2))
+    """
+    Compatibility helper.
+
+    Replace the active draft's stored picks with the supplied
+    state. Most normal draft actions write directly to SQLite,
+    but keeping this function makes the storage transition
+    transparent to older code.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        session = _ensure_active_session(db)
+
+        db.execute(
+            """
+            UPDATE draft_sessions
+            SET
+                teams = ?,
+                your_slot = ?,
+                current_pick = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                state["teams"],
+                state["your_slot"],
+                state["current_pick"],
+                session["id"],
+            ),
+        )
+
+        db.execute(
+            """
+            DELETE FROM draft_picks
+            WHERE draft_session_id = ?
+            """,
+            (session["id"],),
+        )
+
+        for item in state["drafted"]:
+            player = item["player"]
+
+            db.execute(
+                """
+                INSERT INTO draft_picks (
+                    draft_session_id,
+                    overall_pick,
+                    round_number,
+                    slot,
+                    player_id,
+                    player_name,
+                    position,
+                    is_yours,
+                    player_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session["id"],
+                    item["overall_pick"],
+                    item["round"],
+                    item["slot"],
+                    str(player["id"]),
+                    player["name"],
+                    player.get("position"),
+                    int(
+                        item["slot"]
+                        == state["your_slot"]
+                    ),
+                    json.dumps(player),
+                ),
+            )
 
 
 def reset_state():
-    current = load_state()
+    """
+    Start a new mock draft.
 
-    state = default_state()
-    state["teams"] = current.get("teams", state["teams"])
-    state["your_slot"] = current.get("your_slot", state["your_slot"])
+    Unlike the old JSON reset, the previous draft is retained
+    in SQLite as an inactive historical session.
+    """
 
-    save_state(state)
+    initialise_database()
 
-    return state
+    with connect() as db:
+        current = _ensure_active_session(db)
+
+        _create_draft_session(
+            db,
+            current["teams"],
+            current["your_slot"],
+        )
+
+    return load_state()
 
 
-def pick_to_round_and_slot(pick_number, teams):
-    round_number = ((pick_number - 1) // teams) + 1
-    index = (pick_number - 1) % teams
+def pick_to_round_and_slot(
+    pick_number,
+    teams,
+):
+    round_number = (
+        (pick_number - 1) // teams
+    ) + 1
+
+    index = (
+        pick_number - 1
+    ) % teams
 
     if round_number % 2 == 1:
         slot = index + 1
@@ -55,6 +295,7 @@ def is_your_pick(state):
         state["current_pick"],
         state["teams"],
     )
+
     return slot == state["your_slot"]
 
 
@@ -62,7 +303,10 @@ def next_your_pick(state):
     pick = state["current_pick"]
 
     while True:
-        _, slot = pick_to_round_and_slot(pick, state["teams"])
+        _, slot = pick_to_round_and_slot(
+            pick,
+            state["teams"],
+        )
 
         if slot == state["your_slot"]:
             return pick
@@ -70,61 +314,185 @@ def next_your_pick(state):
         pick += 1
 
 
-def draft_player(state, player):
-    round_number, slot = pick_to_round_and_slot(
-        state["current_pick"],
-        state["teams"],
+def draft_player(
+    state,
+    player,
+):
+    """
+    Record one draft selection in SQLite and update the
+    in-memory state supplied by the caller.
+    """
+
+    round_number, slot = (
+        pick_to_round_and_slot(
+            state["current_pick"],
+            state["teams"],
+        )
     )
 
+    overall_pick = state[
+        "current_pick"
+    ]
+
     drafted_entry = {
-        "overall_pick": state["current_pick"],
+        "overall_pick": overall_pick,
         "round": round_number,
         "slot": slot,
         "player": player,
     }
 
-    state["drafted"].append(drafted_entry)
+    initialise_database()
+
+    with connect() as db:
+        session = _ensure_active_session(db)
+
+        db.execute(
+            """
+            INSERT INTO draft_picks (
+                draft_session_id,
+                overall_pick,
+                round_number,
+                slot,
+                player_id,
+                player_name,
+                position,
+                is_yours,
+                player_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session["id"],
+                overall_pick,
+                round_number,
+                slot,
+                str(player["id"]),
+                player["name"],
+                player.get("position"),
+                int(
+                    slot
+                    == state["your_slot"]
+                ),
+                json.dumps(player),
+            ),
+        )
+
+        db.execute(
+            """
+            UPDATE draft_sessions
+            SET
+                current_pick = ?,
+                updated_at =
+                    CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                overall_pick + 1,
+                session["id"],
+            ),
+        )
+
+    state["drafted"].append(
+        drafted_entry
+    )
 
     if slot == state["your_slot"]:
-        state["your_roster"].append(player)
+        state["your_roster"].append(
+            player
+        )
 
     state["current_pick"] += 1
-    save_state(state)
 
     return state
 
 
 def undo_last_pick(state):
-    if not state["drafted"]:
-        return state
+    """
+    Remove the most recent pick from the active draft.
+    """
 
-    last = state["drafted"].pop()
+    initialise_database()
 
-    if last["slot"] == state["your_slot"]:
-        if state["your_roster"]:
-            state["your_roster"].pop()
+    with connect() as db:
+        session = _ensure_active_session(db)
 
-    state["current_pick"] -= 1
-    save_state(state)
+        last = db.execute(
+            """
+            SELECT
+                id,
+                overall_pick
+            FROM draft_picks
+            WHERE draft_session_id = ?
+            ORDER BY overall_pick DESC
+            LIMIT 1
+            """,
+            (session["id"],),
+        ).fetchone()
 
-    return state
+        if not last:
+            return load_state()
 
-def update_settings(teams, your_slot):
+        db.execute(
+            """
+            DELETE FROM draft_picks
+            WHERE id = ?
+            """,
+            (last["id"],),
+        )
+
+        db.execute(
+            """
+            UPDATE draft_sessions
+            SET
+                current_pick = ?,
+                updated_at =
+                    CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                last["overall_pick"],
+                session["id"],
+            ),
+        )
+
+    return load_state()
+
+
+def update_settings(
+    teams,
+    your_slot,
+):
+    """
+    Start a fresh draft session using the requested league
+    size and draft slot.
+
+    The previous session remains stored as history.
+    """
+
     teams = int(teams)
     your_slot = int(your_slot)
 
     if teams < 2:
-        raise ValueError("Number of teams must be at least 2")
-
-    if your_slot < 1 or your_slot > teams:
         raise ValueError(
-            "Draft slot must be between 1 and the number of teams"
+            "Number of teams must be at least 2"
         )
 
-    state = default_state()
-    state["teams"] = teams
-    state["your_slot"] = your_slot
+    if (
+        your_slot < 1
+        or your_slot > teams
+    ):
+        raise ValueError(
+            "Draft slot must be between 1 "
+            "and the number of teams"
+        )
 
-    save_state(state)
+    initialise_database()
 
-    return state
+    with connect() as db:
+        _create_draft_session(
+            db,
+            teams,
+            your_slot,
+        )
+
+    return load_state()

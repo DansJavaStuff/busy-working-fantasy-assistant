@@ -13,3 +13,9 @@ fantasypros_cache.json
 *.v2
 FantasyPros_2026_Overall_ADP_Rankings.csv
 player_database.json
+
+# Local SQLite database
+fantasy_assistant.db
+fantasy_assistant.db-shm
+fantasy_assistant.db-wal
+draft_state.json.retired
