@@ -17,6 +17,7 @@ from player_database import load_players
 from recommendation_engine import get_recommendations
 from simulator import choose_opponent_pick
 from database import (
+    CURRENT_LEAGUE_NAME,
     list_seasons,
     load_current_draft_order,
     save_current_draft_order,
@@ -56,7 +57,7 @@ def dashboard():
     )
     data = {
         "league": {
-            "name": "Busy Working",
+            "name": CURRENT_LEAGUE_NAME,
             "season": state["season"],
             "teams": state["teams"],
         },
@@ -109,7 +110,7 @@ def settings_page():
 
     data = {
         "league": {
-            "name": "Busy Working",
+            "name": CURRENT_LEAGUE_NAME,
             "season": state["season"],
             "teams": state["teams"],
         },

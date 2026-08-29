@@ -6,7 +6,6 @@ from database import (
     connect,
     get_or_create_season,
     initialise_database,
-    list_seasons,
 )
 
 from league_config import DRAFT_ROSTER_SIZE
@@ -549,7 +548,7 @@ def switch_season(season):
               AND s.season = ?
             """,
             (
-                "busy-working",
+                CURRENT_LEAGUE_KEY,
                 season,
             ),
         ).fetchone()
