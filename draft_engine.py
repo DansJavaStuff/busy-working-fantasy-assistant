@@ -14,16 +14,6 @@ from league_config import DRAFT_ROSTER_SIZE
 DEFAULT_TEAMS = 12
 DEFAULT_YOUR_SLOT = 8
 
-
-def default_state():
-    return {
-        "teams": DEFAULT_TEAMS,
-        "your_slot": DEFAULT_YOUR_SLOT,
-        "current_pick": 1,
-        "drafted": [],
-        "your_roster": [],
-    }
-
 def _create_draft_session(
     db,
     teams,
@@ -185,82 +175,6 @@ def load_state():
         "drafted": drafted,
         "your_roster": your_roster,
     }
-
-
-def save_state(state):
-    """
-    Compatibility helper.
-
-    Replace the active draft's stored picks with the supplied
-    state. Most normal draft actions write directly to SQLite,
-    but keeping this function makes the storage transition
-    transparent to older code.
-    """
-
-    initialise_database()
-
-    with connect() as db:
-        session = _ensure_active_session(db)
-
-        db.execute(
-            """
-            UPDATE draft_sessions
-            SET
-                teams = ?,
-                your_slot = ?,
-                current_pick = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (
-                state["teams"],
-                state["your_slot"],
-                state["current_pick"],
-                session["id"],
-            ),
-        )
-
-        db.execute(
-            """
-            DELETE FROM draft_picks
-            WHERE draft_session_id = ?
-            """,
-            (session["id"],),
-        )
-
-        for item in state["drafted"]:
-            player = item["player"]
-
-            db.execute(
-                """
-                INSERT INTO draft_picks (
-                    draft_session_id,
-                    overall_pick,
-                    round_number,
-                    slot,
-                    player_id,
-                    player_name,
-                    position,
-                    is_yours,
-                    player_json
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    session["id"],
-                    item["overall_pick"],
-                    item["round"],
-                    item["slot"],
-                    str(player["id"]),
-                    player["name"],
-                    player.get("position"),
-                    int(
-                        item["slot"]
-                        == state["your_slot"]
-                    ),
-                    json.dumps(player),
-                ),
-            )
 
 def start_actual_draft():
     """
