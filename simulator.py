@@ -7,14 +7,8 @@ from draft_engine import pick_to_round_and_slot
 from league_config import (
     BUSY_WORKING_ROSTER,
     DRAFT_ROSTER_SIZE,
+    normalised_position,
 )
-
-
-def normalised_position(position):
-    if position == "DEF":
-        return "DST"
-
-    return position
 
 
 def roster_for_slot(state, slot):

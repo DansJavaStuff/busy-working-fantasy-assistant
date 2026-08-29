@@ -10,6 +10,7 @@ from league_config import (
     BUSY_WORKING_ROSTER,
     DRAFT_ROSTER_SIZE,
     FLEX_ELIGIBLE,
+    normalised_position,
 )
 
 def next_pick_for_slot_after(current_pick, teams, your_slot):
@@ -568,12 +569,6 @@ def market_adp(player):
         adp = consensus_adp(player)
 
     return float(adp)
-
-def normalised_position(position):
-    if position == "DEF":
-        return "DST"
-
-    return position
 
 def special_teams_run_bonus(
     player,

@@ -27,3 +27,9 @@ DRAFT_ROSTER_SIZE = (
     + BUSY_WORKING_ROSTER["BN"]
 )
 
+def normalised_position(position):
+    if position == "DEF":
+        return "DST"
+
+    return position
+
