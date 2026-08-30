@@ -1,10 +1,11 @@
 import sqlite3
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 
 BASE_DIR = Path(__file__).resolve().parent
 
 DB_FILE = BASE_DIR / "fantasy_assistant.db"
+BACKUP_DIR = BASE_DIR / "backups"
 
 CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
@@ -27,6 +28,36 @@ def connect():
 
     return connection
 
+def backup_database():
+    """
+    Create a consistent timestamped SQLite backup.
+
+    SQLite's backup API is used rather than copying the
+    database file directly so this remains safe even if
+    the database is open.
+    """
+
+    initialise_database()
+
+    BACKUP_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    timestamp = datetime.now().strftime(
+        "%Y%m%d_%H%M%S_%f"
+    )
+
+    backup_file = (
+        BACKUP_DIR
+        / f"fantasy_assistant_{timestamp}.db"
+    )
+
+    with connect() as source:
+        with sqlite3.connect(backup_file) as destination:
+            source.backup(destination)
+
+    return backup_file
 
 def initialise_database():
     """

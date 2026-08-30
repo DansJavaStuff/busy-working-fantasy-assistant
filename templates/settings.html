@@ -204,16 +204,38 @@
 
     {% if data.draft.session_type != "mock" %}
 
-    <div class="settings-locked">
-        <strong>
-            🔒 Settings locked during Draft Night
-        </strong>
+<div class="settings-locked">
+    <strong>
+        🔒 Settings locked during Draft Night
+    </strong>
 
-        <span>
-            Return to the draft before making
-            configuration changes.
-        </span>
-    </div>
+    <span>
+        Configuration changes are disabled while
+        the actual draft is active.
+    </span>
+
+    <form
+        method="post"
+        action="{{ url_for('abandon_draft_night') }}"
+        onsubmit="
+            return confirm(
+                'Abandon the current Draft Night session? '
+                + 'All picks already recorded will remain '
+                + 'saved in the draft history. '
+                + 'A new mock draft will be started, and '
+                + 'the next Start Draft Night will begin '
+                + 'fresh from pick 1.'
+            );
+        "
+    >
+        <button
+            type="submit"
+            class="danger-button"
+        >
+            Abandon Draft Night &amp; Return to Mock
+        </button>
+    </form>
+</div>
 
     {% else %}
 <section class="settings-panel">

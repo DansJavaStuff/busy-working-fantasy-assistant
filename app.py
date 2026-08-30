@@ -241,6 +241,21 @@ def start_draft_night():
         url_for("dashboard")
     )
 
+@app.post("/abandon-draft-night")
+def abandon_draft_night():
+    state = load_state()
+
+    if state["session_type"] != "actual":
+        return redirect(
+            url_for("dashboard")
+        )
+
+    reset_state()
+
+    return redirect(
+        url_for("dashboard")
+    )
+
 @app.post("/season/create")
 def create_season():
     state = load_state()

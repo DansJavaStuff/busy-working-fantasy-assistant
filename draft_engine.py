@@ -3,6 +3,7 @@ from datetime import datetime
 
 from database import (
     active_draft_session,
+    backup_database,
     connect,
     get_or_create_season,
     initialise_database,
@@ -183,6 +184,13 @@ def start_actual_draft():
     """
 
     initialise_database()
+
+    backup_file = backup_database()
+
+    print(
+        "Draft Night backup created:",
+        backup_file,
+    )
 
     with connect() as db:
         current = _ensure_active_session(db)
