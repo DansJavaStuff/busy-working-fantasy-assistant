@@ -1,6 +1,7 @@
 import json
 import re
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 from adp import load_adp
@@ -11,9 +12,8 @@ from ffc import (
     load_players as load_ffc_players,
 )
 
-
 DATABASE_FILE = Path("player_database.json")
-
+PLAYER_DATA_SEASON = 2026
 
 def normalise_name(name):
     """
@@ -532,6 +532,12 @@ def build_database():
     )
 
     database = {
+        "season":
+            PLAYER_DATA_SEASON,
+
+        "built_at":
+            datetime.now().isoformat(),
+
         "count":
             len(players),
 

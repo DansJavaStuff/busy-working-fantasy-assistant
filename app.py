@@ -1,5 +1,4 @@
 from flask import Flask, redirect, render_template, request, url_for
-
 from draft_engine import (
     create_new_season,
     draft_player,
@@ -22,6 +21,8 @@ from database import (
     load_current_draft_order,
     save_current_draft_order,
 )
+from data_status import get_data_status
+from refresh_data import refresh_all
 
 app = Flask(__name__)
 
@@ -122,7 +123,11 @@ def settings_page():
             load_current_draft_order(),
         "seasons":
             list_seasons(),
-    }
+        "player_data":
+            get_data_status(),
+        "refresh_complete":
+            request.args.get("refreshed") == "1",
+            }
 
     return render_template(
         "settings.html",
@@ -341,6 +346,24 @@ def simulate_to_my_pick():
         )
 
     return redirect(url_for("dashboard"))
+
+@app.post("/data/refresh")
+def refresh_player_data():
+    state = load_state()
+
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("settings_page")
+        )
+
+    refresh_all()
+
+    return redirect(
+        url_for(
+            "settings_page",
+            refreshed="1",
+        )
+    )
 
 if __name__ == "__main__":
     app.run(

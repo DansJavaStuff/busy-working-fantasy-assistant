@@ -63,6 +63,145 @@
         </div>
     </div>
 
+    <section class="settings-panel">
+
+        <h2>
+            Player Data
+        </h2>
+        {% if data.refresh_complete %}
+        <div class="data-refresh-success">
+            ✓ Online data refresh finished and the
+            player database was rebuilt.
+        </div>
+        {% endif %}
+
+        <div class="data-status-summary">
+            <strong>
+                {% if data.player_data.ready %}
+                    ✅ READY
+                {% else %}
+                    ⚠ NEEDS REFRESH
+                {% endif %}
+            </strong>
+
+            <span>
+                {{ data.player_data.database.players }}
+                players ·
+                2026 rankings
+            </span>
+        </div>
+
+        <div class="data-status-grid">
+
+            {% for source in data.player_data.sources %}
+            <div class="data-status-row">
+
+                <div>
+                    <strong>
+                        {{ source.label }}
+                    </strong>
+
+                    <small>
+                        {{ source.detail }}
+                    </small>
+                </div>
+
+                <div>
+                    <span class="
+                        data-status-badge
+                        data-status-{{ source.status }}
+                    ">
+                        {{ source.status|upper }}
+                    </span>
+
+                    <small>
+                        {{ source.updated }}
+                    </small>
+                </div>
+
+            </div>
+            {% endfor %}
+
+            <div class="data-status-row">
+
+                <div>
+                    <strong>
+                        Merged Player Database
+                    </strong>
+
+                    <small>
+                        {{ data.player_data.database.players }}
+                        players
+                    </small>
+                </div>
+
+                <div>
+                    <span class="
+                        data-status-badge
+                        data-status-{{ data.player_data.database.status }}
+                    ">
+                        {{ data.player_data.database.status|upper }}
+                    </span>
+
+                    <small>
+                        {{ data.player_data.database.built_at }}
+                    </small>
+                </div>
+
+            </div>
+
+        </div>
+
+    {% if data.draft.session_type == "mock" %}
+
+<form
+    method="post"
+    action="{{ url_for('refresh_player_data') }}"
+    class="data-refresh-form"
+    onsubmit="
+        if (!confirm(
+            'Refresh FantasyPros and FFC data, '
+            + 'then rebuild the player database?'
+        )) {
+            return false;
+        }
+
+        const button = this.querySelector('button');
+        const message = this.querySelector(
+            '.data-refresh-progress'
+        );
+
+        button.disabled = true;
+        button.textContent = 'Refreshing…';
+        message.hidden = false;
+
+        return true;
+    "
+>
+    <button
+        type="submit"
+        class="primary-button"
+    >
+        Refresh Online Data
+    </button>
+
+    <span
+        class="data-refresh-progress"
+        hidden
+    >
+        Updating FantasyPros and FFC…
+    </span>
+</form>
+
+    {% endif %}
+
+    <div class="season-data-warning">
+        FantasyPros Overall ADP is currently loaded
+        from a CSV file and must be updated manually.
+    </div>
+
+</section>
+
     {% if data.draft.session_type != "mock" %}
 
     <div class="settings-locked">
