@@ -5,6 +5,9 @@ from adp import ADP_FILE
 from fantasypros import (
     CACHE_FILE as FANTASYPROS_CACHE_FILE,
 )
+from fantasypros_rankings import (
+    POSITION_FILES as FANTASYPROS_RANKING_FILES,
+)
 from ffc import (
     CACHE_FILE as FFC_CACHE_FILE,
 )
@@ -15,6 +18,7 @@ from player_database import (
 
 
 FANTASYPROS_MAX_AGE = timedelta(days=7)
+FANTASYPROS_RANKINGS_MAX_AGE = timedelta(days=7)
 ADP_MAX_AGE = timedelta(days=7)
 FFC_MAX_AGE = timedelta(hours=6)
 
@@ -100,6 +104,46 @@ def get_data_status():
         ADP_FILE
     )
 
+    ranking_files = list(
+        FANTASYPROS_RANKING_FILES.values()
+    )
+
+    ranking_times = [
+        _modified(path)
+        for path in ranking_files
+    ]
+
+    ranking_missing = [
+        path
+        for path, updated in zip(
+            ranking_files,
+            ranking_times,
+        )
+        if updated is None
+    ]
+
+    if ranking_missing:
+        rankings_updated = None
+        rankings_status = "missing"
+    else:
+        # Show/check the oldest file because all six
+        # positional ranking files need to be current.
+        rankings_updated = min(
+            ranking_times
+        )
+
+        rankings_status = (
+            "fresh"
+            if all(
+                _freshness(
+                    updated,
+                    FANTASYPROS_RANKINGS_MAX_AGE,
+                ) == "fresh"
+                for updated in ranking_times
+            )
+            else "stale"
+        )
+
     ffc_updated = _modified(
         FFC_CACHE_FILE
     )
@@ -136,6 +180,7 @@ def get_data_status():
             fp_updated,
             adp_updated,
             ffc_updated,
+            *ranking_times,
         )
         if value is not None
     ]
@@ -181,6 +226,20 @@ def get_data_status():
                 adp_updated
             ),
             "detail": ADP_FILE.name,
+        },
+        {
+            "key": "fantasypros_rankings",
+            "label": "FantasyPros Positional Rankings",
+            "status": rankings_status,
+            "updated": _display_time(
+                rankings_updated
+            ),
+            "detail": (
+                f"{len(ranking_files) - len(ranking_missing)}"
+                f"/{len(ranking_files)} files · "
+                f"{player_database.get('fantasypros_rankings_total', 0)} "
+                "rankings"
+            ),
         },
         {
             "key": "ffc",

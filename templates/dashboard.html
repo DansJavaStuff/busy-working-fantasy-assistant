@@ -64,6 +64,14 @@
 
 {% endif %}
 
+    {% if data.draft.complete %}
+
+    <div class="on-clock">
+    ✅ DRAFT COMPLETE — {{ data.draft.total_picks }} PICKS RECORDED
+    </div>
+
+    {% endif %}
+
     {% if data.draft.is_your_pick %}
     <div class="on-clock">
         🚨 YOU'RE ON THE CLOCK — PICK {{ data.draft.current_pick }}
@@ -78,21 +86,33 @@
 
         <div class="summary-card">
             <span>Overall Pick</span>
-            <strong>{{ data.draft.current_pick }}</strong>
+            <strong>
+                {% if data.draft.complete %}
+                    Complete
+                {% else %}
+                    {{ data.draft.current_pick }}
+                {% endif %}
+            </strong>
         </div>
 
         <div class="summary-card">
             <span>Current Drafter</span>
-            <strong>
-                {% if data.draft.current_slot == data.draft.your_slot %}
-                    Me
-                {% else %}
-                    {{ data.draft.current_manager }}
-                {% endif %}
-            </strong>
-            <small>
-                Slot {{ data.draft.current_slot }}
-            </small>
+
+            {% if data.draft.complete %}
+                <strong>—</strong>
+                <small>Draft finished</small>
+            {% else %}
+                <strong>
+                    {% if data.draft.current_slot == data.draft.your_slot %}
+                        Me
+                    {% else %}
+                        {{ data.draft.current_manager }}
+                    {% endif %}
+                </strong>
+                <small>
+                    Slot {{ data.draft.current_slot }}
+                </small>
+            {% endif %}
         </div>
 
         <div class="summary-card">
@@ -107,6 +127,7 @@
         </div>
     </section>
 
+{% if not data.draft.complete %}
 <section class="quick-record">
     <div class="quick-record-header">
         <div>
@@ -162,6 +183,7 @@
         </div>
     </div>
 </section>
+{% endif %}
 
 {% if data.recommendations %}
 
@@ -301,6 +323,7 @@
         <small>ADP</small>
         {{ player.adp }}
     </div>
+                {% if not data.draft.complete %}
                 <form
                     method="post"
                     action="{{ url_for('make_pick', player_id=player.id) }}"
@@ -309,6 +332,7 @@
                         Draft
                     </button>
                 </form>
+                {% endif %}
 
             </div>
             {% endfor %}

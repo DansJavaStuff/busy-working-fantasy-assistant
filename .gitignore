@@ -12,6 +12,7 @@ fantasypros_cache.json
 *.v1
 *.v2
 FantasyPros_2026_Overall_ADP_Rankings.csv
+FantasyPros_2026_Draft_*_Rankings.csv
 player_database.json
 
 # Local SQLite database

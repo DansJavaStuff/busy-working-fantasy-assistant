@@ -8,6 +8,9 @@ from adp import load_adp
 from fantasypros import (
     load_players as load_fantasypros_players,
 )
+from fantasypros_rankings import (
+    load_rankings as load_fantasypros_rankings,
+)
 from ffc import (
     load_players as load_ffc_players,
 )
@@ -75,6 +78,27 @@ def normalise_name_without_suffix(name):
 
     return normalise_name(name)
 
+def fantasypros_team_key(team):
+    """
+    Normalise team codes when matching the downloaded
+    FantasyPros positional ranking files.
+
+    FantasyPros uses JAC for Jacksonville while FFC uses JAX.
+    Free agents may appear as blank, None or FA.
+    """
+
+    if not team:
+        return None
+
+    team = str(team).strip().upper()
+
+    if not team or team == "FA":
+        return None
+
+    if team == "JAX":
+        return "JAC"
+
+    return team
 
 # FantasyPros represents team defences using the franchise
 # name, while FFC uses names such as "Denver Defense" and
@@ -137,7 +161,9 @@ def ffc_identity(player):
         str(player.get("ffc_id")),
         player.get("name"),
         player.get("position"),
-        player.get("team"),
+        fantasypros_team_key(
+            player.get("team")
+        ),
     )
 
 
@@ -304,6 +330,10 @@ def build_database():
         load_fantasypros_players()
     )
 
+    fp_rankings = (
+        load_fantasypros_rankings()
+    )
+
     ffc_players = (
         load_ffc_players()
     )
@@ -313,6 +343,42 @@ def build_database():
             player["name"]
         ): player
         for player in fp_players
+    }
+
+    fp_rankings_by_name = {
+        (
+            normalise_name(
+                player["name"]
+            ),
+            player["position"],
+            fantasypros_team_key(
+                player.get("team")
+            ),
+        ): player
+        for player in fp_rankings
+        if player["position"] != "DST"
+    }
+
+    fp_rankings_by_suffix = {
+        (
+            normalise_name_without_suffix(
+                player["name"]
+            ),
+            player["position"],
+            fantasypros_team_key(
+                player.get("team")
+            ),
+        ): player
+        for player in fp_rankings
+        if player["position"] != "DST"
+    }
+
+    fp_rankings_dst_by_team = {
+        fantasypros_team_key(
+            player.get("team")
+        ): player
+        for player in fp_rankings
+        if player["position"] == "DST"
     }
 
     ffc_by_name = {
@@ -328,7 +394,9 @@ def build_database():
                 player["name"]
             ),
             player["position"],
-            player.get("team"),
+            fantasypros_team_key(
+                player.get("team")
+            ),
         ): player
         for player in ffc_players
         if player["position"] != "DST"
@@ -520,6 +588,133 @@ def build_database():
             )
         )
 
+    # ---------------------------------------------------------
+    # Full FantasyPros positional-ranking enrichment.
+    #
+    # The free FantasyPros API only returns the top 10 players
+    # per position. The manually downloaded positional ranking
+    # files provide the complete FantasyPros positional ECR
+    # and tier information.
+    #
+    # These rankings enrich the existing player pool only.
+    # They do not introduce hundreds of additional fringe
+    # players into the draft database.
+    # ---------------------------------------------------------
+
+    matched_fp_rankings = set()
+
+    for player in players:
+
+        position = player.get("position")
+
+        lookup_position = (
+            "DST"
+            if position in ("DEF", "DST")
+            else position
+        )
+
+        ranking = None
+
+        if lookup_position == "DST":
+
+            team_code = (
+                dst_team_code(
+                    player.get("name")
+                )
+                or player.get("team")
+            )
+
+            ranking = (
+                fp_rankings_dst_by_team.get(
+                    fantasypros_team_key(
+                        team_code
+                    )
+                )
+            )
+
+        else:
+
+            ranking = fp_rankings_by_name.get(
+                (
+                    normalise_name(
+                        player.get("name")
+                    ),
+                    lookup_position,
+                    fantasypros_team_key(
+                        player.get("team")
+                    ),
+                )
+            )
+
+            if not ranking:
+                ranking = (
+                    fp_rankings_by_suffix.get(
+                        (
+                            normalise_name_without_suffix(
+                                player.get("name")
+                            ),
+                            lookup_position,
+                            fantasypros_team_key(
+                                player.get("team")
+                            ),
+                        )
+                    )
+                )
+
+        if ranking:
+
+            player["fantasypros_ecr"] = (
+                ranking.get(
+                    "position_rank"
+                )
+            )
+
+            player[
+                "fantasypros_position_rank"
+            ] = ranking.get(
+                "position_rank"
+            )
+
+            player["tier"] = ranking.get(
+                "tier"
+            )
+
+            player[
+                "fantasypros_ecr_vs_adp"
+            ] = ranking.get(
+                "ecr_vs_adp"
+            )
+
+            player[
+                "fantasypros_ranking_source"
+            ] = "csv"
+
+            matched_fp_rankings.add(
+                (
+                    ranking["position"],
+                    ranking.get("team"),
+                    normalise_name(
+                        ranking["name"]
+                    ),
+                )
+            )
+
+        else:
+            player[
+                "fantasypros_ranking_source"
+            ] = (
+                "api"
+                if (
+                    player.get(
+                        "fantasypros_ecr"
+                    ) is not None
+                    or player.get(
+                        "tier"
+                    ) is not None
+                )
+                else None
+            )
+
     # Keep one stable overall ordering.
     players.sort(
         key=lambda player:
@@ -546,6 +741,12 @@ def build_database():
 
         "fantasypros_unmatched":
             len(unmatched_fp),
+
+        "fantasypros_ranking_matches":
+            len(matched_fp_rankings),
+
+        "fantasypros_rankings_total":
+            len(fp_rankings),
 
         "ffc_merged":
             len(matched_ffc),
@@ -581,6 +782,12 @@ def build_database():
     print(
         f"FantasyPros unmatched: "
         f"{len(unmatched_fp)}"
+    )
+
+    print(
+        f"FantasyPros positional ranking matches: "
+        f"{len(matched_fp_rankings)}"
+        f"/{len(fp_rankings)}"
     )
 
     print()

@@ -1,6 +1,7 @@
 from flask import Flask, redirect, render_template, request, url_for
 from draft_engine import (
     create_new_season,
+    draft_is_complete,
     draft_player,
     is_your_pick,
     load_state,
@@ -9,6 +10,7 @@ from draft_engine import (
     reset_state,
     start_actual_draft,
     switch_season,
+    total_draft_picks,
     undo_last_pick,
     update_settings,
 )
@@ -47,15 +49,30 @@ def dashboard():
         key=lambda player: player["adp_rank"],
     )
 
-    round_number, slot = pick_to_round_and_slot(
-        state["current_pick"],
-        state["teams"],
-    )
+    complete = draft_is_complete(state)
 
-    recommendations = get_recommendations(
-        available,
-        state,
-    )
+    if complete:
+        final_pick = total_draft_picks(state)
+
+        round_number, _ = pick_to_round_and_slot(
+            final_pick,
+            state["teams"],
+        )
+
+        slot = None
+        recommendations = []
+
+    else:
+        round_number, slot = pick_to_round_and_slot(
+            state["current_pick"],
+            state["teams"],
+        )
+
+        recommendations = get_recommendations(
+            available,
+            state,
+        )
+
     data = {
         "league": {
             "name": CURRENT_LEAGUE_NAME,
@@ -65,6 +82,8 @@ def dashboard():
         "draft": {
             "round": round_number,
             "current_pick": state["current_pick"],
+            "complete": complete,
+            "total_picks": total_draft_picks(state),
             "current_slot": slot,
             "current_manager": (
                 draft_order.get(
