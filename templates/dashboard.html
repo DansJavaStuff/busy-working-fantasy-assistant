@@ -277,27 +277,27 @@
                 <h2>Your Roster</h2>
             </div>
 
-            {% if data.your_roster %}
+            {% for roster_slot in data.roster_slots %}
 
-                {% for player in data.your_roster %}
-                <div class="roster-row">
-                    <div class="position">
-                        {{ player.position }}
-                    </div>
-
-                    <div class="player-name">
-                        {{ player.name }}
-                    </div>
+            <div class="roster-row">
+                <div class="position">
+                    {{ roster_slot.slot }}
                 </div>
-                {% endfor %}
 
-            {% else %}
-                <div class="empty-panel">
-                    No players drafted yet.
+                <div class="player-name">
+                    {% if roster_slot.player %}
+                        {{ roster_slot.player.name }}
+                    {% else %}
+                        <span class="empty-roster-slot">
+                            — Empty —
+                        </span>
+                    {% endif %}
                 </div>
-            {% endif %}
+            </div>
+
+            {% endfor %}
+
         </section>
-
 
         <section class="panel">
             <div class="panel-header">

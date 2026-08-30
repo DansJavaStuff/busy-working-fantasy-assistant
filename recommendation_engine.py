@@ -341,21 +341,37 @@ def roster_bonus(position, counts, round_number):
         starters = BUSY_WORKING_ROSTER["QB"]
 
         if count >= starters:
-            if round_number <= 9:
+            missing_core_starter = any(
+                counts.get(pos, 0)
+                < BUSY_WORKING_ROSTER[pos]
+                for pos in ("RB", "WR", "TE")
+            )
+
+            if missing_core_starter:
                 return (
-                    -12,
-                    "Starting QB is filled; prioritise RB/WR depth",
+                    -25,
+                    "Starting QB is filled; complete remaining "
+                    "RB/WR/TE starting positions before "
+                    "considering a backup QB",
                 )
 
-            if round_number <= 11:
+            if round_number <= 10:
                 return (
-                    -8,
-                    "Backup QB is still a lower-priority roster need",
+                    -20,
+                    "Only one QB starts; with QB1 filled, preserve "
+                    "bench spots for RB/WR depth",
+                )
+
+            if round_number <= 12:
+                return (
+                    -12,
+                    "Backup QB remains a lower-priority roster need",
                 )
 
             return (
-                -3,
-                "A backup QB is now reasonable if the value is strong",
+                -5,
+                "A backup QB is reasonable this late only if "
+                "the value is exceptional",
             )
 
         if round_number <= 2:
@@ -406,13 +422,45 @@ def roster_bonus(position, counts, round_number):
                 "Fills an open starting TE position",
             )
 
-        # We already have our starting TE.
-        # A second TE can technically use FLEX, but we don't
-        # want to encourage that as strongly as RB/WR.
-        if not flex_filled and position in FLEX_ELIGIBLE:
+        # Two TEs is already plenty in this one-TE league.
+        # A third TE would consume one of only five bench
+        # spots and should require truly exceptional value.
+        if count >= 2:
             return (
-                -2,
-                "Starting TE is filled; a second TE would mainly be FLEX/depth",
+                -35,
+                "You already have two TEs; preserve remaining "
+                "bench spots for RB/WR depth",
+            )
+
+        # We already have our starting TE.
+        #
+        # A second TE can technically fill FLEX, but while
+        # normal RB/WR starting positions remain open we
+        # should strongly prefer completing those first.
+        missing_rb = max(
+            BUSY_WORKING_ROSTER["RB"]
+            - counts.get("RB", 0),
+            0,
+        )
+
+        missing_wr = max(
+            BUSY_WORKING_ROSTER["WR"]
+            - counts.get("WR", 0),
+            0,
+        )
+
+        if missing_rb or missing_wr:
+            return (
+                -12,
+                "Starting TE is filled; complete your RB/WR "
+                "starting positions before considering a second TE",
+            )
+
+        if not flex_filled:
+            return (
+                -5,
+                "Starting TE is filled; RB/WR are preferred "
+                "for the FLEX position",
             )
 
         if round_number <= 9:
@@ -447,16 +495,11 @@ def roster_bonus(position, counts, round_number):
                 f"You already have a starting {position}",
             )
 
-        if round_number <= 10:
-            return (
-                -40,
-                f"Wait until the late rounds to draft {position}",
-            )
-
         if round_number <= 12:
             return (
-                -10,
-                f"{position} can usually still wait",
+                -40,
+                f"Preserve rounds 1-12 for skill-position depth; "
+                f"{position} can wait until the final two rounds",
             )
 
         return (
@@ -519,24 +562,41 @@ def bench_balance_bonus(
         other_count = rb_count
         other_position = "RB"
 
-    # Give a small bonus to the thinner side of the roster.
-    if other_count >= position_count + 2:
-        return (
-            2,
-            f"Balances your RB/WR depth: {position} is substantially "
-            f"thinner than {other_position}",
-    )
+    depth_gap = other_count - position_count
 
-    # Don't keep piling players into one position if we're
-    # already substantially deeper there.
-    if position_count >= other_count + 2:
+    # Moderate imbalance: gently favour the thinner position.
+    if depth_gap == 2:
         return (
-            -2,
-            f"You already have substantially more {position} "
-            f"depth than {other_position}",
+            4,
+            f"Balances your RB/WR depth: {position} is "
+            f"thinner than {other_position}",
+        )
+
+    if depth_gap == -2:
+        return (
+            -4,
+            f"You already have more {position} depth than "
+            f"{other_position}",
+        )
+
+    # Large imbalance: roster construction should now matter
+    # considerably more than squeezing out a little extra ADP value.
+    if depth_gap >= 3:
+        return (
+            8,
+            f"RB/WR depth is heavily imbalanced; prioritise "
+            f"{position} over {other_position}",
+        )
+
+    if depth_gap <= -3:
+        return (
+            -8,
+            f"RB/WR depth is heavily imbalanced; avoid adding "
+            f"more {position} unless the value is exceptional",
         )
 
     return 0, None
+
 
 def consensus_adp(player):
     """
@@ -577,14 +637,20 @@ def special_teams_run_bonus(
     round_number,
 ):
     """
-    Notice meaningful K/DST runs without blindly following them.
+    Track K/DST market depletion without blindly following runs.
 
-    We only care when:
-      - at least 3 have gone in the last 8 picks
-      - we're already in the later rounds
-      - the candidate is one of the top four at the position
+    Two signals matter:
 
-    Even then the bonus is deliberately small.
+      1. Elite depletion:
+         How many of the FantasyPros top-four options have
+         disappeared anywhere in the draft?
+
+      2. Recent run:
+         Have at least three players at the position gone in
+         the last eight picks?
+
+    A slow drain of elite options matters even when it never
+    forms a traditional draft run.
     """
 
     position = normalised_position(
@@ -594,8 +660,87 @@ def special_teams_run_bonus(
     if position not in ("K", "DST"):
         return 0, None
 
+    # Special teams remain deliberately suppressed through
+    # the early and middle rounds.
     if round_number < 11:
         return 0, None
+
+    def position_rank(candidate):
+        """
+        Prefer the full FantasyPros positional CSV ranking.
+
+        Fall back to the older merged position_rank when
+        necessary.
+        """
+
+        rank = candidate.get(
+            "fantasypros_position_rank"
+        )
+
+        if rank is None:
+            rank = candidate.get(
+                "position_rank"
+            )
+
+        return rank
+
+    def is_elite(candidate):
+        if normalised_position(
+            candidate["position"]
+        ) != position:
+            return False
+
+        rank = position_rank(candidate)
+
+        return (
+            rank is not None
+            and rank <= 4
+        )
+
+    # ---------------------------------------------------------
+    # How many elite options have disappeared anywhere in
+    # the draft?
+    # ---------------------------------------------------------
+
+    elite_drafted = [
+        item["player"]
+        for item in state["drafted"]
+        if is_elite(item["player"])
+    ]
+
+    elite_drafted_ids = {
+        str(candidate["id"])
+        for candidate in elite_drafted
+    }
+
+    elite_gone = len(elite_drafted_ids)
+
+    elite_remaining = sorted(
+        [
+            candidate
+            for candidate in available
+            if is_elite(candidate)
+        ],
+        key=lambda candidate: (
+            position_rank(candidate)
+            if position_rank(candidate) is not None
+            else 999
+        ),
+    )
+
+    player_rank = position_rank(player)
+
+    # Only elite candidates benefit from elite-depletion
+    # awareness.
+    if (
+        player_rank is None
+        or player_rank > 4
+    ):
+        return 0, None
+
+    # ---------------------------------------------------------
+    # Also recognise a conventional recent run.
+    # ---------------------------------------------------------
 
     recent = state["drafted"][-8:]
 
@@ -608,69 +753,103 @@ def special_teams_run_bonus(
     ]
 
     run_size = len(recent_at_position)
+    recent_run = run_size >= 3
 
-    if run_size < 3:
+    # ---------------------------------------------------------
+    # Several elite options remain.
+    #
+    # A recent run is worth mentioning, but don't manufacture
+    # urgency while we still have alternatives.
+    # ---------------------------------------------------------
+
+    if len(elite_remaining) > 1:
+        if recent_run:
+            return (
+                0,
+                f"{position} run developing: {run_size} taken "
+                f"in the last 8 picks, but "
+                f"{len(elite_remaining)} top-four options remain",
+            )
+
         return 0, None
 
-    elite_remaining = sorted(
-        [
-            candidate
-            for candidate in available
-            if normalised_position(
-                candidate["position"]
-            ) == position
-            and candidate.get(
-                "position_rank"
-            ) is not None
-            and candidate[
-                "position_rank"
-            ] <= 4
-        ],
-        key=lambda candidate:
-            candidate["position_rank"],
-    )
-
-    player_rank = player.get(
-        "position_rank"
-    )
-
-    # Top tier has already gone.
-    # Don't manufacture urgency for the next tier.
-    if not elite_remaining:
-        return (
-            0,
-            f"{position} run detected, but the top tier "
-            f"has already gone — don't chase it",
-        )
-
-    # Only an elite option should benefit from run awareness.
+    # We only want depletion urgency when we can prove that
+    # three of the top four have actually been drafted.
     if (
-        player_rank is None
-        or player_rank > 4
+        elite_gone < 3
+        or len(elite_remaining) != 1
     ):
         return 0, None
 
-    # Several elite options remain, so merely note the run.
-    if len(elite_remaining) > 1:
-        return (
-            0,
-            f"{position} run developing: {run_size} taken "
-            f"in the last 8 picks, but multiple top-four "
-            f"options remain",
-        )
-
-    # Last elite option.
+    # Only the actual last elite option gets the bonus.
     if (
         str(elite_remaining[0]["id"])
-        == str(player["id"])
+        != str(player["id"])
     ):
-        return (
-            2,
-            f"{position} run: {run_size} taken in the last "
-            f"8 picks and this is the last top-four option",
+        return 0, None
+
+    run_note = (
+        f"; {run_size} {position} have also gone "
+        f"in the last 8 picks"
+        if recent_run
+        else ""
+    )
+
+    # ---------------------------------------------------------
+    # Round 11:
+    #
+    # Start getting nervous, but don't automatically sacrifice
+    # useful RB/WR depth.
+    # ---------------------------------------------------------
+
+    if round_number == 11:
+        bonus = (
+            15
+            if recent_run
+            else 10
         )
 
-    return 0, None
+        return (
+            bonus,
+            f"Only one FantasyPros top-four {position} remains: "
+            f"3 of 4 elite options are already gone"
+            f"{run_note}",
+        )
+
+    # ---------------------------------------------------------
+    # Round 12:
+    #
+    # Waiting another full turn now creates a genuine risk of
+    # losing the final elite option.
+    # ---------------------------------------------------------
+
+    if round_number == 12:
+        bonus = (
+            35
+            if recent_run
+            else 30
+        )
+
+        return (
+            bonus,
+            f"Last FantasyPros top-four {position} remaining: "
+            f"3 of 4 elite options are already gone"
+            f"{run_note}; waiting until round 13 risks losing it",
+        )
+
+    # ---------------------------------------------------------
+    # Rounds 13+:
+    #
+    # We're already in the intended K/DST drafting window.
+    # Give a small additional preference to the last elite
+    # option.
+    # ---------------------------------------------------------
+
+    return (
+        5,
+        f"Last FantasyPros top-four {position} remaining",
+    )
+
 
 def positional_scarcity_bonus(
     player,
@@ -1215,7 +1394,41 @@ def score_player(
         score += 1
 
     # ---------------------------------------------------------
-    # 8. Positional scarcity.
+    # 8. K/DST positional quality.
+    #
+    # Once we are considering special teams, prefer the
+    # FantasyPros positional ranking over small differences
+    # in overall ADP.
+    # ---------------------------------------------------------
+
+    special_position = normalised_position(
+        player["position"]
+    )
+
+    if special_position in ("K", "DST"):
+        fp_position_rank = player.get(
+            "fantasypros_position_rank"
+        )
+
+        if fp_position_rank is None:
+            fp_position_rank = player.get(
+                "position_rank"
+            )
+
+        if fp_position_rank is not None:
+            if fp_position_rank <= 4:
+                score += 8
+            elif fp_position_rank <= 8:
+                score += 5
+            elif fp_position_rank <= 12:
+                score += 3
+            elif fp_position_rank <= 16:
+                score += 1
+            elif fp_position_rank > 20:
+                score -= 3
+
+    # ---------------------------------------------------------
+    # 9. Positional scarcity.
     #
     # QB and TE are one-starter positions, so the value of
     # taking one depends heavily on the quality drop to the

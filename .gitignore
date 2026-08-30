@@ -25,3 +25,6 @@ ffc_cache.json
 # Local database backups
 backups/
 
+
+# Local FantasyPros API usage counter
+data/fantasypros_usage.json

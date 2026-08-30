@@ -428,6 +428,12 @@ footer {
     font-weight: 700;
 }
 
+.empty-roster-slot {
+    color: #9aa4b2;
+    font-weight: 400;
+    font-style: italic;
+}
+
 /* Phone / tablet */
 
 @media (max-width: 750px) {
@@ -520,6 +526,12 @@ footer {
     .data-refresh-form {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .empty-roster-slot {
+        color: #9aa4b2;
+        font-weight: 400;
+        font-style: italic;
     }
 }
 

@@ -25,6 +25,7 @@ from database import (
 )
 from data_status import get_data_status
 from refresh_data import refresh_all
+from roster_display import build_roster_slots
 
 app = Flask(__name__)
 
@@ -116,6 +117,9 @@ def dashboard():
             )
         ],
         "your_roster": state["your_roster"],
+        "roster_slots": build_roster_slots(
+            state["your_roster"]
+        ),
         "recommendations": recommendations,
     }
 

@@ -3,7 +3,12 @@ import re
 from pathlib import Path
 
 
-ADP_FILE = Path("FantasyPros_2026_Overall_ADP_Rankings.csv")
+DATA_DIR = Path(__file__).resolve().parent / "data"
+
+ADP_FILE = (
+    DATA_DIR
+    / "FantasyPros_2026_Overall_ADP_Rankings.csv"
+)
 
 
 def split_player(player_text):

@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import requests
@@ -9,6 +9,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("FANTASYPROS_API_KEY")
+
+DAILY_LIMIT = int(
+    os.getenv(
+        "FANTASYPROS_DAILY_LIMIT",
+        "50",
+    )
+)
+
+USAGE_FILE = (
+    Path(__file__).resolve().parent
+    / "data"
+    / "fantasypros_usage.json"
+)
 
 CACHE_FILE = Path("fantasypros_cache.json")
 
@@ -48,6 +61,103 @@ def convert_player(player):
         "rank_average": player.get("rank_ave"),
     }
 
+def load_usage():
+    today = date.today().isoformat()
+
+    if not USAGE_FILE.exists():
+        return {
+            "date": today,
+            "calls": 0,
+            "last_call": None,
+            "server_limit": None,
+            "server_remaining": None,
+        }
+
+    try:
+        usage = json.loads(
+            USAGE_FILE.read_text()
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ):
+        usage = {}
+
+    if usage.get("date") != today:
+        return {
+            "date": today,
+            "calls": 0,
+            "last_call": None,
+            "server_limit": None,
+            "server_remaining": None,
+        }
+
+    return usage
+
+
+def record_api_call(response=None):
+    usage = load_usage()
+
+    usage["calls"] = (
+        usage.get("calls", 0) + 1
+    )
+
+    usage["last_call"] = (
+        datetime.now().isoformat()
+    )
+
+    if response is not None:
+        headers = response.headers
+
+        for name in (
+            "x-ratelimit-limit",
+            "ratelimit-limit",
+            "x-rate-limit-limit",
+        ):
+            value = headers.get(name)
+
+            if value is not None:
+                usage["server_limit"] = value
+                break
+
+        for name in (
+            "x-ratelimit-remaining",
+            "ratelimit-remaining",
+            "x-rate-limit-remaining",
+        ):
+            value = headers.get(name)
+
+            if value is not None:
+                usage["server_remaining"] = value
+                break
+
+    USAGE_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    USAGE_FILE.write_text(
+        json.dumps(
+            usage,
+            indent=2,
+        )
+    )
+
+    return usage
+
+
+def get_api_usage():
+    usage = load_usage()
+
+    calls = usage.get("calls", 0)
+
+    usage["limit"] = DAILY_LIMIT
+    usage["remaining"] = max(
+        DAILY_LIMIT - calls,
+        0,
+    )
+
+    return usage
 
 def refresh_cache():
     if not API_KEY:
@@ -70,6 +180,17 @@ def refresh_cache():
                 "scoring": "HALF",
             },
             timeout=30,
+        )
+
+        usage = record_api_call(
+            response
+        )
+
+        print(
+            f"  FantasyPros API usage: "
+            f"{usage['calls']}/{DAILY_LIMIT} "
+            f"calls today "
+            f"({max(DAILY_LIMIT - usage['calls'], 0)} remaining)"
         )
 
         response.raise_for_status()

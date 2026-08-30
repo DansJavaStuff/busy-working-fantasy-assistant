@@ -2,13 +2,15 @@ import csv
 from pathlib import Path
 
 
+DATA_DIR = Path(__file__).resolve().parent / "data"
+
 POSITION_FILES = {
-    "QB": Path("FantasyPros_2026_Draft_QB_Rankings.csv"),
-    "RB": Path("FantasyPros_2026_Draft_RB_Rankings.csv"),
-    "WR": Path("FantasyPros_2026_Draft_WR_Rankings.csv"),
-    "TE": Path("FantasyPros_2026_Draft_TE_Rankings.csv"),
-    "K": Path("FantasyPros_2026_Draft_K_Rankings.csv"),
-    "DST": Path("FantasyPros_2026_Draft_DST_Rankings.csv"),
+    "QB": DATA_DIR / "FantasyPros_2026_Draft_QB_Rankings.csv",
+    "RB": DATA_DIR / "FantasyPros_2026_Draft_RB_Rankings.csv",
+    "WR": DATA_DIR / "FantasyPros_2026_Draft_WR_Rankings.csv",
+    "TE": DATA_DIR / "FantasyPros_2026_Draft_TE_Rankings.csv",
+    "K": DATA_DIR / "FantasyPros_2026_Draft_K_Rankings.csv",
+    "DST": DATA_DIR / "FantasyPros_2026_Draft_DST_Rankings.csv",
 }
 
 
