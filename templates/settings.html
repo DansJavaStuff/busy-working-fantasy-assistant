@@ -292,6 +292,170 @@
 
 </section>
 
+    {% if data.draft.session_type == "mock" %}
+    <section class="settings-panel draft-readiness">
+
+        <h2>
+            Draft Night Readiness
+        </h2>
+
+        {% set draft_ready =
+            data.player_data.ready
+            and data.league.season == 2026
+            and data.league.teams == 12
+            and data.draft.your_slot == 8
+        %}
+
+        <div class="
+            draft-readiness-summary
+            {% if draft_ready %}
+                draft-readiness-ready
+            {% else %}
+                draft-readiness-not-ready
+            {% endif %}
+        ">
+            <strong>
+                {% if draft_ready %}
+                    ✅ READY FOR DRAFT NIGHT
+                {% else %}
+                    ⚠ CHECK BEFORE DRAFT NIGHT
+                {% endif %}
+            </strong>
+        </div>
+
+        <div class="draft-readiness-list">
+
+            <div class="draft-readiness-item">
+                <span>
+                    {% if data.player_data.ready %}
+                        ✅
+                    {% else %}
+                        ❌
+                    {% endif %}
+                </span>
+
+                <div>
+                    <strong>
+                        Player data
+                    </strong>
+                    <small>
+                        {% if data.player_data.ready %}
+                            READY
+                        {% else %}
+                            Refresh / rebuild required
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+
+            <div class="draft-readiness-item">
+                <span>
+                    {% if data.league.season == 2026 %}
+                        ✅
+                    {% else %}
+                        ❌
+                    {% endif %}
+                </span>
+
+                <div>
+                    <strong>
+                        Season
+                    </strong>
+                    <small>
+                        {{ data.league.season }}
+                    </small>
+                </div>
+            </div>
+
+            <div class="draft-readiness-item">
+                <span>
+                    {% if data.league.teams == 12 %}
+                        ✅
+                    {% else %}
+                        ❌
+                    {% endif %}
+                </span>
+
+                <div>
+                    <strong>
+                        League size
+                    </strong>
+                    <small>
+                        {{ data.league.teams }} teams
+                    </small>
+                </div>
+            </div>
+
+            <div class="draft-readiness-item">
+                <span>
+                    {% if data.draft.your_slot == 8 %}
+                        ✅
+                    {% else %}
+                        ❌
+                    {% endif %}
+                </span>
+
+                <div>
+                    <strong>
+                        Your draft slot
+                    </strong>
+                    <small>
+                        Pick {{ data.draft.your_slot }}
+                    </small>
+                </div>
+            </div>
+
+            <div class="draft-readiness-item">
+                <span>
+                    {% if data.fantasypros_usage.can_refresh %}
+                        ✅
+                    {% else %}
+                        ⚠
+                    {% endif %}
+                </span>
+
+                <div>
+                    <strong>
+                        FantasyPros allowance
+                    </strong>
+                    <small>
+                        {{ data.fantasypros_usage.remaining }}
+                        calls remaining ·
+                        full refresh needs
+                        {{ data.fantasypros_usage.refresh_calls }}
+                    </small>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="draft-manual-checks">
+            <strong>
+                Final manual checks on Wednesday
+            </strong>
+
+            <ul>
+                <li>
+                    Confirm latest FantasyPros CSV files downloaded.
+                </li>
+                <li>
+                    Confirm Yahoo draft order matches Settings.
+                </li>
+                <li>
+                    Confirm Daniel is pick #8.
+                </li>
+                <li>
+                    Confirm Yahoo draft room is open.
+                </li>
+                <li>
+                    Start Draft Night only when ready to record pick 1.
+                </li>
+            </ul>
+        </div>
+
+    </section>
+    {% endif %}
+
     {% if data.draft.session_type != "mock" %}
 
 <div class="settings-locked">
