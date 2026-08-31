@@ -68,12 +68,30 @@
         <h2>
             Player Data
         </h2>
-        {% if data.refresh_complete %}
-        <div class="data-refresh-success">
-            ✓ Online data refresh finished and the
-            player database was rebuilt.
-        </div>
-        {% endif %}
+            {% if data.refresh_complete %}
+            <div class="data-refresh-success">
+                {% if data.refresh_complete == "all" %}
+                    ✓ FantasyPros and FFC refreshed and the
+                    player database was rebuilt.
+                {% elif data.refresh_complete == "ffc" %}
+                    ✓ FFC refreshed and the player database
+                    was rebuilt. No FantasyPros calls used.
+                {% elif data.refresh_complete == "rebuild" %}
+                    ✓ Player database rebuilt from the
+                    current source data. No API calls used.
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if data.quota_blocked %}
+            <div class="season-data-warning">
+                FantasyPros refresh blocked: a complete refresh
+                requires {{ data.fantasypros_usage.refresh_calls }}
+                calls but only
+                {{ data.fantasypros_usage.remaining }}
+                remain today.
+            </div>
+            {% endif %}
 
         <div class="data-status-summary">
             <strong>
@@ -152,47 +170,119 @@
 
         </div>
 
+        <div class="data-status-row">
+            <div>
+                <strong>
+                    FantasyPros API Allowance
+                </strong>
+
+                <small>
+                    Locally tracked by this application ·
+                    full refresh uses
+                    {{ data.fantasypros_usage.refresh_calls }}
+                    calls
+                </small>
+            </div>
+
+            <div>
+                <span class="
+                    data-status-badge
+                    data-status-{{ data.fantasypros_usage.status_class }}
+                ">
+                    {{ data.fantasypros_usage.status|upper }}
+                </span>
+
+                <small>
+                    {{ data.fantasypros_usage.calls }}
+                    / {{ data.fantasypros_usage.limit }}
+                    used ·
+                    {{ data.fantasypros_usage.remaining }}
+                    remaining
+                </small>
+
+                <small>
+                    Last call:
+                    {{ data.fantasypros_usage.last_call_display }}
+                </small>
+            </div>
+        </div>
+
     {% if data.draft.session_type == "mock" %}
 
-<form
-    method="post"
-    action="{{ url_for('refresh_player_data') }}"
-    class="data-refresh-form"
-    onsubmit="
-        if (!confirm(
-            'Refresh FantasyPros and FFC data, '
-            + 'then rebuild the player database?'
-        )) {
-            return false;
-        }
+<div class="data-refresh-actions">
 
-        const button = this.querySelector('button');
-        const message = this.querySelector(
-            '.data-refresh-progress'
-        );
+    <form
+        method="post"
+        action="{{ url_for('refresh_player_data') }}"
+        class="data-refresh-form"
+        onsubmit="
+            if (!confirm(
+                'Refresh FantasyPros and FFC data, '
+                + 'then rebuild the player database? '
+                + 'This uses '
+                + '{{ data.fantasypros_usage.refresh_calls }} '
+                + 'FantasyPros API calls.'
+            )) {
+                return false;
+            }
 
-        button.disabled = true;
-        button.textContent = 'Refreshing…';
-        message.hidden = false;
+            const button = this.querySelector('button');
+            button.disabled = true;
+            button.textContent = 'Refreshing…';
 
-        return true;
-    "
->
-    <button
-        type="submit"
-        class="primary-button"
+            return true;
+        "
     >
-        Refresh Online Data
-    </button>
+        <button
+            type="submit"
+            class="primary-button"
+            {% if not data.fantasypros_usage.can_refresh %}
+            disabled
+            {% endif %}
+        >
+            Refresh All Online Data
+        </button>
+    </form>
 
-    <span
-        class="data-refresh-progress"
-        hidden
+    <form
+        method="post"
+        action="{{ url_for('refresh_ffc_data') }}"
+        class="data-refresh-form"
+        onsubmit="
+            const button = this.querySelector('button');
+            button.disabled = true;
+            button.textContent = 'Refreshing…';
+            return true;
+        "
     >
-        Updating FantasyPros and FFC…
-    </span>
-</form>
+        <button
+            type="submit"
+            class="secondary-button"
+        >
+            Refresh FFC Only
+        </button>
+    </form>
 
+    <form
+        method="post"
+        action="{{ url_for('rebuild_player_data') }}"
+        class="data-refresh-form"
+        onsubmit="
+            const button = this.querySelector('button');
+            button.disabled = true;
+            button.textContent = 'Rebuilding…';
+            return true;
+        "
+    >
+        <button
+            type="submit"
+            class="secondary-button"
+        >
+            Rebuild Player Database
+        </button>
+    </form>
+
+</div>
     {% endif %}
 
     <div class="season-data-warning">

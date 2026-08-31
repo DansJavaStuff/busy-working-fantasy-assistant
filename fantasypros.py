@@ -150,12 +150,51 @@ def get_api_usage():
     usage = load_usage()
 
     calls = usage.get("calls", 0)
-
-    usage["limit"] = DAILY_LIMIT
-    usage["remaining"] = max(
+    remaining = max(
         DAILY_LIMIT - calls,
         0,
     )
+
+    refresh_calls = len(POSITIONS)
+
+    usage["limit"] = DAILY_LIMIT
+    usage["remaining"] = remaining
+    usage["refresh_calls"] = refresh_calls
+    usage["can_refresh"] = (
+        remaining >= refresh_calls
+    )
+
+    if remaining < refresh_calls:
+        usage["status"] = "blocked"
+        usage["status_class"] = "missing"
+
+    elif remaining < (refresh_calls * 2):
+        usage["status"] = "low"
+        usage["status_class"] = "stale"
+
+    else:
+        usage["status"] = "ok"
+        usage["status_class"] = "current"
+
+    last_call = usage.get("last_call")
+
+    if last_call:
+        try:
+            usage["last_call_display"] = (
+                datetime.fromisoformat(
+                    last_call
+                ).strftime(
+                    "%Y-%m-%d %H:%M"
+                )
+            )
+        except ValueError:
+            usage["last_call_display"] = (
+                last_call
+            )
+    else:
+        usage["last_call_display"] = (
+            "None recorded today"
+        )
 
     return usage
 

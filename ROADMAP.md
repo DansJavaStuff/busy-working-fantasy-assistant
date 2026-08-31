@@ -54,17 +54,17 @@ The immediate priority is reliability for the 2026 draft. Larger architectural c
 
 ## Priority 1 — FantasyPros API Usage
 
-- [ ] Show current FantasyPros API usage on Settings
-- [ ] Show:
+- [x] Show current FantasyPros API usage on Settings
+- [x] Show:
   - calls used today
   - configured daily limit
   - calls remaining
   - last API call time
-- [ ] Clearly explain that the value is locally recorded
-- [ ] Verify daily counter resets correctly
-- [ ] Warn before a refresh when API allowance is low
-- [ ] Prevent a full four-position refresh if fewer than four calls remain
-- [ ] Consider warning thresholds, for example:
+- [x] Clearly explain that the value is locally recorded
+- [x] Verify daily counter resets correctly
+- [x] Warn before a refresh when API allowance is low
+- [x] Prevent a full four-position refresh if fewer than four calls remain
+- [x] Consider warning thresholds, for example:
   - normal
   - low
   - refresh unavailable
@@ -75,12 +75,12 @@ FantasyPros does not currently return a usable server-side remaining-quota heade
 
 Make draft-day refreshing simple and difficult to get wrong.
 
-- [ ] Confirm Settings clearly shows each data source
-- [ ] Confirm missing/stale/current status is obvious
-- [ ] Confirm merged database rebuild occurs when required
-- [ ] Verify manual CSV replacement workflow
-- [ ] Verify online refresh workflow
-- [ ] Confirm `Player data: READY` before Draft Night
+- [x] Confirm Settings clearly shows each data source
+- [x] Confirm missing/stale/current status is obvious
+- [x] Confirm merged database rebuild occurs when required
+- [x] Verify manual CSV replacement workflow
+- [x] Verify online refresh workflow
+- [z] Confirm `Player data: READY` before Draft Night
 
 Manual files required:
 
@@ -134,7 +134,7 @@ Draft Night cannot operate correctly
 
 Do not tune recommendations merely to make another mock roster look prettier.
 
-Immediately After the Draft
+## Immediately After the Draft
 
 The immediate goal is to preserve the result rather than immediately build the whole season-management system.
 
@@ -148,7 +148,18 @@ The immediate goal is to preserve the result rather than immediately build the w
 
 No requirement to build waiver/start-sit functionality immediately after the draft.
 
-In-Season Phase 1 — My Team
+## Team Identity
+
+- [ ] Identify likely franchise/star players from final roster
+- [ ] Generate fantasy team-name ideas
+- [ ] Prefer player-name puns / pop-culture references
+- [ ] Shortlist favourite names
+- [ ] Develop matching logo concepts
+- [ ] Generate square team logo
+- [ ] Set final Yahoo team name and image
+
+
+## In-Season Phase 1 — My Team
 
 Build the post-draft home screen.
 
@@ -373,3 +384,9 @@ Development Principle
 The assistant should save time and improve fantasy decisions.
 
 It should not become a system that requires constant maintenance just to keep playing fantasy football.
+
+- [ ] Make draft strategy league-size aware
+- [ ] Remove remaining 12-team assumptions
+- [ ] Parameterise FFC ADP by league size
+- [ ] Regression-test 8/10/12/14/16-team drafts
+

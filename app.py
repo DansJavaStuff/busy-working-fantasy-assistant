@@ -24,7 +24,12 @@ from database import (
     save_current_draft_order,
 )
 from data_status import get_data_status
-from refresh_data import refresh_all
+from fantasypros import get_api_usage
+from refresh_data import (
+    rebuild_database,
+    refresh_all,
+    refresh_ffc,
+)
 from roster_display import build_roster_slots
 
 app = Flask(__name__)
@@ -148,8 +153,12 @@ def settings_page():
             list_seasons(),
         "player_data":
             get_data_status(),
+        "fantasypros_usage":
+            get_api_usage(),
         "refresh_complete":
             request.args.get("refreshed") == "1",
+        "quota_blocked":
+            request.args.get("quota_blocked") == "1",
             }
 
     return render_template(
@@ -394,12 +403,60 @@ def refresh_player_data():
             url_for("settings_page")
         )
 
+    usage = get_api_usage()
+
+    if not usage["can_refresh"]:
+        return redirect(
+            url_for(
+                "settings_page",
+                quota_blocked="1",
+            )
+        )
+
     refresh_all()
 
     return redirect(
         url_for(
             "settings_page",
-            refreshed="1",
+            refreshed="all",
+        )
+    )
+
+
+@app.post("/data/refresh-ffc")
+def refresh_ffc_data():
+    state = load_state()
+
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("settings_page")
+        )
+
+    refresh_ffc()
+
+    return redirect(
+        url_for(
+            "settings_page",
+            refreshed="ffc",
+        )
+    )
+
+
+@app.post("/data/rebuild")
+def rebuild_player_data():
+    state = load_state()
+
+    if state["session_type"] != "mock":
+        return redirect(
+            url_for("settings_page")
+        )
+
+    rebuild_database()
+
+    return redirect(
+        url_for(
+            "settings_page",
+            refreshed="rebuild",
         )
     )
 
