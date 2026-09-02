@@ -296,7 +296,10 @@ This would normally consume around 12 calls per week from those scheduled refres
 - [ ] Remove old `.v1` / `.v2` development files after review
 - [ ] Review `fantasypros_test.json`
 - [ ] Add backup-retention policy
-- [ ] Add log-retention policy
+- [ ] Standardise application logging through Python `logging`
+- [ ] Send application logs to journald via systemd
+- [ ] Define sensible log levels and message format
+- [ ] Review journald retention / disk limits
 - [ ] Add off-Pi database backup
 - [ ] Add report-only dependency maintenance check
 - [ ] Review service monitoring
