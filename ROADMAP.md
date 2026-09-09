@@ -50,9 +50,9 @@ The assistant currently supports:
 - [x] Recommendation-engine regression testing
 - [x] Recommendation-engine code freeze
 
-## Current Milestone — 2026 Draft Night
+## Current Milestone — In-Season Phase 1: My Team
 
-The immediate priority is reliability for the real 2026 draft. Recommendation logic is frozen unless a genuine functional bug is demonstrated.
+The 2026 draft is complete and preserved. The current priority is to establish reliable in-season roster state and a useful My Team dashboard without depending on Yahoo API access.
 
 ### Now — Draft-Day Readiness
 
@@ -384,14 +384,12 @@ Good ideas that are deliberately not current priorities:
 
 ## Priority Order
 
-1. **2026 Draft Night reliability** — current.
-2. Preserve completed draft and final roster.
-3. Team identity: name and logo.
-4. My Team / roster synchronisation.
-5. Waiver recommendations.
-6. Start / sit recommendations.
-7. Matchups and opponent analysis.
-8. Technical cleanup and post-season architecture work.
+1. **My Team / roster synchronisation** — current.
+2. Waiver recommendations.
+3. Start / sit recommendations.
+4. Matchups and opponent analysis.
+5. Technical cleanup and post-season architecture work.
+6. 2027 draft improvements.
 
 The order is intentionally flexible: a real draft-night or live-season issue can promote a task if it reveals a material weakness in the system.
 
