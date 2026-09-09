@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def connect():
@@ -98,6 +98,44 @@ def initialise_database():
                 PRIMARY KEY (
                     season_id,
                     slot
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_roster (
+                season_id INTEGER NOT NULL,
+
+                roster_slot TEXT NOT NULL,
+                slot_index INTEGER NOT NULL DEFAULT 1,
+
+                player_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                position TEXT NOT NULL,
+
+                team TEXT,
+                bye_week INTEGER,
+                status TEXT,
+
+                source TEXT NOT NULL DEFAULT 'manual',
+
+                acquired_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                updated_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    roster_slot,
+                    slot_index
+                ),
+
+                UNIQUE (
+                    season_id,
+                    player_id
                 ),
 
                 FOREIGN KEY (season_id)
@@ -396,6 +434,130 @@ def save_current_draft_order(order):
                     manager_name,
                 ),
             )
+
+def load_season_roster(season=None):
+    """
+    Return the current roster for a Busy Working season.
+
+    Rows are ordered in normal fantasy-roster order.
+    """
+
+    initialise_database()
+
+    slot_order = {
+        "QB": 1,
+        "RB": 2,
+        "WR": 3,
+        "TE": 4,
+        "FLEX": 5,
+        "K": 6,
+        "DEF": 7,
+        "BN": 8,
+        "IR": 9,
+    }
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                roster_slot,
+                slot_index,
+                player_id,
+                player_name,
+                position,
+                team,
+                bye_week,
+                status,
+                source,
+                acquired_at,
+                updated_at
+            FROM season_roster
+            WHERE season_id = ?
+            """,
+            (season_id,),
+        ).fetchall()
+
+    roster = [
+        dict(row)
+        for row in rows
+    ]
+
+    roster.sort(
+        key=lambda player: (
+            slot_order.get(
+                player["roster_slot"],
+                99,
+            ),
+            player["slot_index"],
+        )
+    )
+
+    return roster
+
+
+def replace_season_roster(
+    players,
+    season=None,
+):
+    """
+    Replace the complete roster for a Busy Working season.
+
+    Intended for initial seeding, manual roster maintenance,
+    and future Yahoo synchronisation.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_roster
+            WHERE season_id = ?
+            """,
+            (season_id,),
+        )
+
+        for player in players:
+            db.execute(
+                """
+                INSERT INTO season_roster (
+                    season_id,
+                    roster_slot,
+                    slot_index,
+                    player_id,
+                    player_name,
+                    position,
+                    team,
+                    bye_week,
+                    status,
+                    source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    season_id,
+                    player["roster_slot"],
+                    player.get("slot_index", 1),
+                    str(player["player_id"]),
+                    player["player_name"],
+                    player["position"],
+                    player.get("team"),
+                    player.get("bye_week"),
+                    player.get("status"),
+                    player.get("source", "manual"),
+                ),
+            )
+
 
 def active_draft_session(db):
     return db.execute(

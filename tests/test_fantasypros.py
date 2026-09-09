@@ -40,10 +40,10 @@ if response.ok:
 
     # Save the complete response locally rather than
     # dumping hundreds of players to the terminal.
-    with open("fantasypros_test.json", "w") as f:
+    with open("tests/fantasypros_test.json", "w") as f:
         json.dump(data, f, indent=2)
 
-    print("Response saved to fantasypros_test.json")
+    print("Response saved to tests/fantasypros_test.json")
 
     print()
     print("Top-level keys:")
