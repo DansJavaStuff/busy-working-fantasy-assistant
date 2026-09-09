@@ -21,6 +21,8 @@ from database import (
     CURRENT_LEAGUE_NAME,
     list_seasons,
     load_current_draft_order,
+    load_season_roster,
+    load_team_identity,
     save_current_draft_order,
 )
 from data_status import get_data_status
@@ -260,6 +262,28 @@ def reset():
     reset_state()
 
     return redirect(url_for("dashboard"))
+
+@app.get("/my-team")
+def my_team():
+    season = 2026
+
+    roster = load_season_roster(season)
+    identity = load_team_identity(season)
+
+    data = {
+        "league": {
+            "name": CURRENT_LEAGUE_NAME,
+            "season": season,
+        },
+        "team": identity,
+        "roster": roster,
+    }
+
+    return render_template(
+        "my_team.html",
+        data=data,
+    )
+
 
 @app.route("/health")
 def health():

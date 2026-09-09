@@ -1088,3 +1088,53 @@ footer {
 .draft-manual-checks ul {
     margin-bottom: 0;
 }
+
+/* Main application navigation */
+
+.app-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.app-nav a {
+    color: white;
+    text-decoration: none;
+    font-weight: 700;
+
+    padding: 9px 13px;
+    border-radius: 8px;
+
+    background: rgba(255,255,255,0.08);
+}
+
+.app-nav a:hover {
+    background: rgba(255,255,255,0.16);
+}
+
+.app-nav a.active {
+    background: white;
+    color: #18202a;
+}
+
+.team-topbar {
+    background: var(--team-primary);
+}
+
+.team-topbar .app-nav a.active {
+    color: var(--team-primary);
+}
+
+.team-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.team-logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    border-radius: 12px;
+}

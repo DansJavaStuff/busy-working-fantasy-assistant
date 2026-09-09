@@ -13,6 +13,15 @@
     </title>
 
     <link
+        rel="icon"
+        type="image/png"
+        href="{{ url_for(
+            'static',
+            filename='favicons/busy_working.png'
+        ) }}"
+    >
+
+    <link
         rel="stylesheet"
         href="{{ url_for('static', filename='style.css') }}"
     >
@@ -40,12 +49,22 @@
             {{ data.league.teams }} Teams
         </div>
 
-        <a
-            class="topbar-link"
-            href="{{ url_for('dashboard') }}"
-        >
-            ← Draft
-        </a>
+        <nav class="app-nav">
+            <a href="{{ url_for('dashboard') }}">
+                Draft
+            </a>
+
+            <a href="{{ url_for('my_team') }}">
+                My Team
+            </a>
+
+            <a
+                class="active"
+                href="{{ url_for('settings_page') }}"
+            >
+                Settings
+            </a>
+        </nav>
     </div>
 </header>
 

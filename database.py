@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def connect():
@@ -99,6 +99,30 @@ def initialise_database():
                     season_id,
                     slot
                 ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_team_identity (
+                season_id INTEGER PRIMARY KEY,
+
+                team_name TEXT NOT NULL,
+
+                logo_path TEXT,
+
+                primary_colour TEXT NOT NULL
+                    DEFAULT '#041228',
+
+                secondary_colour TEXT NOT NULL
+                    DEFAULT '#9A1018',
+
+                accent_colour TEXT NOT NULL
+                    DEFAULT '#1685D0',
+
+                updated_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
 
                 FOREIGN KEY (season_id)
                     REFERENCES seasons(id)
@@ -434,6 +458,99 @@ def save_current_draft_order(order):
                     manager_name,
                 ),
             )
+
+def load_team_identity(season=None):
+    """
+    Return the team identity for a Busy Working season.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        row = db.execute(
+            """
+            SELECT
+                team_name,
+                logo_path,
+                primary_colour,
+                secondary_colour,
+                accent_colour,
+                updated_at
+            FROM season_team_identity
+            WHERE season_id = ?
+            """,
+            (season_id,),
+        ).fetchone()
+
+    if row is None:
+        return {
+            "team_name": "My Team",
+            "logo_path": None,
+            "primary_colour": "#041228",
+            "secondary_colour": "#9A1018",
+            "accent_colour": "#1685D0",
+            "updated_at": None,
+        }
+
+    return dict(row)
+
+
+def save_team_identity(
+    team_name,
+    logo_path=None,
+    primary_colour="#041228",
+    secondary_colour="#9A1018",
+    accent_colour="#1685D0",
+    season=None,
+):
+    """
+    Create or replace the team identity for a season.
+    """
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            INSERT INTO season_team_identity (
+                season_id,
+                team_name,
+                logo_path,
+                primary_colour,
+                secondary_colour,
+                accent_colour,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(season_id)
+            DO UPDATE SET
+                team_name = excluded.team_name,
+                logo_path = excluded.logo_path,
+                primary_colour = excluded.primary_colour,
+                secondary_colour = excluded.secondary_colour,
+                accent_colour = excluded.accent_colour,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                season_id,
+                team_name,
+                logo_path,
+                primary_colour,
+                secondary_colour,
+                accent_colour,
+            ),
+        )
+
 
 def load_season_roster(season=None):
     """

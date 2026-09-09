@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        {{ data.team.team_name }} · My Team
+    </title>
+
+    {% if data.team.logo_path %}
+    <link
+        rel="icon"
+        type="image/png"
+        href="{{ url_for(
+            'static',
+            filename=data.team.logo_path
+        ) }}"
+    >
+    {% endif %}
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+    <style>
+        :root {
+            --team-primary:
+                {{ data.team.primary_colour }};
+
+            --team-secondary:
+                {{ data.team.secondary_colour }};
+
+            --team-accent:
+                {{ data.team.accent_colour }};
+        }
+
+        .team-topbar h1 {
+            color: var(--team-accent);
+        }
+
+        .team-topbar .subtitle {
+            color: var(--team-accent);
+        }
+
+        .team-section {
+            background: white;
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 24px;
+
+            box-shadow:
+                0 2px 10px rgba(0,0,0,0.05);
+
+            border-top:
+                4px solid var(--team-secondary);
+        }
+
+        .team-section h2 {
+            margin-top: 0;
+        }
+
+        .team-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .team-table th,
+        .team-table td {
+            padding: 12px 14px;
+            text-align: left;
+
+            border-bottom:
+                1px solid #eceff3;
+        }
+
+        .team-table th {
+            color: #697586;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .player-status {
+            font-weight: 800;
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="topbar team-topbar">
+
+    <div class="team-brand">
+
+        {% if data.team.logo_path %}
+        <img
+            class="team-logo"
+            src="{{ url_for(
+                'static',
+                filename=data.team.logo_path
+            ) }}"
+            alt="{{ data.team.team_name }} logo"
+        >
+        {% endif %}
+
+        <div>
+            <div class="eyebrow">
+                YAHOO FANTASY FOOTBALL
+            </div>
+
+            <h1>
+                {{ data.team.team_name }}
+            </h1>
+
+            <div class="subtitle">
+                {{ data.league.name }}
+                ·
+                {{ data.league.season }}
+            </div>
+        </div>
+
+    </div>
+
+    <nav class="app-nav">
+        <a href="{{ url_for('dashboard') }}">
+            Draft
+        </a>
+
+        <a
+            class="active"
+            href="{{ url_for('my_team') }}"
+        >
+            My Team
+        </a>
+
+        <a href="{{ url_for('settings_page') }}">
+            Settings
+        </a>
+    </nav>
+
+</header>
+
+<main class="container">
+
+    <section class="team-section">
+        <h2>Starting Lineup</h2>
+
+        <table class="team-table">
+            <thead>
+                <tr>
+                    <th>Slot</th>
+                    <th>Player</th>
+                    <th>Pos</th>
+                    <th>Team</th>
+                    <th>Bye</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for player in data.roster %}
+                {% if player.roster_slot not in ["BN", "IR"] %}
+                <tr>
+                    <td>{{ player.roster_slot }}</td>
+                    <td>{{ player.player_name }}</td>
+                    <td>{{ player.position }}</td>
+                    <td>{{ player.team or "-" }}</td>
+                    <td>{{ player.bye_week or "-" }}</td>
+                    <td class="player-status">
+                        {{ player.status or "" }}
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="team-section">
+        <h2>Bench</h2>
+
+        <table class="team-table">
+            <thead>
+                <tr>
+                    <th>Player</th>
+                    <th>Pos</th>
+                    <th>Team</th>
+                    <th>Bye</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for player in data.roster %}
+                {% if player.roster_slot == "BN" %}
+                <tr>
+                    <td>{{ player.player_name }}</td>
+                    <td>{{ player.position }}</td>
+                    <td>{{ player.team or "-" }}</td>
+                    <td>{{ player.bye_week or "-" }}</td>
+                    <td class="player-status">
+                        {{ player.status or "" }}
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="team-section">
+        <h2>Injured Reserve</h2>
+
+        <table class="team-table">
+            <thead>
+                <tr>
+                    <th>Player</th>
+                    <th>Pos</th>
+                    <th>Team</th>
+                    <th>Bye</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for player in data.roster %}
+                {% if player.roster_slot == "IR" %}
+                <tr>
+                    <td>{{ player.player_name }}</td>
+                    <td>{{ player.position }}</td>
+                    <td>{{ player.team or "-" }}</td>
+                    <td>{{ player.bye_week or "-" }}</td>
+                    <td class="player-status">
+                        {{ player.status or "" }}
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+</main>
+
+</body>
+</html>
