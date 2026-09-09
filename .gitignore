@@ -30,3 +30,10 @@ data/fantasypros_usage.json
 
 # Local test output
 tests/fantasypros_test.json
+
+# Yahoo manual import/source files
+data/Yahoo_*.html
+
+# Generated Yahoo datasets
+data/yahoo_available_players.json
+data/yahoo_my_team.json
