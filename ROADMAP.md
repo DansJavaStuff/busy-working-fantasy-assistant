@@ -64,60 +64,60 @@ The immediate priority is reliability for the real 2026 draft. Recommendation lo
 - [x] Verify full online refresh quota protection
 - [x] Verify daily FantasyPros counter reset
 - [x] Verify `Player data: READY` workflow in rehearsal
-- [ ] Confirm `Player data: READY` on actual draft day
-- [ ] Perform final service / health check on draft day
-- [ ] Confirm final Yahoo draft order and pick #8 before starting
-- [ ] Start actual Draft Night session
-- [ ] Complete real draft and confirm 168 picks recorded
+- [x] Confirm `Player data: READY` on actual draft day
+- [x] Perform final service / health check on draft day
+- [x] Confirm final Yahoo draft order and pick #8 before starting
+- [x] Start actual Draft Night session
+- [x] Complete real draft and confirm 168 picks recorded
 
 ### Draft-Day Data Checklist
 
-- [ ] Download latest FantasyPros Overall ADP CSV
-- [ ] Download latest FantasyPros QB rankings CSV
-- [ ] Download latest FantasyPros RB rankings CSV
-- [ ] Download latest FantasyPros WR rankings CSV
-- [ ] Download latest FantasyPros TE rankings CSV
-- [ ] Download latest FantasyPros K rankings CSV
-- [ ] Download latest FantasyPros DST rankings CSV
-- [ ] Replace files in `data/`
-- [ ] Refresh FantasyPros API data
-- [ ] Refresh Fantasy Football Calculator data
-- [ ] Rebuild merged player database
-- [ ] Run `python data_status.py`
-- [ ] Confirm `Player data: READY`
-- [ ] Confirm `curl http://127.0.0.1:8080/health` returns OK
+- [x] Download latest FantasyPros Overall ADP CSV
+- [x] Download latest FantasyPros QB rankings CSV
+- [x] Download latest FantasyPros RB rankings CSV
+- [x] Download latest FantasyPros WR rankings CSV
+- [x] Download latest FantasyPros TE rankings CSV
+- [x] Download latest FantasyPros K rankings CSV
+- [x] Download latest FantasyPros DST rankings CSV
+- [x] Replace files in `data/`
+- [x] Refresh FantasyPros API data
+- [x] Refresh Fantasy Football Calculator data
+- [x] Rebuild merged player database
+- [x] Run `python data_status.py`
+- [x] Confirm `Player data: READY`
+- [x] Confirm `curl http://127.0.0.1:8080/health` returns OK
 
 The FantasyPros ALL / Superflex file is not required for the 2026 Busy Working draft.
 
 ### Draft-Night Operating Rules
 
 - [x] Recommendation engine frozen for the 2026 draft
-- [ ] Only change recommendation logic before Draft Night if an actual functional bug is demonstrated
-- [ ] Record every Yahoo selection manually
-- [ ] Use Undo immediately if a pick is entered incorrectly
-- [ ] Confirm draft completes at pick 168
+- [x] Only change recommendation logic before Draft Night if an actual functional bug is demonstrated
+- [x] Record every Yahoo selection manually
+- [x] Use Undo immediately if a pick is entered incorrectly
+- [x] Confirm draft completes at pick 168
 
 ## Next — Immediately After the Draft
 
 The first post-draft goal is to preserve the result and establish the initial season state, not to build the entire in-season assistant overnight.
 
-- [ ] Confirm completed actual draft is stored
-- [ ] Preserve final draft history
-- [ ] Confirm final roster
-- [ ] Export or display draft summary
-- [ ] Take an off-Pi backup of the completed draft database
-- [ ] Establish initial in-season roster state
-- [ ] Preserve historical draft recommendations for later analysis
+- [x] Confirm completed actual draft is stored
+- [x] Preserve final draft history
+- [x] Confirm final roster
+- [x] Export or display draft summary
+- [x] Take an off-Pi backup of the completed draft database
+- [x] Establish initial in-season roster state
+- [x] Preserve historical draft recommendations for later analysis
 
 ### Team Identity
 
-- [ ] Identify likely franchise / star players from the final roster
-- [ ] Generate fantasy team-name ideas
-- [ ] Include player-name puns and pop-culture references
-- [ ] Shortlist favourite names
-- [ ] Develop matching logo concepts
-- [ ] Generate square Yahoo-compatible team logo
-- [ ] Set final Yahoo team name and image
+- [x] Identify likely franchise / star players from the final roster
+- [x] Generate fantasy team-name ideas
+- [x] Include player-name puns and pop-culture references
+- [x] Shortlist favourite names
+- [x] Develop matching logo concepts
+- [x] Generate square Yahoo-compatible team logo
+- [x] Set final Yahoo team name and image
 
 ## Near Term — In-Season Phase 1: My Team
 
@@ -173,7 +173,6 @@ This is likely to be the highest-value weekly feature.
 
 Example target output:
 
-```text
 ADD Player X
 DROP Player Y
 
@@ -182,7 +181,6 @@ Why:
 - WR depth is currently weak
 - Player Y is unlikely to enter the starting lineup
 - Player X has favourable upcoming fixtures
-```
 
 ## Near Term — In-Season Phase 3: Start / Sit
 
@@ -311,6 +309,12 @@ This would normally consume around 12 calls per week from those scheduled refres
 - [ ] Update the systemd service after folder rename
 
 ## Post-Season / 2027
+
+### 2027/Draft improvements
+
+- [ ] Add live player-status awareness to draft recommendations
+- [ ] Add bye-week concentration awareness
+- [ ] Improve recovery workflow after Yahoo disconnect / auto-pick
 
 ### League-Size Awareness
 
