@@ -33,6 +33,7 @@ from refresh_data import (
     refresh_ffc,
 )
 from roster_display import build_roster_slots
+from roster_manager import move_roster_player
 
 app = Flask(__name__)
 
@@ -270,6 +271,65 @@ def my_team():
     roster = load_season_roster(season)
     identity = load_team_identity(season)
 
+    roster_by_slot = {
+        (
+            player["roster_slot"],
+            player["slot_index"],
+        ): player
+        for player in roster
+    }
+
+    starter_layout = [
+        ("QB", 1),
+        ("RB", 1),
+        ("RB", 2),
+        ("WR", 1),
+        ("WR", 2),
+        ("TE", 1),
+        ("FLEX", 1),
+        ("K", 1),
+        ("DEF", 1),
+    ]
+
+    starter_slots = [
+        {
+            "roster_slot": roster_slot,
+            "slot_index": slot_index,
+            "player": roster_by_slot.get(
+                (roster_slot, slot_index)
+            ),
+        }
+        for roster_slot, slot_index
+        in starter_layout
+    ]
+
+    bench_slots = [
+        {
+            "roster_slot": "BN",
+            "slot_index": player["slot_index"],
+            "player": player,
+        }
+        for player in roster
+        if player["roster_slot"] == "BN"
+    ]
+
+    # Yahoo allows a starter to be benched even when
+    # the normal five bench places are already occupied.
+    # This synthetic empty row represents that action.
+    bench_slots.append(
+        {
+            "roster_slot": "BN",
+            "slot_index": None,
+            "player": None,
+        }
+    )
+
+    ir_players = [
+        player
+        for player in roster
+        if player["roster_slot"] == "IR"
+    ]
+
     data = {
         "league": {
             "name": CURRENT_LEAGUE_NAME,
@@ -277,11 +337,80 @@ def my_team():
         },
         "team": identity,
         "roster": roster,
+        "starter_slots": starter_slots,
+        "bench_slots": bench_slots,
+        "ir_players": ir_players,
+        "move_success":
+            request.args.get("moved") == "1",
+        "move_error":
+            request.args.get("move_error"),
     }
 
     return render_template(
         "my_team.html",
         data=data,
+    )
+
+
+@app.post("/my-team/move")
+def move_my_team_player():
+    player_id = request.form.get(
+        "player_id",
+        "",
+    ).strip()
+
+    target_slot = request.form.get(
+        "target_slot",
+        "",
+    ).strip()
+
+    target_index = request.form.get(
+        "target_index",
+        type=int,
+    )
+
+    if (
+        not player_id
+        or not target_slot
+    ):
+        return redirect(
+            url_for(
+                "my_team",
+                move_error="Invalid roster move",
+            )
+        )
+
+    if (
+        target_slot.upper() != "BN"
+        and target_index is None
+    ):
+        return redirect(
+            url_for(
+                "my_team",
+                move_error="Invalid roster move",
+            )
+        )
+
+    try:
+        move_roster_player(
+            player_id,
+            target_slot,
+            target_index,
+            season=2026,
+        )
+    except ValueError as exc:
+        return redirect(
+            url_for(
+                "my_team",
+                move_error=str(exc),
+            )
+        )
+
+    return redirect(
+        url_for(
+            "my_team",
+            moved="1",
+        )
     )
 
 
