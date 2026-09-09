@@ -668,6 +668,188 @@ def print_ir_stashes(roster):
 
 
 
+def game_sort_key(player):
+    day_order = {
+        "Thu": 0,
+        "Fri": 1,
+        "Sat": 2,
+        "Sun": 3,
+        "Mon": 4,
+        "Tue": 5,
+        "Wed": 6,
+    }
+
+    day = player.get(
+        "game_day"
+    )
+
+    time_text = player.get(
+        "game_time"
+    )
+
+    minutes = 9999
+
+    if time_text:
+        try:
+            clock, meridiem = (
+                time_text.split()
+            )
+
+            hour, minute = (
+                int(value)
+                for value in clock.split(":")
+            )
+
+            if meridiem.lower() == "pm":
+                if hour != 12:
+                    hour += 12
+            elif hour == 12:
+                hour = 0
+
+            minutes = (
+                hour * 60
+                + minute
+            )
+
+        except (
+            ValueError,
+            AttributeError,
+        ):
+            pass
+
+    return (
+        day_order.get(
+            day,
+            99,
+        ),
+        minutes,
+        player["name"],
+    )
+
+
+def print_upcoming_decisions(
+    roster,
+    lineup,
+):
+    starter_slots = {
+        player["yahoo_player_id"]:
+            slot
+        for slot, player
+        in lineup
+    }
+
+    active_players = [
+        player
+        for player in roster
+        if (
+            player.get(
+                "roster_slot"
+            ) != "IR"
+            and player.get(
+                "game_day"
+            )
+            and player.get(
+                "game_time"
+            )
+        )
+    ]
+
+    active_players.sort(
+        key=game_sort_key
+    )
+
+    print()
+    print("UPCOMING LINEUP LOCKS")
+    print("====================")
+
+    if not active_players:
+        print(
+            "No game times available."
+        )
+        return
+
+    first = active_players[0]
+
+    print(
+        f"First lock: "
+        f"{first['game_day']} "
+        f"{first['game_time']} ET"
+    )
+
+    current_lock = None
+
+    for player in active_players:
+        lock = (
+            player["game_day"],
+            player["game_time"],
+        )
+
+        if lock != current_lock:
+            heading = (
+                f"{player['game_day']} "
+                f"{player['game_time']} ET"
+            )
+
+            print()
+            print(heading)
+            print(
+                "-" * len(heading)
+            )
+
+            current_lock = lock
+
+        starter_slot = (
+            starter_slots.get(
+                player[
+                    "yahoo_player_id"
+                ]
+            )
+        )
+
+        role = (
+            starter_slot
+            if starter_slot
+            else "BENCH"
+        )
+
+        status = (
+            player.get("status")
+            or ""
+        )
+
+        marker = (
+            f" [{status}]"
+            if status
+            else ""
+        )
+
+        matchup = (
+            player.get(
+                "game_display"
+            )
+            or ""
+        )
+
+        # Remove the duplicated day/time
+        # from the matchup for display.
+        prefix = (
+            f"{player['game_day']} "
+            f"{player['game_time']} "
+        )
+
+        if matchup.startswith(prefix):
+            matchup = matchup[
+                len(prefix):
+            ]
+
+        print(
+            f"{role:<6} "
+            f"{player['name']:<24} "
+            f"{matchup:<10}"
+            f"{marker}"
+        )
+
+
 def main():
     roster = load_json(
         MY_TEAM_FILE
@@ -694,6 +876,11 @@ def main():
 
     print_status_warnings(
         lineup
+    )
+
+    print_upcoming_decisions(
+        roster,
+        lineup,
     )
 
     print_available_rankings(

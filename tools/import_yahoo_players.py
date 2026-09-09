@@ -269,6 +269,70 @@ def extract_offense_stats(cells, position):
 
 
 
+def extract_game_info(player_cell):
+    """
+    Extract Yahoo's matchup text, for example:
+
+        Sun 1:00 pm @ Hou
+        Thu 8:20 pm vs NE
+    """
+
+    text = " ".join(
+        player_cell.stripped_strings
+    )
+
+    match = re.search(
+        r"\b"
+        r"(Mon|Tue|Wed|Thu|Fri|Sat|Sun)"
+        r"\s+"
+        r"(\d{1,2}:\d{2})"
+        r"\s*"
+        r"(am|pm)"
+        r"\s+"
+        r"(@|vs\.?)"
+        r"\s+"
+        r"([A-Za-z]{2,4})"
+        r"\b",
+        text,
+        re.IGNORECASE,
+    )
+
+    if not match:
+        return {
+            "game_display": None,
+            "game_day": None,
+            "game_time": None,
+            "opponent": None,
+            "home_away": None,
+        }
+
+    day = match.group(1).title()
+    clock = match.group(2)
+    meridiem = match.group(3).lower()
+    marker = match.group(4).lower()
+    opponent = match.group(5).upper()
+
+    home_away = (
+        "away"
+        if marker == "@"
+        else "home"
+    )
+
+    return {
+        "game_display": (
+            f"{day} {clock} {meridiem} "
+            f"{marker} {opponent}"
+        ),
+        "game_day": day,
+        "game_time": (
+            f"{clock} {meridiem}"
+        ),
+        "opponent": opponent,
+        "home_away": home_away,
+    }
+
+
+
 def parse_page(path):
     html = path.read_text(
         encoding="utf-8",
@@ -339,6 +403,10 @@ def parse_page(path):
             extract_team_position(
                 player_cell
             )
+        )
+
+        game_info = extract_game_info(
+            player_cell
         )
 
         if not name:
@@ -424,6 +492,31 @@ def parse_page(path):
                     player_cell,
                     player_id,
                 ),
+
+            "game_display":
+                game_info[
+                    "game_display"
+                ],
+
+            "game_day":
+                game_info[
+                    "game_day"
+                ],
+
+            "game_time":
+                game_info[
+                    "game_time"
+                ],
+
+            "opponent":
+                game_info[
+                    "opponent"
+                ],
+
+            "home_away":
+                game_info[
+                    "home_away"
+                ],
 
             "projection_stats":
                 extract_offense_stats(
