@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        {% block title %}
+        Busy Working Fantasy Assistant
+        {% endblock %}
+    </title>
+
+    {% block favicon %}
+    <link
+        rel="icon"
+        type="image/png"
+        href="{{ url_for(
+            'static',
+            filename='favicons/busy_working.png'
+        ) }}"
+    >
+    {% endblock %}
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='style.css'
+        ) }}"
+    >
+
+    {% block head_extra %}{% endblock %}
+</head>
+
+<body>
+    {% block header %}{% endblock %}
+
+    <main class="{% block main_class %}container{% endblock %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% include "_yahoo_footer.html" %}
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

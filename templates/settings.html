@@ -1,34 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
+{% extends "base.html" %}
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+{% block title %}
+{{ data.league.name }} Settings
+{% endblock %}
 
-    <title>
-        {{ data.league.name }} Settings
-    </title>
-
-    <link
-        rel="icon"
-        type="image/png"
-        href="{{ url_for(
-            'static',
-            filename='favicons/busy_working.png'
-        ) }}"
-    >
-
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
-</head>
-
-<body>
-
+{% block header %}
 <header class="topbar">
     <div>
         <div class="eyebrow">
@@ -49,28 +25,17 @@
             {{ data.league.teams }} Teams
         </div>
 
-        <nav class="app-nav">
-            <a href="{{ url_for('dashboard') }}">
-                Draft
-            </a>
-
-            <a href="{{ url_for('my_team') }}">
-                My Team
-            </a>
-
-            <a
-                class="active"
-                href="{{ url_for('settings_page') }}"
-            >
-                Settings
-            </a>
-        </nav>
+        {% include "_app_nav.html" %}
     </div>
 </header>
+{% endblock %}
 
-<main class="container settings-page">
+{% block main_class %}
+container settings-page
+{% endblock %}
 
-    <div class="settings-heading">
+{% block content %}
+<div class="settings-heading">
         <div>
             <div class="eyebrow settings-eyebrow">
                 ADMINISTRATION
@@ -753,12 +718,4 @@
     </section>
 
     {% endif %}
-
-</main>
-
-<footer>
-    Busy Working Fantasy Assistant · Development Version
-</footer>
-
-</body>
-</html>
+{% endblock %}

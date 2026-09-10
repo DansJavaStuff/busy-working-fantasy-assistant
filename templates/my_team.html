@@ -1,34 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
+{% extends "base.html" %}
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+{% block title %}
+{{ data.team.team_name }} · My Team
+{% endblock %}
 
-    <title>
-        {{ data.team.team_name }} · My Team
-    </title>
+{% block favicon %}
+{% if data.team.logo_path %}
+<link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for(
+        'static',
+        filename=data.team.logo_path
+    ) }}"
+>
+{% else %}
+{{ super() }}
+{% endif %}
+{% endblock %}
 
-    {% if data.team.logo_path %}
-    <link
-        rel="icon"
-        type="image/png"
-        href="{{ url_for(
-            'static',
-            filename=data.team.logo_path
-        ) }}"
-    >
-    {% endif %}
-
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
-
-    <style>
+{% block head_extra %}
+<style>
         :root {
             --team-primary:
                 {{ data.team.primary_colour }};
@@ -165,10 +157,9 @@
             display: table-row;
         }
     </style>
-</head>
+{% endblock %}
 
-<body>
-
+{% block header %}
 <header class="topbar team-topbar">
 
     <div class="team-brand">
@@ -202,28 +193,17 @@
 
     </div>
 
-    <nav class="app-nav">
-        <a href="{{ url_for('dashboard') }}">
-            Draft
-        </a>
-
-        <a
-            class="active"
-            href="{{ url_for('my_team') }}"
-        >
-            My Team
-        </a>
-
-        <a href="{{ url_for('settings_page') }}">
-            Settings
-        </a>
-    </nav>
+    {% include "_app_nav.html" %}
 
 </header>
+{% endblock %}
 
-<main class="container">
+{% block main_class %}
+container
+{% endblock %}
 
-    {% if data.move_success %}
+{% block content %}
+{% if data.move_success %}
     <div class="move-message move-success">
         ✓ Lineup updated
     </div>
@@ -372,9 +352,9 @@
             </tbody>
         </table>
     </section>
+{% endblock %}
 
-</main>
-
+{% block scripts %}
 <form
     id="roster-move-form"
     method="post"
@@ -682,6 +662,4 @@ for (const row of destinationRows) {
     );
 }
 </script>
-
-</body>
-</html>
+{% endblock %}

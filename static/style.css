@@ -1138,3 +1138,49 @@ footer {
     object-fit: contain;
     border-radius: 12px;
 }
+
+
+/* Shared application footer */
+
+.site-footer {
+    margin-top: 32px;
+    padding: 20px 24px;
+    border-top: 1px solid #d9dde3;
+    text-align: center;
+    color: #697586;
+    font-size: 13px;
+}
+
+.yahoo-attribution {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.yahoo-attribution-logo-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 170px;
+    height: 28px;
+    overflow: hidden;
+}
+
+.yahoo-attribution-logo {
+    width: 293px;
+    height: 293px;
+    display: block;
+    flex: none;
+}
+
+.yahoo-attribution a {
+    color: inherit;
+}
+
+.site-footer-app {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #8a94a3;
+}

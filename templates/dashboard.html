@@ -1,27 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ data.league.name }} Draft Assistant</title>
+{% extends "base.html" %}
 
-    <link
-        rel="icon"
-        type="image/png"
-        href="{{ url_for(
-            'static',
-            filename='favicons/busy_working.png'
-        ) }}"
-    >
+{% block title %}
+{{ data.league.name }} Draft Assistant
+{% endblock %}
 
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
-</head>
-
-<body>
-
+{% block header %}
 <header class="topbar">
     <div>
         <div class="eyebrow">YAHOO FANTASY FOOTBALL</div>
@@ -35,28 +18,17 @@
             {{ data.league.teams }} Teams
         </div>
 
-        <nav class="app-nav">
-            <a
-                class="active"
-                href="{{ url_for('dashboard') }}"
-            >
-                Draft
-            </a>
-
-            <a href="{{ url_for('my_team') }}">
-                My Team
-            </a>
-
-            <a href="{{ url_for('settings_page') }}">
-                Settings
-            </a>
-        </nav>
+        {% include "_app_nav.html" %}
 
     </div>
 </header>
+{% endblock %}
 
-<main class="container">
+{% block main_class %}
+container
+{% endblock %}
 
+{% block content %}
 {% if data.draft.session_type == "actual" %}
 
 <div class="mode-banner mode-live">
@@ -456,12 +428,9 @@
 </div>
 
 {% endif %}
-</main>
+{% endblock %}
 
-<footer>
-    Busy Working Fantasy Assistant · Development Version
-</footer>
-
+{% block scripts %}
 <script>
 const availablePlayers = {{ data.available | tojson }};
 
@@ -658,6 +627,4 @@ searchInput.addEventListener(
     renderResults
 );
 </script>
-
-</body>
-</html>
+{% endblock %}

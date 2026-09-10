@@ -1,0 +1,28 @@
+<nav class="app-nav">
+    <a
+        {% if request.endpoint == 'dashboard' %}
+        class="active"
+        {% endif %}
+        href="{{ url_for('dashboard') }}"
+    >
+        Draft
+    </a>
+
+    <a
+        {% if request.endpoint == 'my_team' %}
+        class="active"
+        {% endif %}
+        href="{{ url_for('my_team') }}"
+    >
+        My Team
+    </a>
+
+    <a
+        {% if request.endpoint == 'settings_page' %}
+        class="active"
+        {% endif %}
+        href="{{ url_for('settings_page') }}"
+    >
+        Settings
+    </a>
+</nav>
