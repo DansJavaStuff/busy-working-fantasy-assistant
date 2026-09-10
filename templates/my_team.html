@@ -215,10 +215,25 @@ container
     </div>
     {% endif %}
 
-    <p class="roster-help">
+    <div class="yahoo-data-status">
+        Yahoo data:
+        <strong>
+            {% if data.yahoo_status.source == "manual_import" %}
+Manual snapshot
+{% else %}
+{{ data.yahoo_status.source }}
+{% endif %}
+        </strong>
+        · captured
+        {{ data.yahoo_status.captured_at_display }}
+    </div>
+
+<p class="roster-help">
         Select a player to show the roster slots
         they can legally swap into.
     </p>
+
+
 
     <section class="team-section">
         <h2>Starting Lineup</h2>

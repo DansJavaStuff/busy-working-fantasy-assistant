@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ data.team.team_name }} · Week {{ data.weekly.week }}
+{% endblock %}
+
+{% block favicon %}
+{% if data.team.logo_path %}
+<link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for(
+        'static',
+        filename=data.team.logo_path
+    ) }}"
+>
+{% else %}
+{{ super() }}
+{% endif %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+    :root {
+        --team-primary:
+            {{ data.team.primary_colour }};
+        --team-secondary:
+            {{ data.team.secondary_colour }};
+        --team-accent:
+            {{ data.team.accent_colour }};
+    }
+
+    .weekly-topbar h1,
+    .weekly-topbar .subtitle {
+        color: var(--team-accent);
+    }
+
+    .weekly-summary {
+        display: grid;
+        grid-template-columns:
+            repeat(
+                auto-fit,
+                minmax(180px, 1fr)
+            );
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .weekly-card,
+    .weekly-section {
+        background: white;
+        border-radius: 14px;
+        box-shadow:
+            0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .weekly-card {
+        padding: 20px;
+        border-top:
+            4px solid var(--team-secondary);
+    }
+
+    .weekly-card span {
+        display: block;
+        color: #697586;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .weekly-card strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 24px;
+    }
+
+    .weekly-section {
+        padding: 24px;
+        margin-bottom: 24px;
+        border-top:
+            4px solid var(--team-secondary);
+    }
+
+    .weekly-section h2 {
+        margin-top: 0;
+    }
+
+    .weekly-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .weekly-table th,
+    .weekly-table td {
+        padding: 12px 14px;
+        text-align: left;
+        border-bottom:
+            1px solid #eceff3;
+    }
+
+    .weekly-table th {
+        color: #697586;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .weekly-projection {
+        font-weight: 800;
+    }
+
+    .weekly-status {
+        font-weight: 800;
+    }
+
+    .lock-group {
+        padding: 16px 0;
+        border-bottom:
+            1px solid #eceff3;
+    }
+
+    .lock-group:last-child {
+        border-bottom: 0;
+    }
+
+    .lock-heading {
+        margin-bottom: 10px;
+        font-weight: 800;
+    }
+
+    .lock-player {
+        display: grid;
+        grid-template-columns:
+            70px 1fr 100px 60px;
+        gap: 12px;
+        padding: 6px 0;
+        align-items: center;
+    }
+
+    .lock-role {
+        font-size: 12px;
+        font-weight: 800;
+        color: #697586;
+    }
+
+    .lock-matchup {
+        color: #697586;
+    }
+
+    .status-warning {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #fff3cd;
+        color: #805d00;
+        font-weight: 800;
+    }
+
+    @media (
+        max-width: 700px
+    ) {
+        .lock-player {
+            grid-template-columns:
+                60px 1fr;
+        }
+
+        .lock-matchup,
+        .lock-player-status {
+            grid-column: 2;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<header class="topbar weekly-topbar">
+    <div>
+        <div class="eyebrow">
+            WEEK {{ data.weekly.week }}
+        </div>
+
+        <h1>
+            🏈 {{ data.team.team_name }}
+        </h1>
+
+        <div class="subtitle">
+            Weekly Assistant
+        </div>
+    </div>
+
+    <div class="topbar-actions">
+        {% if data.team.logo_path %}
+        <img
+            src="{{ url_for(
+                'static',
+                filename=data.team.logo_path
+            ) }}"
+            alt="{{ data.team.team_name }}"
+            style="
+                max-height: 64px;
+                max-width: 160px;
+            "
+        >
+        {% endif %}
+
+        {% include "_app_nav.html" %}
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+
+<div class="yahoo-data-status">
+    Yahoo data:
+    <strong>
+        {% if data.weekly.provider_status.source == "manual_import" %}
+Manual snapshot
+{% else %}
+{{ data.weekly.provider_status.source }}
+{% endif %}
+    </strong>
+    · captured
+    {{ data.weekly.provider_status.captured_at_display }}
+</div>
+
+<section class="weekly-summary">
+    <div class="weekly-card">
+        <span>
+            Projected Points
+        </span>
+
+        <strong>
+            {{
+                "%.2f"
+                | format(
+                    data.weekly.total_projection
+                )
+            }}
+        </strong>
+    </div>
+
+    <div class="weekly-card">
+        <span>
+            Status Watch
+        </span>
+
+        <strong>
+            {{
+                data.weekly.status_watch
+                | length
+            }}
+        </strong>
+    </div>
+
+    <div class="weekly-card">
+        <span>
+            First Lineup Lock
+        </span>
+
+        <strong>
+            {% if data.weekly.first_lock %}
+                {{ data.weekly.first_lock.day }}
+                {{ data.weekly.first_lock.time }}
+                ET
+            {% else %}
+                —
+            {% endif %}
+        </strong>
+    </div>
+</section>
+
+
+<section class="weekly-section">
+    <h2>
+        Recommended Lineup
+    </h2>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Slot</th>
+                <th>Player</th>
+                <th>Team</th>
+                <th>Matchup</th>
+                <th>Proj</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in data.weekly.lineup %}
+            <tr>
+                <td>
+                    <strong>
+                        {{ item.slot }}
+                    </strong>
+                </td>
+
+                <td>
+                    {{ item.player.name }}
+                </td>
+
+                <td>
+                    {{ item.player.team }}
+                </td>
+
+                <td>
+                    {{
+                        item.player.game_display
+                        or "—"
+                    }}
+                </td>
+
+                <td class="weekly-projection">
+                    {{
+                        "%.2f"
+                        | format(
+                            item.player
+                            .week_1_projection
+                            or 0
+                        )
+                    }}
+                </td>
+
+                <td>
+                    {% if item.player.status %}
+                    <span class="status-warning">
+                        {{ item.player.status }}
+                    </span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+
+{% if data.weekly.status_watch %}
+<section class="weekly-section">
+    <h2>
+        Status Watch
+    </h2>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Slot</th>
+                <th>Player</th>
+                <th>Status</th>
+                <th>Game</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in data.weekly.status_watch %}
+            <tr>
+                <td>
+                    {{ item.slot }}
+                </td>
+
+                <td>
+                    {{ item.player.name }}
+                </td>
+
+                <td>
+                    <span class="status-warning">
+                        {{ item.player.status }}
+                    </span>
+                </td>
+
+                <td>
+                    {{
+                        item.player.game_display
+                        or "—"
+                    }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+
+<section class="weekly-section">
+    <h2>
+        Upcoming Lineup Locks
+    </h2>
+
+    {% for group in data.weekly.lock_groups %}
+    <div class="lock-group">
+        <div class="lock-heading">
+            {{ group.day }}
+            {{ group.time }}
+            ET
+        </div>
+
+        {% for item in group.players %}
+        <div class="lock-player">
+            <div class="lock-role">
+                {{ item.role }}
+            </div>
+
+            <div>
+                <strong>
+                    {{ item.player.name }}
+                </strong>
+            </div>
+
+            <div class="lock-matchup">
+                {{ item.matchup }}
+            </div>
+
+            <div class="lock-player-status">
+                {% if item.player.status %}
+                <span class="status-warning">
+                    {{ item.player.status }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</section>
+
+
+{% if data.weekly.ir_review %}
+<section class="weekly-section">
+    <h2>
+        IR Stash Review
+    </h2>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Pos</th>
+                <th>Status</th>
+                <th>Week 1</th>
+                <th>Week 2</th>
+                <th>Next 4</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for player in data.weekly.ir_review %}
+            <tr>
+                <td>
+                    {{ player.name }}
+                </td>
+
+                <td>
+                    {{ player.position }}
+                </td>
+
+                <td>
+                    {{ player.status }}
+                </td>
+
+                <td>
+                    {{
+                        "%.2f"
+                        | format(
+                            player.week_1_projection
+                            or 0
+                        )
+                    }}
+                </td>
+
+                <td>
+                    {{
+                        "%.2f"
+                        | format(
+                            player.week_2_projection
+                            or 0
+                        )
+                    }}
+                </td>
+
+                <td>
+                    {{
+                        "%.2f"
+                        | format(
+                            player
+                            .next_4_weeks_projection
+                            or 0
+                        )
+                    }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% endblock %}

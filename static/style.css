@@ -1184,3 +1184,16 @@ footer {
     font-size: 12px;
     color: #8a94a3;
 }
+
+.yahoo-data-status {
+    margin: 0 0 20px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #f7f8fa;
+    color: #697586;
+    font-size: 13px;
+}
+
+.yahoo-data-status strong {
+    color: #313946;
+}

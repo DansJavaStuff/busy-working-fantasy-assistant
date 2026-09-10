@@ -9,6 +9,15 @@
     </a>
 
     <a
+        {% if request.endpoint == 'weekly' %}
+        class="active"
+        {% endif %}
+        href="{{ url_for('weekly') }}"
+    >
+        Weekly
+    </a>
+
+    <a
         {% if request.endpoint == 'my_team' %}
         class="active"
         {% endif %}

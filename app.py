@@ -34,6 +34,11 @@ from refresh_data import (
 )
 from roster_display import build_roster_slots
 from roster_manager import move_roster_player
+from weekly_engine import build_weekly_data
+from yahoo_provider import (
+    enrich_local_roster,
+    get_yahoo_provider_status,
+)
 
 app = Flask(__name__)
 
@@ -264,12 +269,51 @@ def reset():
 
     return redirect(url_for("dashboard"))
 
+@app.get("/weekly")
+def weekly():
+    season = 2026
+
+    weekly_data = build_weekly_data(
+        season=season,
+        week=1,
+    )
+
+    data = {
+        "league": {
+            "name":
+                CURRENT_LEAGUE_NAME,
+            "season":
+                season,
+        },
+        "team":
+            load_team_identity(
+                season
+            ),
+        "weekly":
+            weekly_data,
+    }
+
+    return render_template(
+        "weekly.html",
+        data=data,
+    )
+
+
 @app.get("/my-team")
 def my_team():
     season = 2026
 
-    roster = load_season_roster(season)
-    identity = load_team_identity(season)
+    local_roster = load_season_roster(
+        season
+    )
+
+    roster = enrich_local_roster(
+        local_roster
+    )
+
+    identity = load_team_identity(
+        season
+    )
 
     roster_by_slot = {
         (
@@ -340,6 +384,8 @@ def my_team():
         "starter_slots": starter_slots,
         "bench_slots": bench_slots,
         "ir_players": ir_players,
+        "yahoo_status":
+            get_yahoo_provider_status(),
         "move_success":
             request.args.get("moved") == "1",
         "move_error":
