@@ -1,8 +1,13 @@
 from pathlib import Path
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 import json
 
 from database import load_season_roster
 from yahoo_provider import yahoo_provider
+from transaction_engine import (
+    build_transaction_recommendations,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -31,6 +36,58 @@ UNAVAILABLE_STATUSES = {
     "PUP",
     "SUSP",
 }
+
+
+_TRANSACTION_CACHE = {
+    "snapshot_key": None,
+    "recommendations": None,
+}
+
+
+def cached_transaction_recommendations(
+    roster,
+    available,
+    provider_status,
+):
+    captured_at = provider_status.get(
+        "captured_at"
+    )
+
+    snapshot_key = (
+        captured_at.isoformat()
+        if captured_at
+        else None
+    )
+
+    if (
+        _TRANSACTION_CACHE[
+            "snapshot_key"
+        ] == snapshot_key
+        and _TRANSACTION_CACHE[
+            "recommendations"
+        ] is not None
+    ):
+        return _TRANSACTION_CACHE[
+            "recommendations"
+        ]
+
+    recommendations = (
+        build_transaction_recommendations(
+            roster,
+            available,
+            limit=5,
+        )
+    )
+
+    _TRANSACTION_CACHE[
+        "snapshot_key"
+    ] = snapshot_key
+
+    _TRANSACTION_CACHE[
+        "recommendations"
+    ] = recommendations
+
+    return recommendations
 
 
 def load_json(path):
@@ -253,6 +310,165 @@ def build_best_lineup(players):
     return lineup
 
 
+WEEK_1_THURSDAY = date(
+    2026,
+    9,
+    10,
+)
+
+EASTERN = ZoneInfo(
+    "America/New_York"
+)
+
+UK_TIME = ZoneInfo(
+    "Europe/London"
+)
+
+
+def game_date_for_week(
+    week,
+    game_day,
+):
+    week_thursday = (
+        WEEK_1_THURSDAY
+        + timedelta(
+            weeks=week - 1
+        )
+    )
+
+    offsets = {
+        "Thu": 0,
+        "Fri": 1,
+        "Sat": 2,
+        "Sun": 3,
+        "Mon": 4,
+        "Tue": 5,
+        "Wed": 6,
+    }
+
+    offset = offsets.get(
+        game_day
+    )
+
+    if offset is None:
+        return None
+
+    return (
+        week_thursday
+        + timedelta(days=offset)
+    )
+
+
+def local_game_info(
+    player,
+    week,
+):
+    game_day = player.get(
+        "game_day"
+    )
+
+    game_time = player.get(
+        "game_time"
+    )
+
+    if not game_day or not game_time:
+        return None
+
+    game_date = game_date_for_week(
+        week,
+        game_day,
+    )
+
+    if game_date is None:
+        return None
+
+    try:
+        clock, meridiem = (
+            game_time.split()
+        )
+
+        hour, minute = (
+            int(value)
+            for value
+            in clock.split(":")
+        )
+
+        if (
+            meridiem.lower() == "pm"
+            and hour != 12
+        ):
+            hour += 12
+
+        if (
+            meridiem.lower() == "am"
+            and hour == 12
+        ):
+            hour = 0
+
+    except ValueError:
+        return None
+
+    eastern = datetime(
+        game_date.year,
+        game_date.month,
+        game_date.day,
+        hour,
+        minute,
+        tzinfo=EASTERN,
+    )
+
+    local = eastern.astimezone(
+        UK_TIME
+    )
+
+    return {
+        "datetime": local,
+        "day":
+            local.strftime("%a"),
+        "date":
+            local.strftime("%-d %b"),
+        "time":
+            local.strftime("%H:%M"),
+        "timezone":
+            local.tzname(),
+        "display":
+            local.strftime(
+                "%a %-d %b · %H:%M %Z"
+            ),
+    }
+
+
+
+def enrich_player_game_time(
+    player,
+    week,
+):
+    local_info = local_game_info(
+        player,
+        week,
+    )
+
+    enriched = dict(player)
+
+    enriched["local_game"] = (
+        local_info
+    )
+
+    if local_info:
+        enriched[
+            "local_game_display"
+        ] = local_info["display"]
+    else:
+        enriched[
+            "local_game_display"
+        ] = player.get(
+            "game_display"
+        )
+
+    return enriched
+
+
+
 def game_sort_key(player):
     day_order = {
         "Thu": 0,
@@ -322,6 +538,7 @@ def game_sort_key(player):
 def build_lock_groups(
     roster,
     lineup,
+    week,
 ):
     starter_slots = {
         item["player"][
@@ -363,13 +580,24 @@ def build_lock_groups(
             not groups
             or groups[-1]["key"] != key
         ):
+            local_info = local_game_info(
+                player,
+                week,
+            )
+
             groups.append(
                 {
                     "key": key,
+
                     "day":
                         player["game_day"],
+
                     "time":
                         player["game_time"],
+
+                    "local":
+                        local_info,
+
                     "players": [],
                 }
             )
@@ -421,9 +649,35 @@ def build_weekly_data(
         .get_roster()
     )
 
+    available = (
+        yahoo_provider
+        .get_available_players()
+    )
+
     add_roster_slots(
         roster,
         season,
+    )
+
+    roster = [
+        enrich_player_game_time(
+            player,
+            week,
+        )
+        for player in roster
+    ]
+
+    provider_status = (
+        yahoo_provider
+        .get_status()
+    )
+
+    transactions = (
+        cached_transaction_recommendations(
+            roster,
+            available,
+            provider_status,
+        )
     )
 
     lineup = build_best_lineup(
@@ -482,17 +736,13 @@ def build_weekly_data(
     lock_groups = build_lock_groups(
         roster,
         lineup,
+        week,
     )
 
     first_lock = (
         lock_groups[0]
         if lock_groups
         else None
-    )
-
-    provider_status = (
-        yahoo_provider
-        .get_status()
     )
 
     return {
@@ -503,6 +753,9 @@ def build_weekly_data(
         "bench": bench,
         "status_watch":
             status_watch,
+
+        "transactions":
+            transactions,
         "ir_review":
             ir_review,
         "lock_groups":

@@ -170,6 +170,104 @@
             grid-column: 2;
         }
     }
+
+    .transaction-grid {
+        display: grid;
+        grid-template-columns:
+            repeat(
+                auto-fit,
+                minmax(280px, 1fr)
+            );
+        gap: 16px;
+    }
+
+    .transaction-card {
+        padding: 18px;
+        border: 1px solid #e3e7ed;
+        border-radius: 12px;
+        background: #fbfcfd;
+    }
+
+    .transaction-heading {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .transaction-label,
+    .transaction-type {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.4px;
+    }
+
+    .transaction-label {
+        background: #eef2f7;
+        color: #313946;
+    }
+
+    .transaction-type {
+        background: #eaf5ff;
+        color: #1267a5;
+    }
+
+    .transaction-players {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .transaction-add,
+    .transaction-drop {
+        padding: 12px;
+        border-radius: 10px;
+        background: white;
+    }
+
+    .transaction-add > span,
+    .transaction-drop > span {
+        display: block;
+        margin-bottom: 5px;
+        color: #697586;
+        font-size: 11px;
+        font-weight: 800;
+    }
+
+    .transaction-add strong,
+    .transaction-drop strong {
+        display: block;
+    }
+
+    .transaction-add small,
+    .transaction-drop small {
+        color: #697586;
+    }
+
+    .transaction-metrics {
+        display: grid;
+        grid-template-columns:
+            repeat(3, 1fr);
+        gap: 8px;
+    }
+
+    .transaction-metrics span {
+        display: block;
+        color: #697586;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .transaction-metrics strong {
+        display: block;
+        margin-top: 3px;
+    }
+
 </style>
 {% endblock %}
 
@@ -260,9 +358,13 @@ Manual snapshot
 
         <strong>
             {% if data.weekly.first_lock %}
+            {% if data.weekly.first_lock.local %}
+                {{ data.weekly.first_lock.local.display }}
+            {% else %}
                 {{ data.weekly.first_lock.day }}
                 {{ data.weekly.first_lock.time }}
                 ET
+            {% endif %}
             {% else %}
                 —
             {% endif %}
@@ -294,6 +396,9 @@ Manual snapshot
                 <td>
                     <strong>
                         {{ item.slot }}
+                        {% if item.slot == "FLEX" %}
+                            ({{ item.player.position }})
+                        {% endif %}
                     </strong>
                 </td>
 
@@ -307,7 +412,7 @@ Manual snapshot
 
                 <td>
                     {{
-                        item.player.game_display
+                        item.player.local_game_display
                         or "—"
                     }}
                 </td>
@@ -327,6 +432,69 @@ Manual snapshot
                     {% if item.player.status %}
                     <span class="status-warning">
                         {{ item.player.status }}
+                    </span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+
+<section class="weekly-section">
+    <h2>
+        Bench
+    </h2>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Pos</th>
+                <th>Team</th>
+                <th>Matchup</th>
+                <th>Proj</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for player in data.weekly.bench %}
+            <tr>
+                <td>
+                    {{ player.name }}
+                </td>
+
+                <td>
+                    {{ player.position }}
+                </td>
+
+                <td>
+                    {{ player.team }}
+                </td>
+
+                <td>
+                    {{
+                        player.local_game_display
+                        or "—"
+                    }}
+                </td>
+
+                <td class="weekly-projection">
+                    {{
+                        "%.2f"
+                        | format(
+                            player.week_1_projection
+                            or 0
+                        )
+                    }}
+                </td>
+
+                <td>
+                    {% if player.status %}
+                    <span class="status-warning">
+                        {{ player.status }}
                     </span>
                     {% endif %}
                 </td>
@@ -372,7 +540,7 @@ Manual snapshot
 
                 <td>
                     {{
-                        item.player.game_display
+                        item.player.local_game_display
                         or "—"
                     }}
                 </td>
@@ -392,9 +560,13 @@ Manual snapshot
     {% for group in data.weekly.lock_groups %}
     <div class="lock-group">
         <div class="lock-heading">
-            {{ group.day }}
-            {{ group.time }}
-            ET
+            {% if group.local %}
+                {{ group.local.display }}
+            {% else %}
+                {{ group.day }}
+                {{ group.time }}
+                ET
+            {% endif %}
         </div>
 
         {% for item in group.players %}
@@ -425,6 +597,96 @@ Manual snapshot
     </div>
     {% endfor %}
 </section>
+
+
+{% if data.weekly.transactions %}
+<section class="weekly-section">
+    <h2>
+        Recommended Moves
+    </h2>
+
+    <div class="transaction-grid">
+        {% for move in data.weekly.transactions %}
+        <article class="transaction-card">
+            <div class="transaction-heading">
+                <span class="transaction-label">
+                    {{ move.label }}
+                </span>
+
+                <span class="transaction-type">
+                    {{ move.move_type }}
+                </span>
+            </div>
+
+            <div class="transaction-players">
+                <div class="transaction-add">
+                    <span>ADD</span>
+                    <strong>
+                        {{ move.add.name }}
+                    </strong>
+                    <small>
+                        {{ move.add.position }}
+                        ·
+                        {{
+                            move.add.roster_status
+                            or "?"
+                        }}
+                    </small>
+                </div>
+
+                <div class="transaction-drop">
+                    <span>DROP</span>
+                    <strong>
+                        {{ move.drop.name }}
+                    </strong>
+                    <small>
+                        {{ move.drop.position }}
+                    </small>
+                </div>
+            </div>
+
+            <div class="transaction-metrics">
+                <div>
+                    <span>Week 1</span>
+                    <strong>
+                        {{
+                            "%+.2f"
+                            | format(
+                                move.week_gain
+                            )
+                        }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>4-week / week</span>
+                    <strong>
+                        {{
+                            "%+.2f"
+                            | format(
+                                move.four_week_gain
+                            )
+                        }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Depth</span>
+                    <strong>
+                        {{
+                            "%+.2f"
+                            | format(
+                                move.bench_gain
+                            )
+                        }}
+                    </strong>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 
 
 {% if data.weekly.ir_review %}
