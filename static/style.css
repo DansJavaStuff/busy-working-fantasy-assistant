@@ -1186,7 +1186,7 @@ footer {
 }
 
 .yahoo-data-status {
-    margin: 0 0 20px;
+    margin: 0 0 10px;
     padding: 10px 14px;
     border-radius: 10px;
     background: #f7f8fa;
@@ -1197,3 +1197,23 @@ footer {
 .yahoo-data-status strong {
     color: #313946;
 }
+
+.yahoo-refresh-form {
+    margin: 0 0 20px;
+}
+
+.yahoo-refresh-button {
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: #313946;
+    color: white;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.yahoo-refresh-button:hover {
+    opacity: 0.9;
+}
+

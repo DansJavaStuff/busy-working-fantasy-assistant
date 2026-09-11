@@ -739,11 +739,60 @@ def build_weekly_data(
         week,
     )
 
+    now_local = datetime.now(
+        UK_TIME
+    )
+
+    upcoming_lock_groups = [
+        group
+        for group in lock_groups
+        if (
+            group.get("local")
+            and group["local"].get(
+                "datetime"
+            )
+            and group["local"][
+                "datetime"
+            ] > now_local
+        )
+    ]
+
     first_lock = (
-        lock_groups[0]
-        if lock_groups
+        upcoming_lock_groups[0]
+        if upcoming_lock_groups
         else None
     )
+
+    next_decision = None
+
+    if first_lock:
+        starters = [
+            item
+            for item in first_lock["players"]
+            if item["role"] != "BENCH"
+        ]
+
+        bench_players = [
+            item
+            for item in first_lock["players"]
+            if item["role"] == "BENCH"
+        ]
+
+        concerns = [
+            item
+            for item in first_lock["players"]
+            if item["player"].get("status")
+        ]
+
+        next_decision = {
+            "lock": first_lock,
+            "starters": starters,
+            "bench_players": bench_players,
+            "concerns": concerns,
+            "starter_count": len(starters),
+            "bench_count": len(bench_players),
+            "concern_count": len(concerns),
+        }
 
     return {
         "season": season,
@@ -760,8 +809,16 @@ def build_weekly_data(
             ir_review,
         "lock_groups":
             lock_groups,
+
+        "upcoming_lock_groups":
+            upcoming_lock_groups,
+
         "first_lock":
             first_lock,
+
+        "next_decision":
+            next_decision,
+
         "total_projection":
             total_projection,
 

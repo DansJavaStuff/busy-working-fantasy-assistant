@@ -406,6 +406,238 @@ def transaction_allowed(
     return True
 
 
+def replacement_candidates(
+    available,
+    position,
+    roster_ids=None,
+):
+    roster_ids = roster_ids or set()
+
+    candidates = [
+        player
+        for player in available
+        if (
+            player["position"] == position
+            and playable(player)
+            and player["yahoo_player_id"]
+            not in roster_ids
+        )
+    ]
+
+    candidates.sort(
+        key=four_week_average,
+        reverse=True,
+    )
+
+    return candidates
+
+
+def build_depth_context(
+    roster,
+    available,
+    add_player,
+    drop_player,
+):
+    roster_ids = {
+        player["yahoo_player_id"]
+        for player in roster
+    }
+
+    # The player being added would no longer
+    # be available after the transaction.
+    roster_ids.add(
+        add_player["yahoo_player_id"]
+    )
+
+    replacements = replacement_candidates(
+        available,
+        drop_player["position"],
+        roster_ids,
+    )
+
+    best_replacement = (
+        replacements[0]
+        if replacements
+        else None
+    )
+
+    drop_average = four_week_average(
+        drop_player
+    )
+
+    replacement_average = (
+        four_week_average(
+            best_replacement
+        )
+        if best_replacement
+        else 0.0
+    )
+
+    comparable_replacements = [
+        player
+        for player in replacements
+        if (
+            four_week_average(player)
+            >= drop_average - 1.0
+        )
+    ]
+
+    context = {
+        "drop_position":
+            drop_player["position"],
+
+        "drop_four_week_avg":
+            drop_average,
+
+        "best_replacement":
+            best_replacement,
+
+        "replacement_four_week_avg":
+            replacement_average,
+
+        "replacement_gap":
+            (
+                drop_average
+                - replacement_average
+            ),
+
+        "comparable_replacements":
+            len(
+                comparable_replacements
+            ),
+
+        "primary_qb":
+            None,
+
+        "covers_primary_qb_bye":
+            None,
+    }
+
+    if drop_player["position"] == "QB":
+        other_qbs = [
+            player
+            for player in roster
+            if (
+                player["position"] == "QB"
+                and player[
+                    "yahoo_player_id"
+                ]
+                != drop_player[
+                    "yahoo_player_id"
+                ]
+            )
+        ]
+
+        if other_qbs:
+            primary_qb = max(
+                other_qbs,
+                key=lambda player:
+                    projection(
+                        player,
+                        "week_1_projection",
+                    ),
+            )
+
+            context["primary_qb"] = (
+                primary_qb
+            )
+
+            context[
+                "covers_primary_qb_bye"
+            ] = (
+                drop_player.get(
+                    "bye_week"
+                )
+                != primary_qb.get(
+                    "bye_week"
+                )
+            )
+
+    return context
+
+
+def build_reasons(
+    result,
+    add_player,
+    drop_player,
+    depth_context,
+):
+    reasons = []
+
+    if result["week_gain"] >= 0.25:
+        reasons.append(
+            "Improves the Week 1 starting "
+            f"lineup by {result['week_gain']:.2f} pts."
+        )
+    elif abs(result["week_gain"]) < 0.10:
+        reasons.append(
+            "Does not change the Week 1 "
+            "starting-lineup projection."
+        )
+
+    if result["four_week_gain"] >= 0.25:
+        reasons.append(
+            "Improves the four-week outlook "
+            f"by {result['four_week_gain']:.2f} "
+            "pts/week."
+        )
+    elif result["four_week_gain"] <= -0.25:
+        reasons.append(
+            "Weakens the four-week outlook "
+            f"by {abs(result['four_week_gain']):.2f} "
+            "pts/week."
+        )
+
+    if result["bench_gain"] >= 0.50:
+        reasons.append(
+            "Improves positional bench/depth "
+            f"value by {result['bench_gain']:.2f}."
+        )
+
+    if drop_player["position"] == "QB":
+        primary_qb = depth_context.get(
+            "primary_qb"
+        )
+
+        if primary_qb:
+            if (
+                depth_context[
+                    "covers_primary_qb_bye"
+                ]
+                is False
+            ):
+                reasons.append(
+                    f"{drop_player['name']} and "
+                    f"{primary_qb['name']} share "
+                    f"the same Week "
+                    f"{primary_qb.get('bye_week')} bye."
+                )
+            else:
+                reasons.append(
+                    f"{drop_player['name']} provides "
+                    f"bye-week cover for "
+                    f"{primary_qb['name']}."
+                )
+
+        replacement = depth_context.get(
+            "best_replacement"
+        )
+
+        if replacement:
+            reasons.append(
+                f"{depth_context['comparable_replacements']} "
+                "comparable QB"
+                f"{'' if depth_context['comparable_replacements'] == 1 else 's'} "
+                "remain available; best currently "
+                f"{replacement['name']} at "
+                f"{depth_context['replacement_four_week_avg']:.2f} "
+                "pts/week."
+            )
+
+    return reasons
+
+
+
 def score_transaction(
     before,
     after,
@@ -570,6 +802,22 @@ def build_transaction_recommendations(
             if result["score"] <= 0.10:
                 continue
 
+            depth_context = (
+                build_depth_context(
+                    roster,
+                    available,
+                    add_player,
+                    drop_player,
+                )
+            )
+
+            reasons = build_reasons(
+                result,
+                add_player,
+                drop_player,
+                depth_context,
+            )
+
             result.update(
                 {
                     "add":
@@ -589,6 +837,12 @@ def build_transaction_recommendations(
                             add_player,
                             drop_player,
                         ),
+
+                    "depth_context":
+                        depth_context,
+
+                    "reasons":
+                        reasons,
                 }
             )
 

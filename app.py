@@ -1,4 +1,7 @@
 from flask import Flask, redirect, render_template, request, url_for
+from pathlib import Path
+import subprocess
+import sys
 from draft_engine import (
     create_new_season,
     draft_is_complete,
@@ -38,6 +41,7 @@ from weekly_engine import build_weekly_data
 from yahoo_provider import (
     enrich_local_roster,
     get_yahoo_provider_status,
+    yahoo_provider,
 )
 
 app = Flask(__name__)
@@ -458,6 +462,50 @@ def move_my_team_player():
             moved="1",
         )
     )
+
+
+@app.post("/yahoo/refresh")
+def refresh_yahoo_data():
+    project_root = Path(
+        __file__
+    ).resolve().parent
+
+    importer = (
+        project_root
+        / "tools"
+        / "import_yahoo_players.py"
+    )
+
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(importer),
+            ],
+            cwd=project_root,
+            check=True,
+            timeout=60,
+        )
+
+        yahoo_provider.refresh()
+
+        return redirect(
+            url_for(
+                "weekly",
+                refreshed="1",
+            )
+        )
+
+    except (
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+    ):
+        return redirect(
+            url_for(
+                "weekly",
+                refresh_error="1",
+            )
+        )
 
 
 @app.route("/health")
