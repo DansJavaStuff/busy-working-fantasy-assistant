@@ -640,6 +640,119 @@ def build_lock_groups(
     return groups
 
 
+def add_transaction_deadlines(
+    transactions,
+):
+    now_local = datetime.now(
+        UK_TIME
+    )
+
+    output = []
+
+    for transaction in transactions:
+        move = dict(transaction)
+
+        add_player = move["add"]
+        drop_player = move["drop"]
+
+        add_game = (
+            add_player.get("local_game")
+            or {}
+        )
+
+        drop_game = (
+            drop_player.get("local_game")
+            or {}
+        )
+
+        add_time = add_game.get(
+            "datetime"
+        )
+
+        drop_time = drop_game.get(
+            "datetime"
+        )
+
+        possible_times = [
+            value
+            for value in [
+                add_time,
+                drop_time,
+            ]
+            if value is not None
+        ]
+
+        if not possible_times:
+            move[
+                "transaction_deadline"
+            ] = None
+
+            move[
+                "transaction_deadline_note"
+            ] = None
+
+            output.append(move)
+            continue
+
+        deadline = min(
+            possible_times
+        )
+
+        if (
+            add_time is not None
+            and drop_time is not None
+            and add_time == drop_time
+        ):
+            note = (
+                "Both players lock then"
+            )
+
+        elif (
+            add_time is not None
+            and add_time == deadline
+        ):
+            note = (
+                f"{add_player['name']} "
+                "locks first"
+            )
+
+        else:
+            note = (
+                f"{drop_player['name']} "
+                "locks first"
+            )
+
+        move[
+            "transaction_deadline"
+        ] = {
+            "datetime":
+                deadline,
+
+            "display":
+                deadline.strftime(
+                    "%a %-d %b · %H:%M %Z"
+                ),
+
+            "passed":
+                deadline <= now_local,
+        }
+
+        move[
+            "transaction_deadline_note"
+        ] = note
+
+        # A recommendation whose earliest
+        # player has already locked is no
+        # longer actionable this week.
+        if deadline <= now_local:
+            continue
+
+        output.append(move)
+
+    return output
+
+
+
 def build_weekly_data(
     season=2026,
     week=1,
@@ -667,6 +780,14 @@ def build_weekly_data(
         for player in roster
     ]
 
+    available = [
+        enrich_player_game_time(
+            player,
+            week,
+        )
+        for player in available
+    ]
+
     provider_status = (
         yahoo_provider
         .get_status()
@@ -677,6 +798,12 @@ def build_weekly_data(
             roster,
             available,
             provider_status,
+        )
+    )
+
+    transactions = (
+        add_transaction_deadlines(
+            transactions
         )
     )
 
