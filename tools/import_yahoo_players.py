@@ -28,6 +28,12 @@ SOURCE_PATTERNS = {
         "Yahoo_Player_list_DEF_week1-Proj.html",
     ],
 
+    "week_1_actual": [
+        "Yahoo_Player_list_week1-Actual*.html",
+        "Yahoo_Player_list_K_week1-Actual.html",
+        "Yahoo_Player_list_DEF_week1-Actual.html",
+    ],
+
     "week_2_projection": [
         "Yahoo_Player_list_week2-Proj*.html",
         "Yahoo_Player_list_K_week2-Proj.html",
@@ -47,6 +53,12 @@ MY_TEAM_SOURCE_PATTERNS = {
         "Yahoo_MyTeam_week1-Proj.html",
         "Yahoo_MyTeam_K_week1-Proj.html",
         "Yahoo_MyTeam_DEF_week1-Proj.html",
+    ],
+
+    "week_1_actual": [
+        "Yahoo_MyTeam_week1-Actual.html",
+        "Yahoo_MyTeam_K_week1-Actual.html",
+        "Yahoo_MyTeam_DEF_week1-Actual.html",
     ],
 
     "week_2_projection": [

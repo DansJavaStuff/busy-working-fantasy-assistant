@@ -484,7 +484,7 @@ def refresh_yahoo_data():
             ],
             cwd=project_root,
             check=True,
-            timeout=60,
+            timeout=180,
         )
 
         yahoo_provider.refresh()

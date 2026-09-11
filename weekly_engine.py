@@ -733,6 +733,34 @@ def build_weekly_data(
         for item in lineup
     )
 
+    actual_so_far = sum(
+        float(
+            item["player"].get(
+                "week_1_actual"
+            )
+            or 0
+        )
+        for item in lineup
+        if item["player"].get(
+            "week_1_actual"
+        ) is not None
+    )
+
+    remaining_projection = sum(
+        projection(
+            item["player"]
+        )
+        for item in lineup
+        if item["player"].get(
+            "week_1_actual"
+        ) is None
+    )
+
+    projected_final = (
+        actual_so_far
+        + remaining_projection
+    )
+
     lock_groups = build_lock_groups(
         roster,
         lineup,
@@ -821,6 +849,15 @@ def build_weekly_data(
 
         "total_projection":
             total_projection,
+
+        "actual_so_far":
+            actual_so_far,
+
+        "remaining_projection":
+            remaining_projection,
+
+        "projected_final":
+            projected_final,
 
         "provider_status":
             provider_status,

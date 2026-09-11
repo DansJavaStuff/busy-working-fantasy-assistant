@@ -75,6 +75,13 @@
         font-size: 24px;
     }
 
+    .weekly-card-detail {
+        display: block;
+        margin-top: 6px;
+        color: #8a94a3;
+        font-size: 12px;
+    }
+
     .weekly-section {
         padding: 24px;
         margin-bottom: 24px;
@@ -107,6 +114,10 @@
     }
 
     .weekly-projection {
+        font-weight: 800;
+    }
+
+    .weekly-actual {
         font-weight: 800;
     }
 
@@ -433,17 +444,42 @@ Manual snapshot
 <section class="weekly-summary">
     <div class="weekly-card">
         <span>
-            Projected Points
+            Actual So Far
         </span>
 
         <strong>
             {{
                 "%.2f"
                 | format(
-                    data.weekly.total_projection
+                    data.weekly.actual_so_far
                 )
             }}
         </strong>
+    </div>
+
+    <div class="weekly-card">
+        <span>
+            Projected Final
+        </span>
+
+        <strong>
+            {{
+                "%.2f"
+                | format(
+                    data.weekly.projected_final
+                )
+            }}
+        </strong>
+
+        <small class="weekly-card-detail">
+            Original projection:
+            {{
+                "%.2f"
+                | format(
+                    data.weekly.total_projection
+                )
+            }}
+        </small>
     </div>
 
     <div class="weekly-card">
@@ -580,6 +616,7 @@ Manual snapshot
                 <th>Team</th>
                 <th>Matchup</th>
                 <th>Proj</th>
+                <th>Actual</th>
                 <th>Status</th>
             </tr>
         </thead>
@@ -622,6 +659,23 @@ Manual snapshot
                     }}
                 </td>
 
+                <td class="weekly-actual">
+                    {% if
+                        item.player.week_1_actual
+                        is not none
+                    %}
+                    {{
+                        "%.2f"
+                        | format(
+                            item.player
+                            .week_1_actual
+                        )
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
                 <td>
                     {% if item.player.status %}
                     <span class="status-warning">
@@ -649,6 +703,7 @@ Manual snapshot
                 <th>Team</th>
                 <th>Matchup</th>
                 <th>Proj</th>
+                <th>Actual</th>
                 <th>Status</th>
             </tr>
         </thead>
@@ -683,6 +738,22 @@ Manual snapshot
                             or 0
                         )
                     }}
+                </td>
+
+                <td class="weekly-actual">
+                    {% if
+                        player.week_1_actual
+                        is not none
+                    %}
+                    {{
+                        "%.2f"
+                        | format(
+                            player.week_1_actual
+                        )
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
                 </td>
 
                 <td>
@@ -745,6 +816,74 @@ Manual snapshot
 </section>
 {% endif %}
 
+
+<section class="weekly-section">
+    <h2>
+        IR Stash Review
+    </h2>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Player</th>
+                <th>Pos</th>
+                <th>Status</th>
+                <th>Week 1</th>
+                <th>Week 2</th>
+                <th>Next 4</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for player in data.weekly.ir_review %}
+            <tr>
+                <td>
+                    {{ player.name }}
+                </td>
+
+                <td>
+                    {{ player.position }}
+                </td>
+
+                <td>
+                    {{ player.status }}
+                </td>
+
+                <td>
+                    {{
+                        "%.2f"
+                        | format(
+                            player.week_1_projection
+                            or 0
+                        )
+                    }}
+                </td>
+
+                <td>
+                    {{
+                        "%.2f"
+                        | format(
+                            player.week_2_projection
+                            or 0
+                        )
+                    }}
+                </td>
+
+                <td>
+                    {{
+                        "%.2f"
+                        | format(
+                            player
+                            .next_4_weeks_projection
+                            or 0
+                        )
+                    }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
 
 <section class="weekly-section">
     <h2>
@@ -898,73 +1037,7 @@ Manual snapshot
 
 
 {% if data.weekly.ir_review %}
-<section class="weekly-section">
-    <h2>
-        IR Stash Review
-    </h2>
 
-    <table class="weekly-table">
-        <thead>
-            <tr>
-                <th>Player</th>
-                <th>Pos</th>
-                <th>Status</th>
-                <th>Week 1</th>
-                <th>Week 2</th>
-                <th>Next 4</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for player in data.weekly.ir_review %}
-            <tr>
-                <td>
-                    {{ player.name }}
-                </td>
-
-                <td>
-                    {{ player.position }}
-                </td>
-
-                <td>
-                    {{ player.status }}
-                </td>
-
-                <td>
-                    {{
-                        "%.2f"
-                        | format(
-                            player.week_1_projection
-                            or 0
-                        )
-                    }}
-                </td>
-
-                <td>
-                    {{
-                        "%.2f"
-                        | format(
-                            player.week_2_projection
-                            or 0
-                        )
-                    }}
-                </td>
-
-                <td>
-                    {{
-                        "%.2f"
-                        | format(
-                            player
-                            .next_4_weeks_projection
-                            or 0
-                        )
-                    }}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</section>
 {% endif %}
 
 {% endblock %}
