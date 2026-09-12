@@ -48,6 +48,8 @@ def cached_transaction_recommendations(
     roster,
     available,
     provider_status,
+    week,
+    waiver_priority=None,
 ):
     captured_at = provider_status.get(
         "captured_at"
@@ -76,6 +78,8 @@ def cached_transaction_recommendations(
             roster,
             available,
             limit=5,
+            current_week=week,
+            waiver_priority=waiver_priority,
         )
     )
 
@@ -310,11 +314,95 @@ def build_best_lineup(players):
     return lineup
 
 
-WEEK_1_THURSDAY = date(
-    2026,
-    9,
-    10,
-)
+def fantasy_season_for_date(
+    today=None,
+):
+    if today is None:
+        today = datetime.now(
+            UK_TIME
+        ).date()
+
+    # January and February still belong
+    # to the NFL season that started in
+    # the previous calendar year.
+    if today.month <= 2:
+        return today.year - 1
+
+    return today.year
+
+
+def week_1_thursday(
+    season,
+):
+    september_1 = date(
+        season,
+        9,
+        1,
+    )
+
+    # US Labor Day is the first Monday
+    # in September.
+    days_until_monday = (
+        0
+        - september_1.weekday()
+    ) % 7
+
+    labor_day = (
+        september_1
+        + timedelta(
+            days=days_until_monday
+        )
+    )
+
+    return (
+        labor_day
+        + timedelta(days=3)
+    )
+
+
+def week_1_start(
+    season,
+):
+    # Fantasy week starts on the Tuesday
+    # before the Thursday opener.
+    return (
+        week_1_thursday(season)
+        - timedelta(days=2)
+    )
+
+
+def current_fantasy_week(
+    season=None,
+):
+    today = datetime.now(
+        UK_TIME
+    ).date()
+
+    if season is None:
+        season = fantasy_season_for_date(
+            today
+        )
+
+    start = week_1_start(
+        season
+    )
+
+    if today < start:
+        return 1
+
+    week = (
+        (
+            today
+            - start
+        ).days
+        // 7
+        + 1
+    )
+
+    return max(
+        1,
+        min(18, week),
+    )
 
 EASTERN = ZoneInfo(
     "America/New_York"
@@ -326,11 +414,14 @@ UK_TIME = ZoneInfo(
 
 
 def game_date_for_week(
+    season,
     week,
     game_day,
 ):
     week_thursday = (
-        WEEK_1_THURSDAY
+        week_1_thursday(
+            season
+        )
         + timedelta(
             weeks=week - 1
         )
@@ -361,6 +452,7 @@ def game_date_for_week(
 
 def local_game_info(
     player,
+    season,
     week,
 ):
     game_day = player.get(
@@ -375,6 +467,7 @@ def local_game_info(
         return None
 
     game_date = game_date_for_week(
+        season,
         week,
         game_day,
     )
@@ -441,10 +534,12 @@ def local_game_info(
 
 def enrich_player_game_time(
     player,
+    season,
     week,
 ):
     local_info = local_game_info(
         player,
+        season,
         week,
     )
 
@@ -538,6 +633,7 @@ def game_sort_key(player):
 def build_lock_groups(
     roster,
     lineup,
+    season,
     week,
 ):
     starter_slots = {
@@ -582,6 +678,7 @@ def build_lock_groups(
         ):
             local_info = local_game_info(
                 player,
+                season,
                 week,
             )
 
@@ -754,9 +851,19 @@ def add_transaction_deadlines(
 
 
 def build_weekly_data(
-    season=2026,
-    week=1,
+    season=None,
+    week=None,
 ):
+    if season is None:
+        season = (
+            fantasy_season_for_date()
+        )
+
+    if week is None:
+        week = current_fantasy_week(
+            season
+        )
+
     roster = (
         yahoo_provider
         .get_roster()
@@ -775,6 +882,7 @@ def build_weekly_data(
     roster = [
         enrich_player_game_time(
             player,
+            season,
             week,
         )
         for player in roster
@@ -783,6 +891,7 @@ def build_weekly_data(
     available = [
         enrich_player_game_time(
             player,
+            season,
             week,
         )
         for player in available
@@ -798,6 +907,7 @@ def build_weekly_data(
             roster,
             available,
             provider_status,
+            week,
         )
     )
 
@@ -891,6 +1001,7 @@ def build_weekly_data(
     lock_groups = build_lock_groups(
         roster,
         lineup,
+        season,
         week,
     )
 

@@ -36,6 +36,183 @@ def playable(player):
         not in UNAVAILABLE_STATUSES
     )
 
+def on_bye(
+    player,
+    week,
+):
+    bye_week = player.get(
+        "bye_week"
+    )
+
+    if bye_week in {
+        None,
+        "",
+    }:
+        return False
+
+    try:
+        return int(bye_week) == int(week)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return False
+
+
+def build_bye_coverage(
+    roster,
+    current_week,
+    through_week=14,
+):
+    coverage = []
+
+    for week in range(
+        current_week + 1,
+        through_week + 1,
+    ):
+        bye_players = [
+            player
+            for player in roster
+            if (
+                player.get(
+                    "roster_slot"
+                ) != "IR"
+                and on_bye(
+                    player,
+                    week,
+                )
+            )
+        ]
+
+        usable = [
+            player
+            for player in roster
+            if (
+                player.get(
+                    "roster_slot"
+                ) != "IR"
+                and playable(player)
+                and not on_bye(
+                    player,
+                    week,
+                )
+            )
+        ]
+
+        counts = {
+            position: sum(
+                1
+                for player in usable
+                if (
+                    player["position"]
+                    == position
+                )
+            )
+            for position in [
+                "QB",
+                "RB",
+                "WR",
+                "TE",
+                "K",
+                "DST",
+            ]
+        }
+
+        problems = []
+        thin = []
+
+        if counts["QB"] < 1:
+            problems.append("QB")
+
+        if counts["RB"] < 2:
+            problems.append("RB")
+        elif counts["RB"] == 2:
+            thin.append("RB")
+
+        if counts["WR"] < 2:
+            problems.append("WR")
+        elif counts["WR"] == 2:
+            thin.append("WR")
+
+        if counts["TE"] < 1:
+            problems.append("TE")
+
+        if counts["K"] < 1:
+            problems.append("K")
+
+        if counts["DST"] < 1:
+            problems.append("DST")
+
+        # After reserving 2 RB, 2 WR and 1 TE,
+        # we still need one remaining RB/WR/TE
+        # to fill FLEX.
+        flex_remaining = (
+            max(
+                counts["RB"] - 2,
+                0,
+            )
+            + max(
+                counts["WR"] - 2,
+                0,
+            )
+            + max(
+                counts["TE"] - 1,
+                0,
+            )
+        )
+
+        if flex_remaining < 1:
+            problems.append("FLEX")
+        elif flex_remaining == 1:
+            thin.append("FLEX")
+
+        skill_problems = [
+            position
+            for position in problems
+            if position not in {
+                "K",
+                "DST",
+            }
+        ]
+
+        stream_problems = [
+            position
+            for position in problems
+            if position in {
+                "K",
+                "DST",
+            }
+        ]
+
+        if skill_problems:
+            status = (
+                "ACTION NEEDED"
+            )
+        elif stream_problems:
+            status = "STREAM"
+        elif thin:
+            status = "WATCH"
+        else:
+            status = "GOOD"
+
+        coverage.append(
+            {
+                "week": week,
+                "status": status,
+                "bye_players":
+                    bye_players,
+                "counts":
+                    counts,
+                "flex_remaining":
+                    flex_remaining,
+                "problems":
+                    problems,
+                "thin":
+                    thin,
+            }
+        )
+
+    return coverage
 
 def four_week_average(player):
     return (
@@ -555,6 +732,283 @@ def build_depth_context(
 
     return context
 
+def replacement_security(
+    player,
+    roster,
+    available,
+    current_week,
+    waiver_priority=None,
+):
+    roster_ids = {
+        p["yahoo_player_id"]
+        for p in roster
+    }
+
+    replacements = replacement_candidates(
+        available,
+        player["position"],
+        roster_ids,
+    )
+
+    player_average = four_week_average(
+        player
+    )
+
+    comparable = [
+        candidate
+        for candidate in replacements
+        if (
+            four_week_average(candidate)
+            >= player_average - 1.0
+        )
+    ]
+
+    comparable_count = len(
+        comparable
+    )
+
+    bye_week = player.get(
+        "bye_week"
+    )
+
+    weeks_until_bye = None
+
+    if (
+        bye_week is not None
+        and current_week is not None
+    ):
+        weeks_until_bye = max(
+            int(bye_week)
+            - int(current_week),
+            0,
+        )
+
+    risk_points = 0
+
+    if comparable_count <= 1:
+        risk_points += 3
+    elif comparable_count <= 2:
+        risk_points += 2
+    elif comparable_count <= 4:
+        risk_points += 1
+
+    if weeks_until_bye is not None:
+        if weeks_until_bye <= 1:
+            risk_points += 3
+        elif weeks_until_bye <= 2:
+            risk_points += 2
+        elif weeks_until_bye <= 4:
+            risk_points += 1
+
+    if waiver_priority is not None:
+        if waiver_priority >= 10:
+            risk_points += 2
+        elif waiver_priority >= 7:
+            risk_points += 1
+
+    if risk_points >= 5:
+        level = "LOW"
+    elif risk_points >= 3:
+        level = "MEDIUM"
+    else:
+        level = "HIGH"
+
+    return {
+        "level": level,
+        "comparable_count": (
+            comparable_count
+        ),
+        "weeks_until_bye": (
+            weeks_until_bye
+        ),
+        "bye_week": bye_week,
+        "waiver_priority": (
+            waiver_priority
+        ),
+    }
+
+def classify_roster_role(
+    roster,
+    available,
+    player,
+    current_week,
+    waiver_priority=None,
+):
+    roster_ids = {
+        p["yahoo_player_id"]
+        for p in roster
+    }
+
+    replacements = replacement_candidates(
+        available,
+        player["position"],
+        roster_ids,
+    )
+
+    best_replacement = (
+        replacements[0]
+        if replacements
+        else None
+    )
+
+    player_average = four_week_average(
+        player
+    )
+
+    replacement_average = (
+        four_week_average(
+            best_replacement
+        )
+        if best_replacement
+        else 0.0
+    )
+
+    replacement_gap = (
+        player_average
+        - replacement_average
+    )
+
+    comparable = [
+        candidate
+        for candidate in replacements
+        if (
+            four_week_average(candidate)
+            >= player_average - 1.0
+        )
+    ]
+
+    result = {
+        "role": "USEFUL DEPTH",
+        "replacement_gap": replacement_gap,
+        "comparable_replacements": len(comparable),
+        "best_replacement": best_replacement,
+        "bye_cover": None,
+        "reason": None,
+    }
+
+    result["replacement_security"] = (
+        replacement_security(
+            player,
+            roster,
+            available,
+            current_week,
+            waiver_priority,
+        )
+    )
+
+    if player["position"] in {
+        "K",
+        "DST",
+    }:
+        if (
+            replacement_gap <= 1.0
+            and len(comparable) >= 3
+        ):
+            result["role"] = (
+                "STREAMABLE POSITION"
+            )
+            result["reason"] = (
+                f"{len(comparable)} comparable "
+                f"{player['position']} options "
+                "remain available."
+            )
+
+            return result
+
+        if replacement_gap >= 2.0:
+            result["role"] = (
+                "STRONG STARTER"
+            )
+            result["reason"] = (
+                f"Projects {replacement_gap:.2f} "
+                "pts/week above the best "
+                "available replacement."
+            )
+
+            return result
+
+    if player["position"] == "QB":
+        other_qbs = [
+            p
+            for p in roster
+            if (
+                p["position"] == "QB"
+                and p["yahoo_player_id"]
+                != player["yahoo_player_id"]
+            )
+        ]
+
+        if other_qbs:
+            primary_qb = max(
+                other_qbs,
+                key=lambda p: projection(
+                    p,
+                    "week_1_projection",
+                ),
+            )
+
+            same_bye = (
+                player.get("bye_week")
+                == primary_qb.get("bye_week")
+            )
+
+            result["bye_cover"] = not same_bye
+
+            if (
+                same_bye
+                and len(comparable) >= 2
+            ):
+                result["role"] = (
+                    "REPLACEABLE BENCH SPOT"
+                )
+                result["reason"] = (
+                    f"Shares {primary_qb['name']}'s "
+                    f"Week {primary_qb.get('bye_week')} bye "
+                    f"and {len(comparable)} comparable QBs "
+                    "remain available."
+                )
+
+                return result
+
+            if not same_bye:
+                result["role"] = "USEFUL BYE COVER"
+                result["reason"] = (
+                    f"Provides bye-week cover for "
+                    f"{primary_qb['name']}."
+                )
+
+                return result
+
+    if replacement_gap >= 2.0:
+        result["role"] = "STRONG DEPTH"
+        result["reason"] = (
+            f"Projects {replacement_gap:.2f} pts/week "
+            "above the best available replacement."
+        )
+
+        return result
+
+    if (
+        replacement_gap <= 1.0
+        and len(comparable) >= 3
+    ):
+        result["role"] = (
+            "REPLACEABLE BENCH SPOT"
+        )
+        result["reason"] = (
+            f"{len(comparable)} comparable "
+            f"{player['position']} options remain "
+            "available."
+        )
+
+        return result
+
+    result["reason"] = (
+        f"Projects {replacement_gap:.2f} pts/week "
+        "above the best available replacement."
+    )
+
+    return result
 
 def build_reasons(
     result,
@@ -733,6 +1187,8 @@ def build_transaction_recommendations(
     roster,
     available,
     limit=5,
+    current_week=1,
+    waiver_priority=None,
 ):
     before = roster_metrics(
         roster,
@@ -838,6 +1294,14 @@ def build_transaction_recommendations(
                             drop_player,
                         ),
 
+                    "drop_roster_role":
+                        classify_roster_role(
+                            roster,
+                            available,
+                            drop_player,
+                            current_week,
+                            waiver_priority,
+                        ),
                     "depth_context":
                         depth_context,
 
