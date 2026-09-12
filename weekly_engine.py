@@ -6,6 +6,7 @@ import json
 from database import load_season_roster
 from yahoo_provider import yahoo_provider
 from transaction_engine import (
+    build_bye_coverage,
     build_transaction_recommendations,
 )
 
@@ -902,6 +903,19 @@ def build_weekly_data(
         .get_status()
     )
 
+    bye_coverage = (
+        build_bye_coverage(
+            roster,
+            week,
+        )
+    )
+
+    future_bye_coverage = [
+        item
+        for item in bye_coverage
+        if item["status"] != "GOOD"
+    ]
+
     transactions = (
         cached_transaction_recommendations(
             roster,
@@ -1071,6 +1085,10 @@ def build_weekly_data(
 
         "transactions":
             transactions,
+
+        "future_bye_coverage":
+            future_bye_coverage,
+
         "ir_review":
             ir_review,
         "lock_groups":

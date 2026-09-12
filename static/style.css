@@ -1513,3 +1513,28 @@ footer {
         margin: 5px 0;
         line-height: 1.4;
     }
+
+.bye-status {
+    display: inline-block;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.bye-status-action {
+    background: #fde8e8;
+    color: #991b1b;
+}
+
+.bye-status-stream {
+    background: #e8f2ff;
+    color: #075985;
+}
+
+.bye-status-watch {
+    background: #fff4d6;
+    color: #92400e;
+}
+

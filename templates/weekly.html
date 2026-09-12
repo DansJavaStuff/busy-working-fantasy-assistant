@@ -587,6 +587,77 @@ Manual snapshot
 </section>
 
 
+{% if data.weekly.future_bye_coverage %}
+<section class="weekly-section">
+    <h2>
+        Future Bye Coverage
+    </h2>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Week</th>
+                <th>Status</th>
+                <th>Players on bye</th>
+                <th>Issue</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in
+                data.weekly.future_bye_coverage
+            %}
+            <tr>
+                <td>
+                    <strong>
+                        Week {{ item.week }}
+                    </strong>
+                </td>
+
+                <td>
+                    <span class="
+                        bye-status
+                        {% if item.status == 'ACTION NEEDED' %}
+                            bye-status-action
+                        {% elif item.status == 'STREAM' %}
+                            bye-status-stream
+                        {% elif item.status == 'WATCH' %}
+                            bye-status-watch
+                        {% endif %}
+                    ">
+                        {{ item.status }}
+                    </span>
+                </td>
+                <td>
+                    {% for player
+                        in item.bye_players
+                    %}
+                        {{ player.name }}
+                        ({{ player.position }})
+                        {% if not loop.last %}
+                            ·
+                        {% endif %}
+                    {% endfor %}
+                </td>
+
+                <td>
+                    {% if item.problems %}
+                        {{ item.problems | join(", ") }}
+                    {% elif item.thin %}
+                        Thin at
+                        {{ item.thin | join(", ") }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+
 {% if data.weekly.transactions %}
 <section class="weekly-section">
     <h2>
