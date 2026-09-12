@@ -214,6 +214,199 @@ def build_bye_coverage(
 
     return coverage
 
+
+def bye_week_risk(
+    week_info,
+    current_week,
+):
+    weeks_away = max(
+        week_info["week"]
+        - current_week,
+        1,
+    )
+
+    # Future problems matter, but their
+    # importance increases as they approach.
+    if weeks_away <= 1:
+        urgency = 1.00
+    elif weeks_away == 2:
+        urgency = 0.80
+    elif weeks_away == 3:
+        urgency = 0.60
+    elif weeks_away == 4:
+        urgency = 0.45
+    elif weeks_away == 5:
+        urgency = 0.35
+    elif weeks_away == 6:
+        urgency = 0.30
+    elif weeks_away == 7:
+        urgency = 0.25
+    else:
+        urgency = 0.15
+
+    skill_problems = [
+        position
+        for position
+        in week_info["problems"]
+        if position not in {
+            "K",
+            "DST",
+        }
+    ]
+
+    stream_problems = [
+        position
+        for position
+        in week_info["problems"]
+        if position in {
+            "K",
+            "DST",
+        }
+    ]
+
+    risk = (
+        len(skill_problems) * 4.0
+        + len(stream_problems) * 0.75
+        + len(week_info["thin"]) * 0.50
+    )
+
+    return risk * urgency
+
+
+def compare_bye_coverage(
+    before,
+    after,
+    current_week,
+):
+    before_by_week = {
+        item["week"]: item
+        for item in before
+    }
+
+    after_by_week = {
+        item["week"]: item
+        for item in after
+    }
+
+    improvements = []
+    regressions = []
+
+    before_risk = 0.0
+    after_risk = 0.0
+
+    for week in sorted(
+        set(before_by_week)
+        | set(after_by_week)
+    ):
+        before_week = before_by_week.get(
+            week
+        )
+
+        after_week = after_by_week.get(
+            week
+        )
+
+        if (
+            before_week is None
+            or after_week is None
+        ):
+            continue
+
+        before_risk += bye_week_risk(
+            before_week,
+            current_week,
+        )
+
+        after_risk += bye_week_risk(
+            after_week,
+            current_week,
+        )
+
+        before_problems = set(
+            before_week["problems"]
+        )
+
+        after_problems = set(
+            after_week["problems"]
+        )
+
+        resolved = sorted(
+            before_problems
+            - after_problems
+        )
+
+        created = sorted(
+            after_problems
+            - before_problems
+        )
+
+        if resolved:
+            improvements.append(
+                {
+                    "week": week,
+                    "positions": resolved,
+                }
+            )
+
+        if created:
+            regressions.append(
+                {
+                    "week": week,
+                    "positions": created,
+                }
+            )
+
+    return {
+        "gain":
+            before_risk
+            - after_risk,
+
+        "before_risk":
+            before_risk,
+
+        "after_risk":
+            after_risk,
+
+        "improvements":
+            improvements,
+
+        "regressions":
+            regressions,
+    }
+
+
+def build_bye_reasons(
+    bye_context,
+):
+    reasons = []
+
+    for item in bye_context[
+        "improvements"
+    ]:
+        positions = ", ".join(
+            item["positions"]
+        )
+
+        reasons.append(
+            f"Fixes Week {item['week']} "
+            f"bye coverage at {positions}."
+        )
+
+    for item in bye_context[
+        "regressions"
+    ]:
+        positions = ", ".join(
+            item["positions"]
+        )
+
+        reasons.append(
+            f"Creates a Week {item['week']} "
+            f"bye-week problem at {positions}."
+        )
+
+    return reasons
+
+
 def four_week_average(player):
     return (
         projection(
@@ -1198,6 +1391,13 @@ def build_transaction_recommendations(
     if before is None:
         return []
 
+    before_bye_coverage = (
+        build_bye_coverage(
+            roster,
+            current_week,
+        )
+    )
+
     # Limit the first pass to realistic
     # candidates rather than every obscure FA.
     candidates = sorted(
@@ -1250,9 +1450,41 @@ def build_transaction_recommendations(
             if after is None:
                 continue
 
+            after_bye_coverage = (
+                build_bye_coverage(
+                    simulated,
+                    current_week,
+                )
+            )
+
+            bye_context = (
+                compare_bye_coverage(
+                    before_bye_coverage,
+                    after_bye_coverage,
+                    current_week,
+                )
+            )
+
             result = score_transaction(
                 before,
                 after,
+            )
+
+            result[
+                "bye_coverage_gain"
+            ] = bye_context["gain"]
+
+            result[
+                "bye_score_adjustment"
+            ] = (
+                bye_context["gain"]
+                * 0.25
+            )
+
+            result["score"] += (
+                result[
+                    "bye_score_adjustment"
+                ]
             )
 
             if result["score"] <= 0.10:
@@ -1272,6 +1504,12 @@ def build_transaction_recommendations(
                 add_player,
                 drop_player,
                 depth_context,
+            )
+
+            reasons.extend(
+                build_bye_reasons(
+                    bye_context
+                )
             )
 
             result.update(
@@ -1302,6 +1540,9 @@ def build_transaction_recommendations(
                             current_week,
                             waiver_priority,
                         ),
+                    "bye_context":
+                        bye_context,
+
                     "depth_context":
                         depth_context,
 
@@ -1324,6 +1565,7 @@ def build_transaction_recommendations(
     # different drop options for one addition.
     output = []
     seen_adds = set()
+    seen_bye_fixes = set()
 
     for result in results:
         add_id = result[
@@ -1335,9 +1577,35 @@ def build_transaction_recommendations(
         if add_id in seen_adds:
             continue
 
+        bye_fix_key = tuple(
+            (
+                item["week"],
+                tuple(item["positions"]),
+            )
+            for item in result.get(
+                "bye_context",
+                {}
+            ).get(
+                "improvements",
+                [],
+            )
+        )
+
+        if (
+            bye_fix_key
+            and bye_fix_key
+            in seen_bye_fixes
+        ):
+            continue
+
         seen_adds.add(
             add_id
         )
+
+        if bye_fix_key:
+            seen_bye_fixes.add(
+                bye_fix_key
+            )
 
         output.append(
             result
