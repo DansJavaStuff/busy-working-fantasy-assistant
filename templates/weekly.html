@@ -687,6 +687,19 @@ Manual snapshot
                         }}
                     </strong>
                 </div>
+                            {% if move.bye_score_adjustment %}
+                <div>
+                    <span>Bye impact</span>
+                    <strong>
+                        {{
+                            "%+.2f"
+                            | format(
+                                move.bye_score_adjustment
+                            )
+                        }}
+                    </strong>
+                </div>
+                {% endif %}
             </div>
                     {% if move.reasons %}
             <div class="transaction-reasons">
