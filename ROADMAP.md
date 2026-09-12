@@ -49,10 +49,29 @@ The assistant currently supports:
 - [x] Move manually downloaded CSV data into `data/`
 - [x] Recommendation-engine regression testing
 - [x] Recommendation-engine code freeze
+- [x] My Team roster dashboard
+- [x] Yahoo manual roster / free-agent snapshot import
+- [x] Yahoo data-provider abstraction
+- [x] Weekly Assistant dashboard
+- [x] Recommended weekly starting lineup
+- [x] Bench and IR review
+- [x] Player-status watch
+- [x] Upcoming lineup-lock tracking
+- [x] Transaction deadline awareness
+- [x] ADD / DROP transaction recommendations
+- [x] Multi-week transaction scoring
+- [x] Roster-role classification
+- [x] Replacement-security framework
+- [x] Bye-week concentration analysis
+- [x] Future bye-coverage warnings
+- [x] Bye coverage included in transaction scoring
+- [x] Recommendation diversity for duplicate bye fixes
 
-## Current Milestone — In-Season Phase 1: My Team
+## Current Milestone — In-Season Phase 2: Weekly Assistant + Yahoo API Integration
 
-The 2026 draft is complete and preserved. The current priority is to establish reliable in-season roster state and a useful My Team dashboard without depending on Yahoo API access.
+The 2026 draft is complete and preserved, and the first version of the season-long Weekly Assistant is operational.
+
+The immediate priority is to replace the manual Yahoo snapshot with approved read-only Yahoo Fantasy API data while keeping the existing manual import as a fallback. The Weekly Assistant should then be hardened using live league context such as current week, roster state, available players and waiver priority.
 
 ### Now — Draft-Day Readiness
 
@@ -119,87 +138,161 @@ The first post-draft goal is to preserve the result and establish the initial se
 - [x] Generate square Yahoo-compatible team logo
 - [x] Set final Yahoo team name and image
 
-## Near Term — In-Season Phase 1: My Team
+## Completed Foundation — In-Season Phase 1: My Team
 
-Build the post-draft home screen and establish reliable roster synchronisation.
+The initial post-draft roster-management foundation is now in place.
 
 ### My Team Dashboard
 
-- [ ] Current roster
-- [ ] Starter / bench positions
-- [ ] Bye weeks
-- [ ] Player status
-- [ ] Injury / availability indicators
+- [x] Current roster
+- [x] Starter / bench positions
+- [x] Bye weeks
+- [x] Player status
+- [x] Injury / availability indicators
 - [ ] Current matchup
 - [ ] Projected matchup score where suitable
-- [ ] Identify weak roster positions
-- [ ] Highlight players who require attention
+- [x] Identify roster-depth concerns
+- [x] Highlight players who require attention
+- [x] Yahoo-style lineup-management interface
+- [x] Team branding / Allen Wrench identity
 
 ### Roster Synchronisation
 
-Preferred order:
+The application currently uses a manual Yahoo snapshot behind a provider abstraction so that the UI and recommendation engines do not depend directly on the source of the Yahoo data.
+
+Preferred order remains:
 
 1. Yahoo Fantasy API
-2. FantasyPros My Playbook investigation
-3. Simple manual roster maintenance
+2. Manual Yahoo snapshot fallback
+3. Manual roster maintenance only if required
 
-Planned work:
+Current state:
 
-- [ ] Re-test Yahoo Fantasy API access
-- [ ] Investigate FantasyPros My Playbook as a possible roster-data fallback
-- [ ] Build manual add/drop interface if automated synchronisation remains unavailable
+- [x] Manual Yahoo roster import
+- [x] Manual Yahoo available-player import
+- [x] Manual Yahoo status import
+- [x] Data freshness / captured-at display
+- [x] Refresh workflow
+- [x] `YahooDataProvider` abstraction
+- [x] Keep raw Yahoo HTML / token material out of Git
+- [ ] Replace manual provider data with Yahoo Fantasy API
+- [ ] Retain manual snapshot as fallback after API launch
 
 The season-management application must not depend entirely on Yahoo API access.
 
-## Near Term — In-Season Phase 2: Waivers
 
-This is likely to be the highest-value weekly feature.
+## Current — Yahoo Fantasy API Integration
 
-- [ ] Available-player ranking
-- [ ] Suggested adds
-- [ ] Suggested drops
-- [ ] ADD / DROP pair recommendations
-- [ ] Roster-need awareness
-- [ ] Bye-week awareness
-- [ ] Injury replacements
+Yahoo approved the Fantasy API application in September 2026. The agreement indicates an access period beginning 15 September 2026, so live API provisioning is expected on or after that date.
+
+The integration should remain read-only.
+
+- [x] Yahoo developer application created
+- [x] OAuth web-authorisation flow proven
+- [x] Yahoo Fantasy API application submitted
+- [x] Yahoo Fantasy API application approved
+- [x] Required confirmation completed
+- [ ] Confirm Fantasy API endpoints work on / after 15 September 2026
+- [ ] Implement API-backed `YahooDataProvider`
+- [ ] Fetch current season from Yahoo
+- [ ] Fetch current fantasy week from Yahoo
+- [ ] Fetch current roster and roster slots
+- [ ] Fetch player injury / availability statuses
+- [ ] Fetch available / free-agent players
+- [ ] Fetch live waiver priority
+- [ ] Fetch league settings where useful
+- [ ] Fetch matchup / opponent data
+- [ ] Fetch league standings
+- [ ] Confirm API refresh / token-renewal behaviour
+- [ ] Add clear API failure / fallback status
+- [ ] Preserve manual-import fallback
+- [ ] Document Yahoo API compliance and attribution requirements
+
+Yahoo should become the authoritative source for league context where the API exposes it. Calendar-derived season/week logic should remain only as a fallback.
+
+
+## Current — In-Season Phase 2: Waivers and Transactions
+
+The first transaction recommendation engine is operational.
+
+### Completed
+
+- [x] Suggested adds
+- [x] Suggested drops
+- [x] ADD / DROP pair recommendations
+- [x] Roster-need awareness
+- [x] Positional depth awareness
+- [x] Multi-week projection outlook
+- [x] Explain recommendations
+- [x] Transaction deadline calculation
+- [x] K / DST streaming awareness
+- [x] Replacement-player comparison
+- [x] Comparable-replacement counts
+- [x] Roster-role classification
+- [x] Replacement-security framework
+- [x] Bye-week awareness
+- [x] Full-roster future bye coverage
+- [x] FLEX-aware bye coverage
+- [x] Future bye-risk scoring
+- [x] Transaction-score adjustment for bye coverage
+- [x] Avoid duplicate recommendations that solve the same bye problem
+- [x] Future Bye Coverage dashboard
+
+### Still to add / improve
+
+- [ ] Dedicated available-player ranking view
+- [ ] Live waiver priority from Yahoo
+- [ ] Include waiver priority in replacement-security scoring
+- [ ] Better injury-replacement recommendations
 - [ ] Recent usage / opportunity changes
 - [ ] Targets
 - [ ] Carries
 - [ ] Snap share where data is available
 - [ ] Upcoming matchup quality
-- [ ] Multi-week outlook
-- [ ] Waiver priority awareness
-- [ ] Explain recommendations
+- [ ] Rest-of-season ranking / value
+- [ ] Waiver-processing-state awareness
+- [ ] Distinguish free-agent moves from waiver claims
+- [ ] Record transaction recommendations and outcomes for later analysis
 
-Example target output:
+The engine should increasingly answer not only "who scores more?" but also "what does this move do to the roster now and later in the season?"
 
-ADD Player X
-DROP Player Y
 
-Why:
-- Player X has gained a larger role
-- WR depth is currently weak
-- Player Y is unlikely to enter the starting lineup
-- Player X has favourable upcoming fixtures
+## Current — In-Season Phase 3: Start / Sit
 
-## Near Term — In-Season Phase 3: Start / Sit
+The first weekly lineup engine is operational.
 
-- [ ] Generate legal starting lineups
-- [ ] Compare realistic lineup alternatives
-- [ ] QB recommendation
-- [ ] RB recommendation
-- [ ] WR recommendation
-- [ ] TE recommendation
-- [ ] FLEX optimisation
-- [ ] K recommendation
-- [ ] DST recommendation
-- [ ] Injury / status checks
-- [ ] Thursday Night Football decision support
-- [ ] Sunday inactive-player check
+### Completed
+
+- [x] Generate legal starting lineup
+- [x] QB selection
+- [x] RB selection
+- [x] WR selection
+- [x] TE selection
+- [x] FLEX optimisation
+- [x] K selection
+- [x] DST selection
+- [x] Injury / availability filtering
+- [x] Bench display
+- [x] IR review
+- [x] Upcoming lineup locks
+- [x] Next-decision summary
+- [x] Local UK kickoff-time conversion
+- [x] Current actual-points tracking
+- [x] Projected-final score
+
+### Still to add / improve
+
+- [ ] Compare realistic close lineup alternatives
+- [ ] Explain close start / sit decisions
+- [ ] Thursday Night Football-specific decision support
+- [ ] Sunday active / inactive-player check
 - [ ] High-floor vs high-upside recommendations
-- [ ] Explain each close decision
+- [ ] Late-game FLEX planning
+- [ ] Use matchup state to alter risk / upside preference
+- [ ] Use live Yahoo current-week context rather than fallback calendar logic
 
 Draft ADP should have little or no influence on weekly start/sit decisions once the season is underway.
+
 
 ## Later — Matchups and Opponents
 
@@ -384,14 +477,14 @@ Good ideas that are deliberately not current priorities:
 
 ## Priority Order
 
-1. **My Team / roster synchronisation** — current.
-2. Waiver recommendations.
-3. Start / sit recommendations.
-4. Matchups and opponent analysis.
-5. Technical cleanup and post-season architecture work.
-6. 2027 draft improvements.
+1. **Yahoo Fantasy API integration** — confirm live access and replace manual Yahoo snapshots with the API while retaining the fallback.
+2. **Harden Weekly Assistant / waiver logic** — live waiver priority, replacement security, transaction-state awareness and better weekly recommendations.
+3. **Matchups and opponent analysis** — opponent roster, matchup projection, standings and live matchup state.
+4. **Player usage / injury intelligence** — richer opportunity data, news and injury-driven recommendations.
+5. **Technical cleanup and reliability** — logging, tests, backups, folder rename and maintenance.
+6. **2027 draft improvements**.
 
-The order is intentionally flexible: a real draft-night or live-season issue can promote a task if it reveals a material weakness in the system.
+The order is intentionally flexible: a real live-season issue can promote a task if it reveals a material weakness in the system.
 
 ## Development Principle
 
