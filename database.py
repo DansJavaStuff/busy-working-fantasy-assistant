@@ -14,12 +14,37 @@ CURRENT_YAHOO_LEAGUE_ID = "688636"
 SCHEMA_VERSION = 4
 
 
+class ClosingConnection(sqlite3.Connection):
+    """
+    SQLite connection that closes when used
+    as a context manager.
+    """
+
+    def __exit__(
+        self,
+        exc_type,
+        exc_value,
+        traceback,
+    ):
+        try:
+            return super().__exit__(
+                exc_type,
+                exc_value,
+                traceback,
+            )
+        finally:
+            self.close()
+
+
 def connect():
     """
     Open the Fantasy Assistant SQLite database.
     """
 
-    connection = sqlite3.connect(DB_FILE)
+    connection = sqlite3.connect(
+        DB_FILE,
+        factory=ClosingConnection,
+    )
     connection.row_factory = sqlite3.Row
 
     connection.execute(
