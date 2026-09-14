@@ -2,11 +2,21 @@ from pathlib import Path
 import json
 import re
 import shutil
+import sys
 
 from bs4 import BeautifulSoup
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(
+        0,
+        str(PROJECT_ROOT),
+    )
+
+from database import load_season_roster
+
 DATA_DIR = PROJECT_ROOT / "data"
 
 HEADSHOT_DIR = (
@@ -19,6 +29,8 @@ OUTPUT_FILE = (
     DATA_DIR
     / "yahoo_available_players.json"
 )
+
+MY_TEAM_NAME = "Allen Wrench"
 
 
 SOURCE_PATTERNS = {
@@ -73,7 +85,6 @@ MY_TEAM_SOURCE_PATTERNS = {
         "Yahoo_MyTeam_DEF_4week-Proj.html",
     ],
 }
-
 
 
 def clean_text(value):
@@ -632,11 +643,23 @@ def merge_projection_sources(source_patterns):
                 )
 
             if player["roster_status"]:
-                existing[
-                    "roster_status"
-                ] = player[
-                    "roster_status"
-                ]
+                # Ownership can disagree between Yahoo
+                # stat views after a recent transaction.
+                # If any current snapshot identifies a
+                # player as ours, do not let a stale
+                # FA/waiver view overwrite that.
+                if (
+                    player["roster_status"]
+                    == MY_TEAM_NAME
+                    or existing.get(
+                        "roster_status"
+                    ) != MY_TEAM_NAME
+                ):
+                    existing[
+                        "roster_status"
+                    ] = player[
+                        "roster_status"
+                    ]
 
     return merged
 
@@ -685,12 +708,107 @@ def write_players(
 
 
 def main():
-    print("AVAILABLE PLAYERS")
-    print("=================")
+    print("COMBINED YAHOO PLAYER SNAPSHOT")
+    print("=============================")
 
-    available = merge_projection_sources(
+    combined = merge_projection_sources(
         SOURCE_PATTERNS
     )
+
+    my_team = {
+        player_id: player
+        for player_id, player
+        in combined.items()
+        if player.get("roster_status")
+        == MY_TEAM_NAME
+    }
+
+    print()
+    print("MY TEAM SUPPLEMENT")
+    print("==================")
+
+    my_team_supplement = (
+        merge_projection_sources(
+            MY_TEAM_SOURCE_PATTERNS
+        )
+    )
+
+    for (
+        player_id,
+        player,
+    ) in my_team_supplement.items():
+        existing = my_team.get(
+            player_id
+        )
+
+        if existing is None:
+            my_team[player_id] = player
+            continue
+
+        for key, value in player.items():
+            if (
+                existing.get(key) is None
+                and value is not None
+            ):
+                existing[key] = value
+
+    local_roster = load_season_roster(
+        2026
+    )
+
+    local_names = {
+        player["player_name"].lower()
+        for player in local_roster
+    }
+
+    local_dst_teams = {
+        player.get("team")
+        for player in local_roster
+        if player.get("position")
+        in {"DEF", "DST"}
+    }
+
+    my_team = {
+        player_id: player
+        for player_id, player
+        in my_team.items()
+        if (
+            player.get(
+                "name",
+                "",
+            ).lower()
+            in local_names
+            or (
+                player.get("position")
+                == "DST"
+                and player.get("team")
+                in local_dst_teams
+            )
+        )
+    }
+
+    available = {
+        player_id: player
+        for player_id, player
+        in combined.items()
+        if not (
+            player.get(
+                "name",
+                "",
+            ).lower()
+            in local_names
+            or (
+                player.get("position")
+                == "DST"
+                and player.get("team")
+                in local_dst_teams
+            )
+        )
+    }
+
+    print()
+    print("AVAILABLE PLAYERS")
+    print("=================")
 
     write_players(
         available,
@@ -703,16 +821,28 @@ def main():
     )
 
     print()
-    print("MY TEAM")
-    print("=======")
-
-    my_team = merge_projection_sources(
-        MY_TEAM_SOURCE_PATTERNS
-    )
+    print("MY TEAM ENRICHMENT")
+    print("==================")
 
     write_players(
         my_team,
         my_team_output,
+    )
+
+    print()
+    print(
+        f"Combined players: "
+        f"{len(combined)}"
+    )
+
+    print(
+        f"My team: "
+        f"{len(my_team)}"
+    )
+
+    print(
+        f"Available: "
+        f"{len(available)}"
     )
 
     print()

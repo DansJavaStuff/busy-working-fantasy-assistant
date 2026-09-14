@@ -237,9 +237,88 @@ def best_players(
     return selected
 
 
+def has_played(player):
+    return (
+        player.get("week_1_actual")
+        is not None
+    )
+
+
 def build_best_lineup(players):
     used = set()
     lineup = []
+
+    starter_slots = {
+        "QB",
+        "RB",
+        "WR",
+        "TE",
+        "FLEX",
+        "K",
+        "DST",
+    }
+
+    locked_counts = {
+        slot: 0
+        for slot in starter_slots
+    }
+
+    # Players who have already played are
+    # locked into the lineup decision that
+    # was recorded locally at game time.
+    #
+    # A player who has already played on the
+    # bench must not be promoted afterwards
+    # just because projections changed.
+    for player in players:
+        if not has_played(player):
+            continue
+
+        roster_slot = player.get(
+            "roster_slot"
+        )
+
+        if roster_slot in {
+            None,
+            "BN",
+            "IR",
+        }:
+            continue
+
+        slot = (
+            "DST"
+            if roster_slot
+            in {"DEF", "DST"}
+            else roster_slot
+        )
+
+        if slot not in starter_slots:
+            continue
+
+        lineup.append(
+            {
+                "slot": slot,
+                "player": player,
+            }
+        )
+
+        used.add(
+            player["yahoo_player_id"]
+        )
+
+        locked_counts[slot] += 1
+
+    # Only players whose games have not yet
+    # been played remain eligible for lineup
+    # optimisation.
+    candidates = [
+        player
+        for player in players
+        if not has_played(player)
+        and player.get(
+            "roster_slot"
+        ) != "IR"
+    ]
 
     requirements = [
         ("QB", "QB", 1),
@@ -253,10 +332,16 @@ def build_best_lineup(players):
         position,
         count,
     ) in requirements:
+        remaining = max(
+            0,
+            count
+            - locked_counts[slot],
+        )
+
         selected = best_players(
-            players,
+            candidates,
             position,
-            count,
+            remaining,
             used,
         )
 
@@ -268,49 +353,56 @@ def build_best_lineup(players):
                 }
             )
 
-    flex_candidates = [
-        player
-        for player in players
-        if (
-            player["position"]
-            in FLEX_POSITIONS
-            and player[
-                "yahoo_player_id"
-            ] not in used
-            and is_available_to_play(
-                player
+    if locked_counts["FLEX"] == 0:
+        flex_candidates = [
+            player
+            for player in candidates
+            if (
+                player["position"]
+                in FLEX_POSITIONS
+                and player[
+                    "yahoo_player_id"
+                ] not in used
+                and is_available_to_play(
+                    player
+                )
             )
-        )
-    ]
+        ]
 
-    flex_candidates.sort(
-        key=lambda player:
-            projection(player),
-        reverse=True,
-    )
-
-    if flex_candidates:
-        flex = flex_candidates[0]
-
-        used.add(
-            flex["yahoo_player_id"]
+        flex_candidates.sort(
+            key=lambda player:
+                projection(player),
+            reverse=True,
         )
 
-        lineup.append(
-            {
-                "slot": "FLEX",
-                "player": flex,
-            }
-        )
+        if flex_candidates:
+            flex = flex_candidates[0]
+
+            used.add(
+                flex["yahoo_player_id"]
+            )
+
+            lineup.append(
+                {
+                    "slot": "FLEX",
+                    "player": flex,
+                }
+            )
 
     for position in [
         "K",
         "DST",
     ]:
+        remaining = max(
+            0,
+            1
+            - locked_counts[position],
+        )
+
         selected = best_players(
-            players,
+            candidates,
             position,
-            1,
+            remaining,
             used,
         )
 
@@ -338,7 +430,6 @@ def build_best_lineup(players):
     )
 
     return lineup
-
 
 def fantasy_season_for_date(
     today=None,

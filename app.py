@@ -517,6 +517,70 @@ def move_my_team_player():
             )
         )
 
+    local_roster = load_season_roster(
+        2026
+    )
+
+    enriched_roster = enrich_local_roster(
+        local_roster
+    )
+
+    moving_player = next(
+        (
+            player
+            for player in enriched_roster
+            if player.get("player_id")
+            == player_id
+        ),
+        None,
+    )
+
+    target_player = next(
+        (
+            player
+            for player in enriched_roster
+            if (
+                player.get("roster_slot")
+                == target_slot
+                and player.get("slot_index")
+                == target_index
+            )
+        ),
+        None,
+    )
+
+    if (
+        moving_player
+        and moving_player.get(
+            "week_1_actual"
+        ) is not None
+    ):
+        return redirect(
+            url_for(
+                "my_team",
+                move_error=(
+                    f"{moving_player['name']} "
+                    "has already played and is locked"
+                ),
+            )
+        )
+
+    if (
+        target_player
+        and target_player.get(
+            "week_1_actual"
+        ) is not None
+    ):
+        return redirect(
+            url_for(
+                "my_team",
+                move_error=(
+                    f"{target_player['name']} "
+                    "has already played and that slot is locked"
+                ),
+            )
+        )
+
     try:
         move_roster_player(
             player_id,
