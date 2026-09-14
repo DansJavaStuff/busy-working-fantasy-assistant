@@ -280,6 +280,71 @@ class RosterManagerTests(TestCase):
             2,
         )
 
+    def test_replace_player_keeps_roster_slot(self):
+        roster_manager.replace_roster_player(
+            "dst1",
+            {
+                "player_id": "dst2",
+                "player_name": "Defence Two",
+                "position": "DST",
+                "team": "DET",
+                "bye_week": 6,
+            },
+            season=2026,
+        )
+
+        roster = self.roster_by_id()
+
+        self.assertNotIn(
+            "dst1",
+            roster,
+        )
+
+        self.assertEqual(
+            roster["dst2"]["roster_slot"],
+            "DEF",
+        )
+
+        self.assertEqual(
+            roster["dst2"]["slot_index"],
+            1,
+        )
+
+        self.assertEqual(
+            roster["dst2"]["team"],
+            "DET",
+        )
+
+        self.assertEqual(
+            roster["dst2"]["bye_week"],
+            6,
+        )
+
+    def test_illegal_replacement_rolls_back(self):
+        with self.assertRaises(ValueError):
+            roster_manager.replace_roster_player(
+                "dst1",
+                {
+                    "player_id": "qb2",
+                    "player_name": "Quarterback Two",
+                    "position": "QB",
+                    "team": "TEST",
+                },
+                season=2026,
+            )
+
+        roster = self.roster_by_id()
+
+        self.assertIn(
+            "dst1",
+            roster,
+        )
+
+        self.assertNotIn(
+            "qb2",
+            roster,
+        )
+
     def test_ir_move_is_rejected_for_now(self):
         with self.assertRaises(ValueError):
             roster_manager.move_roster_player(

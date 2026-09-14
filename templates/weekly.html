@@ -315,16 +315,16 @@ Manual snapshot
                 </td>
 
                 <td class="weekly-actual">
-                    {% if
-                        item.player.week_1_actual
-                        is not none
+                    {% set actual =
+                        item.player.get(
+                            "week_1_actual"
+                        )
                     %}
+
+                    {% if actual is not none %}
                     {{
                         "%.2f"
-                        | format(
-                            item.player
-                            .week_1_actual
-                        )
+                        | format(actual)
                     }}
                     {% else %}
                     —

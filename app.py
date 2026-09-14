@@ -36,7 +36,10 @@ from refresh_data import (
     refresh_ffc,
 )
 from roster_display import build_roster_slots
-from roster_manager import move_roster_player
+from roster_manager import (
+    move_roster_player,
+    replace_roster_player,
+)
 from weekly_engine import build_weekly_data
 from yahoo_provider import (
     enrich_local_roster,
@@ -394,6 +397,79 @@ def my_team():
             request.args.get("moved") == "1",
         "move_error":
             request.args.get("move_error"),
+        "transaction_success":
+            request.args.get("transaction") == "1",
+        "transaction_error":
+            request.args.get("transaction_error"),
+        "transaction_candidates":
+            sorted(
+                {
+                    str(
+                        player["yahoo_player_id"]
+                    ): player
+                    for player in (
+                        yahoo_provider.get_roster()
+                        + yahoo_provider.get_available_players()
+                    )
+                    if player.get(
+                        "yahoo_player_id"
+                    )
+                    and player.get("name")
+                    and player.get("position")
+                    and not any(
+                        (
+                            player.get(
+                                "name",
+                                "",
+                            ).lower()
+                            ==
+                            local[
+                                "player_name"
+                            ].lower()
+                        )
+                        or (
+                            player.get("team")
+                            ==
+                            local.get("team")
+                            and player.get(
+                                "position"
+                            ) == "DST"
+                            and local.get(
+                                "position"
+                            )
+                            in {
+                                "DEF",
+                                "DST",
+                            }
+                        )
+                        for local
+                        in local_roster
+                    )
+                }.values(),
+                key=lambda player: (
+                    player.get(
+                        "position",
+                        "",
+                    ),
+                    (
+                        player.get(
+                            "name",
+                            "",
+                        ).split()[-1].lower()
+                        if player.get(
+                            "position"
+                        ) != "DST"
+                        else player.get(
+                            "name",
+                            "",
+                        ).lower()
+                    ),
+                    player.get(
+                        "name",
+                        "",
+                    ).lower(),
+                ),
+            ),
     }
 
     return render_template(
@@ -460,6 +536,101 @@ def move_my_team_player():
         url_for(
             "my_team",
             moved="1",
+        )
+    )
+
+
+@app.post("/my-team/transaction")
+def record_roster_transaction():
+    drop_player_id = request.form.get(
+        "drop_player_id",
+        "",
+    ).strip()
+
+    yahoo_player_id = request.form.get(
+        "add_yahoo_player_id",
+        "",
+    ).strip()
+
+    if not drop_player_id or not yahoo_player_id:
+        return redirect(
+            url_for(
+                "my_team",
+                transaction_error=(
+                    "Choose both a player to drop "
+                    "and a player to add"
+                ),
+            )
+        )
+
+    candidates = (
+        yahoo_provider.get_roster()
+        + yahoo_provider.get_available_players()
+    )
+
+    incoming = next(
+        (
+            player
+            for player in candidates
+            if str(
+                player.get("yahoo_player_id")
+            ) == yahoo_player_id
+        ),
+        None,
+    )
+
+    if incoming is None:
+        return redirect(
+            url_for(
+                "my_team",
+                transaction_error=(
+                    "Could not find the incoming "
+                    "player in the Yahoo snapshot"
+                ),
+            )
+        )
+
+    local_id = (
+        incoming["name"]
+        .lower()
+        .replace("'", "")
+        .replace(".", "")
+        .replace(" ", "-")
+    )
+
+    try:
+        replace_roster_player(
+            drop_player_id,
+            {
+                "player_id": local_id,
+                "player_name":
+                    incoming["name"],
+                "position":
+                    incoming["position"],
+                "team":
+                    incoming.get("team"),
+                "bye_week":
+                    incoming.get("bye_week"),
+                "status":
+                    incoming.get("status"),
+                "source":
+                    "manual_transaction",
+            },
+            season=2026,
+        )
+
+    except ValueError as exc:
+        return redirect(
+            url_for(
+                "my_team",
+                transaction_error=str(exc),
+            )
+        )
+
+    return redirect(
+        url_for(
+            "my_team",
+            transaction="1",
         )
     )
 

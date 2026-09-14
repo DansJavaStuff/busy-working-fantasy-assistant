@@ -37,3 +37,6 @@ data/Yahoo_*.html
 # Generated Yahoo datasets
 data/yahoo_available_players.json
 data/yahoo_my_team.json
+
+# Private local project notes
+private/

@@ -4,7 +4,10 @@ from zoneinfo import ZoneInfo
 import json
 
 from database import load_season_roster
-from yahoo_provider import yahoo_provider
+from yahoo_provider import (
+    enrich_local_roster,
+    yahoo_provider,
+)
 from transaction_engine import (
     build_bye_coverage,
     build_transaction_recommendations,
@@ -56,10 +59,32 @@ def cached_transaction_recommendations(
         "captured_at"
     )
 
+    roster_key = tuple(
+        sorted(
+            str(
+                player.get(
+                    "player_id",
+                    player.get(
+                        "yahoo_player_id",
+                        player.get(
+                            "name",
+                            "",
+                        ),
+                    ),
+                )
+            )
+            for player in roster
+        )
+    )
+
     snapshot_key = (
-        captured_at.isoformat()
-        if captured_at
-        else None
+        (
+            captured_at.isoformat()
+            if captured_at
+            else None
+        ),
+        roster_key,
+        week,
     )
 
     if (
@@ -865,19 +890,17 @@ def build_weekly_data(
             season
         )
 
-    roster = (
-        yahoo_provider
-        .get_roster()
+    local_roster = load_season_roster(
+        season
+    )
+
+    roster = enrich_local_roster(
+        local_roster
     )
 
     available = (
         yahoo_provider
         .get_available_players()
-    )
-
-    add_roster_slots(
-        roster,
-        season,
     )
 
     roster = [

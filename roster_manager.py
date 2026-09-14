@@ -106,6 +106,135 @@ def next_bench_index(db, season_id):
     return row["max_index"] + 1
 
 
+def replace_roster_player(
+    drop_player_id,
+    add_player,
+    season=2026,
+):
+    """
+    Replace one rostered player with another.
+
+    The incoming player inherits the dropped
+    player's current roster slot and index.
+    """
+
+    required = {
+        "player_id",
+        "player_name",
+        "position",
+    }
+
+    missing = required - set(add_player)
+
+    if missing:
+        raise ValueError(
+            "Incoming player is missing: "
+            + ", ".join(sorted(missing))
+        )
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        dropped = db.execute(
+            """
+            SELECT *
+            FROM season_roster
+            WHERE season_id = ?
+              AND player_id = ?
+            """,
+            (
+                season_id,
+                str(drop_player_id),
+            ),
+        ).fetchone()
+
+        if dropped is None:
+            raise ValueError(
+                "Dropped player is not on the roster"
+            )
+
+        existing = db.execute(
+            """
+            SELECT 1
+            FROM season_roster
+            WHERE season_id = ?
+              AND player_id = ?
+            """,
+            (
+                season_id,
+                str(add_player["player_id"]),
+            ),
+        ).fetchone()
+
+        if existing is not None:
+            raise ValueError(
+                "Incoming player is already on the roster"
+            )
+
+        if not player_can_fill_slot(
+            add_player["position"],
+            dropped["roster_slot"],
+        ):
+            raise ValueError(
+                f'{add_player["player_name"]} '
+                f'cannot fill '
+                f'{dropped["roster_slot"]}'
+            )
+
+        db.execute(
+            """
+            DELETE FROM season_roster
+            WHERE season_id = ?
+              AND player_id = ?
+            """,
+            (
+                season_id,
+                dropped["player_id"],
+            ),
+        )
+
+        db.execute(
+            """
+            INSERT INTO season_roster (
+                season_id,
+                roster_slot,
+                slot_index,
+                player_id,
+                player_name,
+                position,
+                team,
+                bye_week,
+                status,
+                source
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                season_id,
+                dropped["roster_slot"],
+                dropped["slot_index"],
+                str(add_player["player_id"]),
+                add_player["player_name"],
+                add_player["position"],
+                add_player.get("team"),
+                add_player.get("bye_week"),
+                add_player.get("status"),
+                add_player.get(
+                    "source",
+                    "manual_transaction",
+                ),
+            ),
+        )
+
+        normalise_bench(
+            db,
+            season_id,
+        )
+
+
 def move_roster_player(
     player_id,
     target_slot,

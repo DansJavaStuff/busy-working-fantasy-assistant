@@ -339,6 +339,129 @@ Manual snapshot
     </section>
 
     <section class="team-section">
+        <h2>Record Roster Transaction</h2>
+
+        <p class="roster-help">
+            Use this after making an add/drop in Yahoo.
+            The incoming player's position, NFL team and
+            bye week are taken from the current Yahoo
+            snapshot.
+        </p>
+
+        {% if data.transaction_success %}
+        <div class="move-message move-success">
+            ✓ Roster transaction recorded
+        </div>
+        {% endif %}
+
+        {% if data.transaction_error %}
+        <div class="move-message move-error">
+            ⚠ {{ data.transaction_error }}
+        </div>
+        {% endif %}
+
+        <form
+            method="post"
+            action="{{ url_for(
+                'record_roster_transaction'
+            ) }}"
+        >
+            <p>
+                <label for="drop-player">
+                    <strong>Drop</strong>
+                </label>
+                <br>
+
+                <select
+                    id="drop-player"
+                    name="drop_player_id"
+                    required
+                >
+                    <option value="">
+                        Choose player…
+                    </option>
+
+                    {% for player in data.roster %}
+                    <option
+                        value="{{ player.player_id }}"
+                    >
+                        {{ player.player_name }}
+                        —
+                        {{ player.position }}
+                        ·
+                        {{ player.team or "-" }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </p>
+
+            <p>
+                <label for="add-position">
+                    <strong>Position</strong>
+                </label>
+                <br>
+
+                <select
+                    id="add-position"
+                >
+                    <option value="">
+                        All
+                    </option>
+                    <option value="QB">QB</option>
+                    <option value="RB">RB</option>
+                    <option value="WR">WR</option>
+                    <option value="TE">TE</option>
+                    <option value="K">K</option>
+                    <option value="DST">DST</option>
+                </select>
+            </p>
+
+            <p>
+                <label for="add-player">
+                    <strong>Add</strong>
+                </label>
+                <br>
+
+                <select
+                    id="add-player"
+                    name="add_yahoo_player_id"
+                    required
+                >
+                    <option value="">
+                        Choose player…
+                    </option>
+
+                    {% for player
+                        in data.transaction_candidates
+                    %}
+                    <option
+                        value="{{
+                            player.yahoo_player_id
+                        }}"
+                        data-position="{{
+                            player.position
+                        }}"
+                    >
+                        {{ player.name }}
+                        —
+                        {{ player.position }}
+                        ·
+                        {{ player.team or "-" }}
+                        · Bye
+                        {{ player.bye_week or "-" }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </p>
+
+            <button type="submit">
+                Record Add / Drop
+            </button>
+        </form>
+    </section>
+
+
+    <section class="team-section">
         <h2>Injured Reserve</h2>
 
         <table class="team-table">
@@ -676,5 +799,88 @@ for (const row of destinationRows) {
         }
     );
 }
+const dropSelect = document.getElementById(
+    "drop-player"
+);
+
+const positionSelect = document.getElementById(
+    "add-position"
+);
+
+const addSelect = document.getElementById(
+    "add-player"
+);
+
+function filterAddPlayers() {
+    const selectedPosition =
+        positionSelect.value;
+
+    for (
+        const option
+        of Array.from(
+            addSelect.options
+        )
+    ) {
+        if (!option.value) {
+            option.hidden = false;
+            continue;
+        }
+
+        option.hidden = (
+            selectedPosition
+            &&
+            option.dataset.position
+            !== selectedPosition
+        );
+    }
+
+    const selectedOption =
+        addSelect.selectedOptions[0];
+
+    if (
+        selectedOption
+        &&
+        selectedOption.value
+        &&
+        selectedOption.hidden
+    ) {
+        addSelect.value = "";
+    }
+}
+
+positionSelect.addEventListener(
+    "change",
+    filterAddPlayers
+);
+
+dropSelect.addEventListener(
+    "change",
+    () => {
+        const option =
+            dropSelect.selectedOptions[0];
+
+        if (!option || !option.value) {
+            return;
+        }
+
+        const text =
+            option.textContent;
+
+        const match =
+            text.match(
+                /—\s+(QB|RB|WR|TE|K|DST)\s+·/
+            );
+
+        if (match) {
+            positionSelect.value =
+                match[1];
+
+            filterAddPlayers();
+        }
+    }
+);
+
+filterAddPlayers();
+
 </script>
 {% endblock %}

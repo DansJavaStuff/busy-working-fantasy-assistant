@@ -197,6 +197,13 @@ def enrich_local_roster(
             local_player
         )
 
+        # Keep the local database field, but also
+        # expose the normalized provider-style name
+        # expected by the weekly/transaction engines.
+        player["name"] = (
+            local_player["player_name"]
+        )
+
         yahoo_player = by_name.get(
             local_player[
                 "player_name"
@@ -276,6 +283,12 @@ def enrich_local_roster(
                 "week_1_projection"
             ] = yahoo_player.get(
                 "week_1_projection"
+            )
+
+            player[
+                "week_1_actual"
+            ] = yahoo_player.get(
+                "week_1_actual"
             )
 
             player[
