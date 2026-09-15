@@ -34,10 +34,51 @@
         ) }}"
     >
 
+    <link
+        rel="stylesheet"
+        href="{{ url_for(
+            'static',
+            filename='busy_overlay.css'
+        ) }}"
+    >
+
+    <script
+        defer
+        src="{{ url_for(
+            'static',
+            filename='busy_overlay.js'
+        ) }}"
+    ></script>
+
     {% block head_extra %}{% endblock %}
 </head>
 
 <body>
+    <div
+        id="busy-overlay"
+        class="busy-overlay"
+        aria-hidden="true"
+        aria-live="polite"
+    >
+        <div
+            class="busy-overlay-card"
+            role="status"
+        >
+            <div
+                class="busy-overlay-spinner"
+                aria-hidden="true"
+            ></div>
+
+            <strong data-busy-message>
+                Updating data…
+            </strong>
+
+            <span data-busy-detail>
+                Refreshing Yahoo data and rebuilding analysis.
+            </span>
+        </div>
+    </div>
+
     {% block header %}{% endblock %}
 
     <main class="{% block main_class %}container{% endblock %}">
