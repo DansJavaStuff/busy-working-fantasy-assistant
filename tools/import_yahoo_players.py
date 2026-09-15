@@ -52,6 +52,18 @@ SOURCE_PATTERNS = {
         "Yahoo_Player_list_DEF_week2-Proj.html",
     ],
 
+    "week_3_projection": [
+        "Yahoo_Player_list_week3-Proj*.html",
+        "Yahoo_Player_list_K_week3-Proj.html",
+        "Yahoo_Player_list_DEF_week3-Proj.html",
+    ],
+
+    "week_4_projection": [
+        "Yahoo_Player_list_week4-Proj*.html",
+        "Yahoo_Player_list_K_week4-Proj.html",
+        "Yahoo_Player_list_DEF_week4-Proj.html",
+    ],
+
     "next_4_weeks_projection": [
         "Yahoo_Player_list_4week-Proj*.html",
         "Yahoo_Player_list_K_4week-Proj.html",
@@ -77,6 +89,18 @@ MY_TEAM_SOURCE_PATTERNS = {
         "Yahoo_MyTeam_week2-Proj.html",
         "Yahoo_MyTeam_K_week2-Proj.html",
         "Yahoo_MyTeam_DEF_week2-Proj.html",
+    ],
+
+    "week_3_projection": [
+        "Yahoo_MyTeam_week3-Proj.html",
+        "Yahoo_MyTeam_K_week3-Proj.html",
+        "Yahoo_MyTeam_DEF_week3-Proj.html",
+    ],
+
+    "week_4_projection": [
+        "Yahoo_MyTeam_week4-Proj.html",
+        "Yahoo_MyTeam_K_week4-Proj.html",
+        "Yahoo_MyTeam_DEF_week4-Proj.html",
     ],
 
     "next_4_weeks_projection": [
@@ -636,6 +660,41 @@ def merge_projection_sources(source_patterns):
             ] = player.get(
                 "projection_stats"
             )
+
+            if projection_name.startswith("week_"):
+                week_prefix = (
+                    projection_name
+                    .replace(
+                        "_projection",
+                        "",
+                    )
+                )
+
+                for key in (
+                    "game_display",
+                    "game_day",
+                    "game_time",
+                    "opponent",
+                    "home_away",
+                ):
+                    existing[
+                        f"{week_prefix}_{key}"
+                    ] = player.get(key)
+
+                # Week 2 is the current manual
+                # snapshot for now. The Weekly
+                # engine will shortly select
+                # week-specific matchup fields
+                # itself.
+                if projection_name == "week_2_projection":
+                    for key in (
+                        "game_display",
+                        "game_day",
+                        "game_time",
+                        "opponent",
+                        "home_away",
+                    ):
+                        existing[key] = player.get(key)
 
             if player["status"]:
                 existing["status"] = (

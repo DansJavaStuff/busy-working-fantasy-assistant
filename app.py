@@ -40,7 +40,10 @@ from roster_manager import (
     move_roster_player,
     replace_roster_player,
 )
-from weekly_engine import build_weekly_data
+from weekly_engine import (
+    build_weekly_data,
+    current_fantasy_week,
+)
 from yahoo_provider import (
     enrich_local_roster,
     get_yahoo_provider_status,
@@ -279,10 +282,13 @@ def reset():
 @app.get("/weekly")
 def weekly():
     season = 2026
+    week = current_fantasy_week(
+        season
+    )
 
     weekly_data = build_weekly_data(
         season=season,
-        week=1,
+        week=week,
     )
 
     data = {
