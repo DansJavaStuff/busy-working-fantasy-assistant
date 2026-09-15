@@ -2,6 +2,10 @@ from datetime import date
 from unittest import TestCase
 
 from fantasy_calendar import (
+    CHAMPIONSHIP_WEEK,
+    FINAL_FANTASY_WEEK,
+    PLAYOFF_START_WEEK,
+    REGULAR_SEASON_WEEKS,
     current_fantasy_week,
     fantasy_season_for_date,
     game_date_for_week,
@@ -35,6 +39,28 @@ class FantasyCalendarTests(TestCase):
                 date(2026, 9, 15),
             ),
             2,
+        )
+
+    def test_busy_working_season_boundaries(self):
+        self.assertEqual(REGULAR_SEASON_WEEKS, 14)
+        self.assertEqual(PLAYOFF_START_WEEK, 15)
+        self.assertEqual(CHAMPIONSHIP_WEEK, 17)
+        self.assertEqual(FINAL_FANTASY_WEEK, 17)
+
+    def test_current_week_stops_at_championship_week(self):
+        self.assertEqual(
+            current_fantasy_week(
+                2026,
+                date(2026, 12, 29),
+            ),
+            17,
+        )
+        self.assertEqual(
+            current_fantasy_week(
+                2026,
+                date(2027, 1, 5),
+            ),
+            17,
         )
 
     def test_january_belongs_to_previous_season(self):
