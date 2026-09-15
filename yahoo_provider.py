@@ -3,9 +3,16 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import json
 
+from yahoo_normalizer import player_for_week
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_ROOT / "data"
+
+NORMALIZED_FILE = (
+    DATA_DIR
+    / "yahoo_normalized.json"
+)
 
 MY_TEAM_FILE = (
     DATA_DIR
@@ -98,30 +105,72 @@ def normalise_week(
     player,
     week=None,
 ):
-    """
-    Present the selected Yahoo week through the legacy
-    fields still consumed by the weekly and transaction
-    engines.
+    """Expose one normalized player's selected week to legacy callers.
 
-    The raw imported week_N_* fields are retained. The
-    week_1_projection/week_1_actual aliases are temporary
-    compatibility fields until the engines are fully
-    week-aware themselves.
+    The canonical source is now ``player['weeks'][week]``.  The old
+    ``week_1_projection``/``week_1_actual`` and flat matchup fields remain
+    temporary compatibility aliases for Weekly and Transactions while those
+    engines are migrated to the arbitrary-week model.
+
+    Legacy imported players are still accepted during the transition so a
+    missing normalized file does not make the fallback path unusable.
     """
 
     if week is None:
         week = current_fantasy_week()
 
     output = dict(player)
-    prefix = f"week_{week}"
 
-    current_projection = player.get(
-        f"{prefix}_projection"
-    )
+    weeks = player.get("weeks")
 
-    current_actual = player.get(
-        f"{prefix}_actual"
-    )
+    if isinstance(weeks, dict):
+        week_data = player_for_week(
+            player,
+            week,
+        )
+
+        current_projection = (
+            week_data.get("projection")
+        )
+
+        current_actual = (
+            week_data.get("actual")
+        )
+
+        game = week_data.get("game") or {}
+
+        output["game_display"] = (
+            game.get("display")
+        )
+        output["game_day"] = (
+            game.get("day")
+        )
+        output["game_time"] = (
+            game.get("time")
+        )
+        output["opponent"] = (
+            game.get("opponent")
+        )
+        output["home_away"] = (
+            game.get("home_away")
+        )
+
+    else:
+        # Transitional support for the previous imported JSON format.
+        prefix = f"week_{week}"
+
+        current_projection = player.get(
+            f"{prefix}_projection"
+        )
+
+        current_actual = player.get(
+            f"{prefix}_actual"
+        )
+
+        for field in GAME_FIELDS:
+            output[field] = player.get(
+                f"{prefix}_{field}"
+            )
 
     output["current_week"] = week
     output[
@@ -131,9 +180,8 @@ def normalise_week(
         "current_week_actual"
     ] = current_actual
 
-    # Compatibility aliases for code that still calls
-    # these Week 1 names. In Week 2+, they intentionally
-    # represent the selected/current fantasy week.
+    # Temporary aliases for code that still uses Week 1 names as shorthand
+    # for the current scoring week.
     output[
         "week_1_projection"
     ] = current_projection
@@ -141,31 +189,22 @@ def normalise_week(
         "week_1_actual"
     ] = current_actual
 
-    for field in GAME_FIELDS:
-        output[field] = player.get(
-            f"{prefix}_{field}"
-        )
-
     return output
 
 
 class YahooDataProvider:
-    """
-    Current Yahoo data source for the application.
+    """Provide one normalized Yahoo dataset to the application.
 
-    Today:
-        loads the manual Yahoo HTML import JSON.
-
-    Later:
-        refresh() will fetch live Yahoo Fantasy API
-        data and keep the resulting snapshot in memory.
-
-    Yahoo-derived data should not be persisted here.
+    The provider is intentionally source-agnostic.  Today the normalized file
+    is produced by the emergency HTML fallback importer.  The Yahoo API path
+    will produce the same schema, allowing Weekly and Transactions to consume
+    identical player objects regardless of source.
     """
 
     def __init__(self):
         self._roster = []
         self._available = []
+        self._dataset = None
 
         self._loaded_at = None
         self._source = None
@@ -179,14 +218,42 @@ class YahooDataProvider:
             )
         )
 
-    def refresh(self):
-        """
-        Temporary fallback implementation.
+    def _load_normalized(self):
+        dataset = self._load_json(
+            NORMALIZED_FILE
+        )
 
-        Reload the most recent manually imported
-        Yahoo snapshot from disk.
-        """
+        players = dataset.get(
+            "players",
+            {},
+        )
 
+        self._roster = [
+            players[player_id]
+            for player_id
+            in dataset.get(
+                "my_team_ids",
+                [],
+            )
+            if player_id in players
+        ]
+
+        self._available = [
+            players[player_id]
+            for player_id
+            in dataset.get(
+                "available_ids",
+                [],
+            )
+            if player_id in players
+        ]
+
+        self._dataset = dataset
+        self._source = dataset.get(
+            "source"
+        ) or "normalized_snapshot"
+
+    def _load_legacy(self):
         self._roster = self._load_json(
             MY_TEAM_FILE
         )
@@ -194,6 +261,21 @@ class YahooDataProvider:
         self._available = self._load_json(
             AVAILABLE_FILE
         )
+
+        self._dataset = None
+        self._source = "manual_import_legacy"
+
+    def refresh(self):
+        """Reload the latest normalized Yahoo snapshot from disk.
+
+        During migration, fall back to the two legacy JSON files if the
+        normalized snapshot has not yet been generated.
+        """
+
+        if NORMALIZED_FILE.exists():
+            self._load_normalized()
+        else:
+            self._load_legacy()
 
         self._loaded_at = (
             datetime.now(
@@ -203,10 +285,6 @@ class YahooDataProvider:
 
         self._captured_at = (
             self._manual_snapshot_time()
-        )
-
-        self._source = (
-            "manual_import"
         )
 
     def ensure_loaded(self):
@@ -253,6 +331,31 @@ class YahooDataProvider:
     def get_status(self):
         self.ensure_loaded()
 
+        weeks = []
+
+        if self._dataset:
+            week_values = set()
+
+            for player in self._dataset.get(
+                "players",
+                {},
+            ).values():
+                week_values.update(
+                    str(value)
+                    for value in player.get(
+                        "weeks",
+                        {},
+                    )
+                )
+
+            weeks = sorted(
+                (
+                    int(value)
+                    for value in week_values
+                    if str(value).isdigit()
+                )
+            )
+
         return {
             "source":
                 self._source,
@@ -268,6 +371,18 @@ class YahooDataProvider:
 
             "current_week":
                 current_fantasy_week(),
+
+            "weeks":
+                weeks,
+
+            "schema_version":
+                (
+                    self._dataset.get(
+                        "schema_version"
+                    )
+                    if self._dataset
+                    else None
+                ),
 
             "captured_at":
                 self._captured_at,
@@ -310,14 +425,7 @@ yahoo_provider = YahooDataProvider()
 def enrich_local_roster(
     local_roster,
 ):
-    """
-    Combine our local roster-slot state with
-    the current Yahoo player snapshot.
-
-    Local data remains authoritative for roster layout
-    and identity. Yahoo supplies status, matchup,
-    projections, actual points and Yahoo player IDs.
-    """
+    """Combine local roster layout with the current Yahoo snapshot."""
 
     yahoo_roster = (
         yahoo_provider
@@ -357,9 +465,7 @@ def enrich_local_roster(
             ].lower()
         )
 
-        # Defence names differ:
-        # "Houston Texans" locally,
-        # "Texans" in Yahoo.
+        # Defence names differ: "Houston Texans" locally, "Texans" in Yahoo.
         if (
             yahoo_player is None
             and local_player[
@@ -378,9 +484,7 @@ def enrich_local_roster(
                         "team"
                     )
                 ):
-                    yahoo_player = (
-                        candidate
-                    )
+                    yahoo_player = candidate
                     break
 
         if yahoo_player:
