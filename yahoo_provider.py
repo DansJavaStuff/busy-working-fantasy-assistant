@@ -1,5 +1,6 @@
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import json
 
 
@@ -15,6 +16,137 @@ AVAILABLE_FILE = (
     DATA_DIR
     / "yahoo_available_players.json"
 )
+
+UK_TIME = ZoneInfo(
+    "Europe/London"
+)
+
+GAME_FIELDS = (
+    "game_display",
+    "game_day",
+    "game_time",
+    "opponent",
+    "home_away",
+)
+
+
+def week_1_thursday(season):
+    september_1 = date(
+        season,
+        9,
+        1,
+    )
+
+    days_until_monday = (
+        0
+        - september_1.weekday()
+    ) % 7
+
+    labor_day = (
+        september_1
+        + timedelta(
+            days=days_until_monday
+        )
+    )
+
+    return (
+        labor_day
+        + timedelta(days=3)
+    )
+
+
+def current_fantasy_week(
+    season=None,
+    today=None,
+):
+    if today is None:
+        today = datetime.now(
+            UK_TIME
+        ).date()
+
+    if season is None:
+        season = (
+            today.year - 1
+            if today.month <= 2
+            else today.year
+        )
+
+    week_1_start = (
+        week_1_thursday(season)
+        - timedelta(days=2)
+    )
+
+    if today < week_1_start:
+        return 1
+
+    week = (
+        (
+            today
+            - week_1_start
+        ).days
+        // 7
+        + 1
+    )
+
+    return max(
+        1,
+        min(18, week),
+    )
+
+
+def normalise_week(
+    player,
+    week=None,
+):
+    """
+    Present the selected Yahoo week through the legacy
+    fields still consumed by the weekly and transaction
+    engines.
+
+    The raw imported week_N_* fields are retained. The
+    week_1_projection/week_1_actual aliases are temporary
+    compatibility fields until the engines are fully
+    week-aware themselves.
+    """
+
+    if week is None:
+        week = current_fantasy_week()
+
+    output = dict(player)
+    prefix = f"week_{week}"
+
+    current_projection = player.get(
+        f"{prefix}_projection"
+    )
+
+    current_actual = player.get(
+        f"{prefix}_actual"
+    )
+
+    output["current_week"] = week
+    output[
+        "current_week_projection"
+    ] = current_projection
+    output[
+        "current_week_actual"
+    ] = current_actual
+
+    # Compatibility aliases for code that still calls
+    # these Week 1 names. In Week 2+, they intentionally
+    # represent the selected/current fantasy week.
+    output[
+        "week_1_projection"
+    ] = current_projection
+    output[
+        "week_1_actual"
+    ] = current_actual
+
+    for field in GAME_FIELDS:
+        output[field] = player.get(
+            f"{prefix}_{field}"
+        )
+
+    return output
 
 
 class YahooDataProvider:
@@ -84,16 +216,26 @@ class YahooDataProvider:
     def get_roster(self):
         self.ensure_loaded()
 
+        week = current_fantasy_week()
+
         return [
-            dict(player)
+            normalise_week(
+                player,
+                week,
+            )
             for player in self._roster
         ]
 
     def get_available_players(self):
         self.ensure_loaded()
 
+        week = current_fantasy_week()
+
         return [
-            dict(player)
+            normalise_week(
+                player,
+                week,
+            )
             for player in self._available
         ]
 
@@ -124,6 +266,9 @@ class YahooDataProvider:
             "available_players":
                 len(self._available),
 
+            "current_week":
+                current_fantasy_week(),
+
             "captured_at":
                 self._captured_at,
 
@@ -141,7 +286,7 @@ class YahooDataProvider:
     def _manual_snapshot_time(self):
         source_files = list(
             DATA_DIR.glob(
-                "Yahoo_MyTeam_*.html"
+                "Yahoo_*.html"
             )
         )
 
@@ -158,6 +303,7 @@ class YahooDataProvider:
             timezone.utc,
         )
 
+
 yahoo_provider = YahooDataProvider()
 
 
@@ -168,15 +314,9 @@ def enrich_local_roster(
     Combine our local roster-slot state with
     the current Yahoo player snapshot.
 
-    Local data remains authoritative for:
-        roster_slot
-        slot_index
-
-    Yahoo remains authoritative for:
-        status
-        matchup
-        projections
-        Yahoo player ID
+    Local data remains authoritative for roster layout
+    and identity. Yahoo supplies status, matchup,
+    projections, actual points and Yahoo player IDs.
     """
 
     yahoo_roster = (
@@ -192,14 +332,21 @@ def enrich_local_roster(
 
     enriched = []
 
+    local_authoritative = {
+        "name",
+        "player_name",
+        "player_id",
+        "team",
+        "position",
+        "roster_slot",
+        "slot_index",
+    }
+
     for local_player in local_roster:
         player = dict(
             local_player
         )
 
-        # Keep the local database field, but also
-        # expose the normalized provider-style name
-        # expected by the weekly/transaction engines.
         player["name"] = (
             local_player["player_name"]
         )
@@ -237,71 +384,13 @@ def enrich_local_roster(
                     break
 
         if yahoo_player:
-            player[
-                "yahoo_player_id"
-            ] = yahoo_player.get(
-                "yahoo_player_id"
-            )
+            for key, value in (
+                yahoo_player.items()
+            ):
+                if key in local_authoritative:
+                    continue
 
-            player["status"] = (
-                yahoo_player.get(
-                    "status"
-                )
-            )
-
-            player[
-                "game_display"
-            ] = yahoo_player.get(
-                "game_display"
-            )
-
-            player["game_day"] = (
-                yahoo_player.get(
-                    "game_day"
-                )
-            )
-
-            player["game_time"] = (
-                yahoo_player.get(
-                    "game_time"
-                )
-            )
-
-            player["opponent"] = (
-                yahoo_player.get(
-                    "opponent"
-                )
-            )
-
-            player["home_away"] = (
-                yahoo_player.get(
-                    "home_away"
-                )
-            )
-
-            player[
-                "week_1_projection"
-            ] = yahoo_player.get(
-                "week_1_projection"
-            )
-
-            player[
-                "week_1_actual"
-            ] = yahoo_player.get(
-                "week_1_actual"
-            )
-
-            player[
-                "week_2_projection"
-            ] = yahoo_player.get(
-                "week_2_projection"
-            )
-
-            player[
-                "next_4_weeks_projection"
-            ] = yahoo_player.get(
-                "next_4_weeks_projection"
-            )
+                player[key] = value
 
         enriched.append(
             player
