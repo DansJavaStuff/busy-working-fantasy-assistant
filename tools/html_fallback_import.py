@@ -10,7 +10,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from tools import import_yahoo_players as importer
 from tools.yahoo_html_metadata import inspect_path
-from yahoo_normalizer import build_dataset
+from yahoo_normalizer import (
+    build_dataset,
+    preserve_locked_projections,
+)
 
 
 NORMALIZED_OUTPUT_FILE = (
@@ -125,6 +128,13 @@ def load_json(path):
 
 
 def write_normalized_dataset():
+    previous_dataset = None
+
+    if NORMALIZED_OUTPUT_FILE.exists():
+        previous_dataset = load_json(
+            NORMALIZED_OUTPUT_FILE
+        )
+
     roster = load_json(
         importer.MY_TEAM_OUTPUT_FILE
     )
@@ -137,6 +147,12 @@ def write_normalized_dataset():
         available,
         source="manual_html",
     )
+
+    if previous_dataset:
+        dataset = preserve_locked_projections(
+            previous_dataset,
+            dataset,
+        )
 
     NORMALIZED_OUTPUT_FILE.write_text(
         json.dumps(
