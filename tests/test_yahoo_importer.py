@@ -130,7 +130,7 @@ class YahooProviderWeekTests(TestCase):
             2,
         )
 
-    def test_current_week_preserves_historical_week_one_projection(self):
+    def test_current_week_preserves_historical_week_one_data(self):
         player = {
             "name": "Example Player",
             "week_1_projection": 8.5,
@@ -163,7 +163,7 @@ class YahooProviderWeekTests(TestCase):
             ]
         )
 
-        # Historical Week 1 projection remains historical data.
+        # Historical Week 1 values remain historical data.
         self.assertEqual(
             result[
                 "week_1_projection"
@@ -171,16 +171,15 @@ class YahooProviderWeekTests(TestCase):
             8.5,
         )
 
-        # week_1_actual is the one temporary compatibility alias left
-        # for My Team's lock checks until that route is migrated.
-        self.assertIsNone(
+        self.assertEqual(
             result[
                 "week_1_actual"
-            ]
+            ],
+            11.2,
         )
 
         # Critical regression check: callers must use the explicit
-        # current-week fields for Week 2 projection decisions.
+        # current-week fields for Week 2 lock/projection decisions.
         self.assertEqual(
             result["game_day"],
             "Sun",
