@@ -1,8 +1,8 @@
 from pathlib import Path
-from datetime import date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 import json
 
+from fantasy_calendar import current_fantasy_week
 from yahoo_normalizer import player_for_week
 
 
@@ -24,10 +24,6 @@ AVAILABLE_FILE = (
     / "yahoo_available_players.json"
 )
 
-UK_TIME = ZoneInfo(
-    "Europe/London"
-)
-
 GAME_FIELDS = (
     "game_display",
     "game_day",
@@ -35,70 +31,6 @@ GAME_FIELDS = (
     "opponent",
     "home_away",
 )
-
-
-def week_1_thursday(season):
-    september_1 = date(
-        season,
-        9,
-        1,
-    )
-
-    days_until_monday = (
-        0
-        - september_1.weekday()
-    ) % 7
-
-    labor_day = (
-        september_1
-        + timedelta(
-            days=days_until_monday
-        )
-    )
-
-    return (
-        labor_day
-        + timedelta(days=3)
-    )
-
-
-def current_fantasy_week(
-    season=None,
-    today=None,
-):
-    if today is None:
-        today = datetime.now(
-            UK_TIME
-        ).date()
-
-    if season is None:
-        season = (
-            today.year - 1
-            if today.month <= 2
-            else today.year
-        )
-
-    week_1_start = (
-        week_1_thursday(season)
-        - timedelta(days=2)
-    )
-
-    if today < week_1_start:
-        return 1
-
-    week = (
-        (
-            today
-            - week_1_start
-        ).days
-        // 7
-        + 1
-    )
-
-    return max(
-        1,
-        min(18, week),
-    )
 
 
 def normalise_week(

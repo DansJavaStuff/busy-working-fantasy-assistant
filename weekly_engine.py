@@ -1,9 +1,15 @@
 from pathlib import Path
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
 
 from database import load_season_roster
+from fantasy_calendar import (
+    UK_TIME,
+    current_fantasy_week,
+    fantasy_season_for_date,
+    game_date_for_week,
+)
 from yahoo_provider import (
     enrich_local_roster,
     yahoo_provider,
@@ -431,140 +437,10 @@ def build_best_lineup(players):
 
     return lineup
 
-def fantasy_season_for_date(
-    today=None,
-):
-    if today is None:
-        today = datetime.now(
-            UK_TIME
-        ).date()
-
-    # January and February still belong
-    # to the NFL season that started in
-    # the previous calendar year.
-    if today.month <= 2:
-        return today.year - 1
-
-    return today.year
-
-
-def week_1_thursday(
-    season,
-):
-    september_1 = date(
-        season,
-        9,
-        1,
-    )
-
-    # US Labor Day is the first Monday
-    # in September.
-    days_until_monday = (
-        0
-        - september_1.weekday()
-    ) % 7
-
-    labor_day = (
-        september_1
-        + timedelta(
-            days=days_until_monday
-        )
-    )
-
-    return (
-        labor_day
-        + timedelta(days=3)
-    )
-
-
-def week_1_start(
-    season,
-):
-    # Fantasy week starts on the Tuesday
-    # before the Thursday opener.
-    return (
-        week_1_thursday(season)
-        - timedelta(days=2)
-    )
-
-
-def current_fantasy_week(
-    season=None,
-):
-    today = datetime.now(
-        UK_TIME
-    ).date()
-
-    if season is None:
-        season = fantasy_season_for_date(
-            today
-        )
-
-    start = week_1_start(
-        season
-    )
-
-    if today < start:
-        return 1
-
-    week = (
-        (
-            today
-            - start
-        ).days
-        // 7
-        + 1
-    )
-
-    return max(
-        1,
-        min(18, week),
-    )
 
 EASTERN = ZoneInfo(
     "America/New_York"
 )
-
-UK_TIME = ZoneInfo(
-    "Europe/London"
-)
-
-
-def game_date_for_week(
-    season,
-    week,
-    game_day,
-):
-    week_thursday = (
-        week_1_thursday(
-            season
-        )
-        + timedelta(
-            weeks=week - 1
-        )
-    )
-
-    offsets = {
-        "Thu": 0,
-        "Fri": 1,
-        "Sat": 2,
-        "Sun": 3,
-        "Mon": 4,
-        "Tue": 5,
-        "Wed": 6,
-    }
-
-    offset = offsets.get(
-        game_day
-    )
-
-    if offset is None:
-        return None
-
-    return (
-        week_thursday
-        + timedelta(days=offset)
-    )
 
 
 def local_game_info(
