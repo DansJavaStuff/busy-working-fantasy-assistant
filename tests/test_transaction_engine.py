@@ -4,6 +4,7 @@ from transaction_engine import (
     build_bye_coverage,
     build_transaction_recommendations,
     compare_bye_coverage,
+    roster_metrics,
 )
 
 
@@ -21,7 +22,7 @@ def player(
         "name": name,
         "position": position,
         "bye_week": bye_week,
-        "week_1_projection": week_projection,
+        "current_week_projection": week_projection,
         "next_4_weeks_projection": four_week_projection,
         "status": None,
         "roster_slot": roster_slot,
@@ -351,6 +352,27 @@ class TransactionEngineTests(TestCase):
         self.assertEqual(
             len(week_7_qb_fixes),
             1,
+        )
+
+    def test_roster_metrics_ignore_stale_week_one_alias(self):
+        roster = base_roster()
+
+        for item in roster:
+            item["week_1_projection"] = 999.0
+
+        metrics = roster_metrics(
+            roster,
+            [],
+        )
+
+        self.assertIsNotNone(metrics)
+        self.assertLess(
+            metrics["current_week_total"],
+            999.0,
+        )
+        self.assertNotIn(
+            "week_1_total",
+            metrics,
         )
 
 

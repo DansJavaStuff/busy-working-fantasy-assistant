@@ -693,9 +693,9 @@ def roster_metrics(
     roster,
     available,
 ):
-    week_1 = optimise_lineup(
+    current_week = optimise_lineup(
         roster,
-        "week_1_projection",
+        "current_week_projection",
     )
 
     four_week = optimise_lineup(
@@ -704,14 +704,14 @@ def roster_metrics(
     )
 
     if (
-        week_1 is None
+        current_week is None
         or four_week is None
     ):
         return None
 
     return {
-        "week_1_total":
-            week_1["total"],
+        "current_week_total":
+            current_week["total"],
 
         "four_week_weekly":
             four_week["total"] / 4.0,
@@ -719,7 +719,7 @@ def roster_metrics(
         "bench_value":
             bench_value(
                 roster,
-                week_1["lineup"],
+                current_week["lineup"],
                 available,
             ),
     }
@@ -904,7 +904,7 @@ def build_depth_context(
                 key=lambda player:
                     projection(
                         player,
-                        "week_1_projection",
+                        "current_week_projection",
                     ),
             )
 
@@ -1136,7 +1136,7 @@ def classify_roster_role(
                 other_qbs,
                 key=lambda p: projection(
                     p,
-                    "week_1_projection",
+                    "current_week_projection",
                 ),
             )
 
@@ -1213,12 +1213,12 @@ def build_reasons(
 
     if result["week_gain"] >= 0.25:
         reasons.append(
-            "Improves the Week 1 starting "
+            "Improves the current week starting "
             f"lineup by {result['week_gain']:.2f} pts."
         )
     elif abs(result["week_gain"]) < 0.10:
         reasons.append(
-            "Does not change the Week 1 "
+            "Does not change the current week "
             "starting-lineup projection."
         )
 
@@ -1290,8 +1290,8 @@ def score_transaction(
     after,
 ):
     week_gain = (
-        after["week_1_total"]
-        - before["week_1_total"]
+        after["current_week_total"]
+        - before["current_week_total"]
     )
 
     four_week_gain = (
@@ -1405,7 +1405,7 @@ def build_transaction_recommendations(
         key=lambda player: (
             projection(
                 player,
-                "week_1_projection",
+                "current_week_projection",
             )
             + four_week_average(
                 player

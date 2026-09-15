@@ -130,7 +130,7 @@ def load_json(path):
 
 def projection(
     player,
-    field="week_1_projection",
+    field="current_week_projection",
 ):
     value = player.get(field)
 
@@ -239,7 +239,7 @@ def best_players(
 
 def has_played(player):
     return (
-        player.get("week_1_actual")
+        player.get("current_week_actual")
         is not None
     )
 
@@ -1101,13 +1101,13 @@ def build_weekly_data(
     actual_so_far = sum(
         float(
             item["player"].get(
-                "week_1_actual"
+                "current_week_actual"
             )
             or 0
         )
         for item in lineup
         if item["player"].get(
-            "week_1_actual"
+            "current_week_actual"
         ) is not None
     )
 
@@ -1117,7 +1117,7 @@ def build_weekly_data(
         )
         for item in lineup
         if item["player"].get(
-            "week_1_actual"
+            "current_week_actual"
         ) is None
     )
 

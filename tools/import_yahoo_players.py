@@ -30,85 +30,29 @@ OUTPUT_FILE = (
     / "yahoo_available_players.json"
 )
 
+MY_TEAM_OUTPUT_FILE = (
+    DATA_DIR
+    / "yahoo_my_team.json"
+)
+
+SEASON = 2026
 MY_TEAM_NAME = "Allen Wrench"
 
+PLAYER_SOURCE_PREFIX = (
+    "Yahoo_Player_list_"
+)
 
-SOURCE_PATTERNS = {
-    "week_1_projection": [
-        "Yahoo_Player_list_week1-Proj*.html",
-        "Yahoo_Player_list_K_week1-Proj.html",
-        "Yahoo_Player_list_DEF_week1-Proj.html",
-    ],
+MY_TEAM_SOURCE_PREFIX = (
+    "Yahoo_MyTeam_"
+)
 
-    "week_1_actual": [
-        "Yahoo_Player_list_week1-Actual*.html",
-        "Yahoo_Player_list_K_week1-Actual.html",
-        "Yahoo_Player_list_DEF_week1-Actual.html",
-    ],
-
-    "week_2_projection": [
-        "Yahoo_Player_list_week2-Proj*.html",
-        "Yahoo_Player_list_K_week2-Proj.html",
-        "Yahoo_Player_list_DEF_week2-Proj.html",
-    ],
-
-    "week_3_projection": [
-        "Yahoo_Player_list_week3-Proj*.html",
-        "Yahoo_Player_list_K_week3-Proj.html",
-        "Yahoo_Player_list_DEF_week3-Proj.html",
-    ],
-
-    "week_4_projection": [
-        "Yahoo_Player_list_week4-Proj*.html",
-        "Yahoo_Player_list_K_week4-Proj.html",
-        "Yahoo_Player_list_DEF_week4-Proj.html",
-    ],
-
-    "next_4_weeks_projection": [
-        "Yahoo_Player_list_4week-Proj*.html",
-        "Yahoo_Player_list_K_4week-Proj.html",
-        "Yahoo_Player_list_DEF_4week-Proj.html",
-    ],
-}
-
-
-MY_TEAM_SOURCE_PATTERNS = {
-    "week_1_projection": [
-        "Yahoo_MyTeam_week1-Proj.html",
-        "Yahoo_MyTeam_K_week1-Proj.html",
-        "Yahoo_MyTeam_DEF_week1-Proj.html",
-    ],
-
-    "week_1_actual": [
-        "Yahoo_MyTeam_week1-Actual.html",
-        "Yahoo_MyTeam_K_week1-Actual.html",
-        "Yahoo_MyTeam_DEF_week1-Actual.html",
-    ],
-
-    "week_2_projection": [
-        "Yahoo_MyTeam_week2-Proj.html",
-        "Yahoo_MyTeam_K_week2-Proj.html",
-        "Yahoo_MyTeam_DEF_week2-Proj.html",
-    ],
-
-    "week_3_projection": [
-        "Yahoo_MyTeam_week3-Proj.html",
-        "Yahoo_MyTeam_K_week3-Proj.html",
-        "Yahoo_MyTeam_DEF_week3-Proj.html",
-    ],
-
-    "week_4_projection": [
-        "Yahoo_MyTeam_week4-Proj.html",
-        "Yahoo_MyTeam_K_week4-Proj.html",
-        "Yahoo_MyTeam_DEF_week4-Proj.html",
-    ],
-
-    "next_4_weeks_projection": [
-        "Yahoo_MyTeam_4week-Proj.html",
-        "Yahoo_MyTeam_K_4week-Proj.html",
-        "Yahoo_MyTeam_DEF_4week-Proj.html",
-    ],
-}
+GAME_FIELDS = (
+    "game_display",
+    "game_day",
+    "game_time",
+    "opponent",
+    "home_away",
+)
 
 
 def clean_text(value):
@@ -196,7 +140,10 @@ def extract_status(cell):
     return value or None
 
 
-def extract_headshot(cell, player_id):
+def extract_headshot(
+    cell,
+    player_id,
+):
     image = cell.find(
         "img",
         alt=True,
@@ -214,7 +161,10 @@ def extract_headshot(cell, player_id):
         src.replace("./", "")
     )
 
-    source = DATA_DIR / html_relative
+    source = (
+        DATA_DIR
+        / html_relative
+    )
 
     if not source.exists():
         return None
@@ -237,14 +187,17 @@ def extract_headshot(cell, player_id):
     )
 
     return (
-        f"player_headshots/"
+        "player_headshots/"
         f"{destination.name}"
     )
 
 
-def extract_offense_stats(cells, position):
+def extract_offense_stats(
+    cells,
+    position,
+):
     """
-    Yahoo offense projection columns after % rostered:
+    Yahoo offense stat columns after % rostered:
 
     10 pass yards
     11 pass TD
@@ -273,52 +226,104 @@ def extract_offense_stats(cells, position):
         return None
 
     return {
-        "pass_yards": parse_number(
-            cells[10].get_text(strip=True)
-        ),
-        "pass_td": parse_number(
-            cells[11].get_text(strip=True)
-        ),
-        "interceptions": parse_number(
-            cells[12].get_text(strip=True)
-        ),
-        "rush_attempts": parse_number(
-            cells[13].get_text(strip=True)
-        ),
-        "rush_yards": parse_number(
-            cells[14].get_text(strip=True)
-        ),
-        "rush_td": parse_number(
-            cells[15].get_text(strip=True)
-        ),
-        "targets": parse_number(
-            cells[16].get_text(strip=True)
-        ),
-        "receptions": parse_number(
-            cells[17].get_text(strip=True)
-        ),
-        "receiving_yards": parse_number(
-            cells[18].get_text(strip=True)
-        ),
-        "receiving_td": parse_number(
-            cells[19].get_text(strip=True)
-        ),
-        "return_td": parse_number(
-            cells[20].get_text(strip=True)
-        ),
-        "two_point": parse_number(
-            cells[21].get_text(strip=True)
-        ),
-        "fumbles_lost": parse_number(
-            cells[22].get_text(strip=True)
-        ),
+        "pass_yards":
+            parse_number(
+                cells[10].get_text(
+                    strip=True
+                )
+            ),
+
+        "pass_td":
+            parse_number(
+                cells[11].get_text(
+                    strip=True
+                )
+            ),
+
+        "interceptions":
+            parse_number(
+                cells[12].get_text(
+                    strip=True
+                )
+            ),
+
+        "rush_attempts":
+            parse_number(
+                cells[13].get_text(
+                    strip=True
+                )
+            ),
+
+        "rush_yards":
+            parse_number(
+                cells[14].get_text(
+                    strip=True
+                )
+            ),
+
+        "rush_td":
+            parse_number(
+                cells[15].get_text(
+                    strip=True
+                )
+            ),
+
+        "targets":
+            parse_number(
+                cells[16].get_text(
+                    strip=True
+                )
+            ),
+
+        "receptions":
+            parse_number(
+                cells[17].get_text(
+                    strip=True
+                )
+            ),
+
+        "receiving_yards":
+            parse_number(
+                cells[18].get_text(
+                    strip=True
+                )
+            ),
+
+        "receiving_td":
+            parse_number(
+                cells[19].get_text(
+                    strip=True
+                )
+            ),
+
+        "return_td":
+            parse_number(
+                cells[20].get_text(
+                    strip=True
+                )
+            ),
+
+        "two_point":
+            parse_number(
+                cells[21].get_text(
+                    strip=True
+                )
+            ),
+
+        "fumbles_lost":
+            parse_number(
+                cells[22].get_text(
+                    strip=True
+                )
+            ),
     }
 
 
-
-def extract_game_info(player_cell):
+def extract_game_info(
+    player_cell,
+):
     """
-    Extract Yahoo's matchup text, for example:
+    Extract Yahoo matchup text such as:
 
         Sun 1:00 pm @ Hou
         Thu 8:20 pm vs NE
@@ -355,9 +360,15 @@ def extract_game_info(player_cell):
 
     day = match.group(1).title()
     clock = match.group(2)
-    meridiem = match.group(3).lower()
-    marker = match.group(4).lower()
-    opponent = match.group(5).upper()
+    meridiem = (
+        match.group(3).lower()
+    )
+    marker = (
+        match.group(4).lower()
+    )
+    opponent = (
+        match.group(5).upper()
+    )
 
     home_away = (
         "away"
@@ -367,7 +378,8 @@ def extract_game_info(player_cell):
 
     return {
         "game_display": (
-            f"{day} {clock} {meridiem} "
+            f"{day} {clock} "
+            f"{meridiem} "
             f"{marker} {opponent}"
         ),
         "game_day": day,
@@ -377,7 +389,6 @@ def extract_game_info(player_cell):
         "opponent": opponent,
         "home_away": home_away,
     }
-
 
 
 def parse_page(path):
@@ -433,7 +444,7 @@ def parse_page(path):
         # 7 pre-season rank
         # 8 actual rank
         # 9 rostered %
-        # 10+ projected stats
+        # 10+ projected/actual stats
         if len(cells) < 10:
             continue
 
@@ -446,21 +457,27 @@ def parse_page(path):
             )
         )
 
-        team, position = (
-            extract_team_position(
-                player_cell
-            )
-        )
-
-        game_info = extract_game_info(
+        (
+            team,
+            position,
+        ) = extract_team_position(
             player_cell
         )
 
         if not name:
             continue
 
-        if not team or not position:
+        if (
+            not team
+            or not position
+        ):
             continue
+
+        game_info = (
+            extract_game_info(
+                player_cell
+            )
+        )
 
         roster_status = clean_text(
             cells[3].get_text(
@@ -540,31 +557,6 @@ def parse_page(path):
                     player_id,
                 ),
 
-            "game_display":
-                game_info[
-                    "game_display"
-                ],
-
-            "game_day":
-                game_info[
-                    "game_day"
-                ],
-
-            "game_time":
-                game_info[
-                    "game_time"
-                ],
-
-            "opponent":
-                game_info[
-                    "opponent"
-                ],
-
-            "home_away":
-                game_info[
-                    "home_away"
-                ],
-
             "projection_stats":
                 extract_offense_stats(
                     cells,
@@ -572,41 +564,171 @@ def parse_page(path):
                 ),
         }
 
+        for field in GAME_FIELDS:
+            players[
+                player_id
+            ][field] = (
+                game_info[field]
+            )
+
         seen.add(player_id)
 
     return players
 
 
-def merge_projection_sources(source_patterns):
+def snapshot_name_from_filename(
+    path,
+    prefix,
+):
+    """
+    Convert a saved Yahoo HTML filename into
+    the provider field it contains.
+
+    Pagination suffixes are deliberately ignored, so
+    week2-Proj.html, week2-Proj2.html and similar files
+    all merge into one Week 2 snapshot.
+    """
+
+    name = path.name
+
+    if (
+        not name.startswith(prefix)
+        or not name.lower().endswith(
+            ".html"
+        )
+    ):
+        return None
+
+    detail = name[
+        len(prefix):-5
+    ]
+
+    detail = re.sub(
+        r"^(?:K|DEF)_",
+        "",
+        detail,
+        flags=re.IGNORECASE,
+    )
+
+    if re.match(
+        r"^4week-Proj",
+        detail,
+        re.IGNORECASE,
+    ):
+        return (
+            "next_4_weeks_projection"
+        )
+
+    match = re.match(
+        r"^week(\d+)-"
+        r"(Proj|Actual)",
+        detail,
+        re.IGNORECASE,
+    )
+
+    if not match:
+        return None
+
+    week = int(
+        match.group(1)
+    )
+
+    kind = (
+        match.group(2)
+        .lower()
+    )
+
+    suffix = (
+        "projection"
+        if kind == "proj"
+        else "actual"
+    )
+
+    return (
+        f"week_{week}_{suffix}"
+    )
+
+
+def discover_source_files(
+    prefix,
+):
+    discovered = {}
+
+    for path in sorted(
+        DATA_DIR.glob(
+            f"{prefix}*.html"
+        )
+    ):
+        snapshot_name = (
+            snapshot_name_from_filename(
+                path,
+                prefix,
+            )
+        )
+
+        if snapshot_name is None:
+            continue
+
+        discovered.setdefault(
+            snapshot_name,
+            [],
+        ).append(path)
+
+    return discovered
+
+
+def snapshot_sort_key(
+    snapshot_name,
+):
+    match = re.fullmatch(
+        r"week_(\d+)_"
+        r"(projection|actual)",
+        snapshot_name,
+    )
+
+    if match:
+        return (
+            int(match.group(1)),
+            (
+                0
+                if match.group(2)
+                == "projection"
+                else 1
+            ),
+        )
+
+    if (
+        snapshot_name
+        == "next_4_weeks_projection"
+    ):
+        return (999, 0)
+
+    return (1000, snapshot_name)
+
+
+def merge_projection_sources(
+    source_files,
+):
     merged = {}
 
     for (
         projection_name,
-        patterns,
-    ) in source_patterns.items():
-
-        paths = []
-
-        for pattern in patterns:
-            paths.extend(
-                DATA_DIR.glob(pattern)
-            )
-
-        paths = sorted(
-            set(paths)
-        )
-
-        if not paths:
-            raise SystemExit(
-                f"No source files found for "
-                f"{projection_name}"
-            )
-
+        paths,
+    ) in sorted(
+        source_files.items(),
+        key=lambda item:
+            snapshot_sort_key(
+                item[0]
+            ),
+    ):
         projection_players = {}
 
         print()
         print(projection_name)
-        print("-" * len(projection_name))
+        print(
+            "-"
+            * len(projection_name)
+        )
 
         for path in paths:
             print(
@@ -614,8 +736,8 @@ def merge_projection_sources(source_patterns):
                 f"{path.name}"
             )
 
-            page_players = parse_page(
-                path
+            page_players = (
+                parse_page(path)
             )
 
             print(
@@ -636,24 +758,37 @@ def merge_projection_sources(source_patterns):
         for (
             player_id,
             player,
-        ) in projection_players.items():
+        ) in (
+            projection_players
+            .items()
+        ):
+            transient_fields = {
+                "projection",
+                "projection_stats",
+                *GAME_FIELDS,
+            }
 
-            existing = merged.setdefault(
-                player_id,
-                {
-                    key: value
-                    for key, value
-                    in player.items()
-                    if key not in {
-                        "projection",
-                        "projection_stats",
-                    }
-                },
+            existing = (
+                merged.setdefault(
+                    player_id,
+                    {
+                        key: value
+                        for (
+                            key,
+                            value,
+                        )
+                        in player.items()
+                        if key
+                        not in transient_fields
+                    },
+                )
             )
 
             existing[
                 projection_name
-            ] = player["projection"]
+            ] = player.get(
+                "projection"
+            )
 
             existing[
                 f"{projection_name}_stats"
@@ -661,67 +796,118 @@ def merge_projection_sources(source_patterns):
                 "projection_stats"
             )
 
-            if projection_name.startswith("week_"):
+            week_match = (
+                re.fullmatch(
+                    r"(week_\d+)_"
+                    r"(projection|actual)",
+                    projection_name,
+                )
+            )
+
+            if week_match:
                 week_prefix = (
-                    projection_name
-                    .replace(
-                        "_projection",
-                        "",
-                    )
+                    week_match.group(1)
                 )
 
-                for key in (
-                    "game_display",
-                    "game_day",
-                    "game_time",
-                    "opponent",
-                    "home_away",
+                for field in (
+                    GAME_FIELDS
                 ):
-                    existing[
-                        f"{week_prefix}_{key}"
-                    ] = player.get(key)
+                    value = (
+                        player.get(field)
+                    )
 
-                # Week 2 is the current manual
-                # snapshot for now. The Weekly
-                # engine will shortly select
-                # week-specific matchup fields
-                # itself.
-                if projection_name == "week_2_projection":
-                    for key in (
-                        "game_display",
-                        "game_day",
-                        "game_time",
-                        "opponent",
-                        "home_away",
+                    if (
+                        value is not None
+                        or f"{week_prefix}_{field}"
+                        not in existing
                     ):
-                        existing[key] = player.get(key)
+                        existing[
+                            f"{week_prefix}_{field}"
+                        ] = value
 
-            if player["status"]:
+            for key in (
+                "games_played",
+                "bye_week",
+                "preseason_rank",
+                "actual_rank",
+                "rostered_pct",
+                "headshot_source",
+            ):
+                value = (
+                    player.get(key)
+                )
+
+                if value is not None:
+                    existing[key] = value
+
+            if player.get(
+                "status"
+            ):
                 existing["status"] = (
                     player["status"]
                 )
 
-            if player["roster_status"]:
-                # Ownership can disagree between Yahoo
-                # stat views after a recent transaction.
-                # If any current snapshot identifies a
-                # player as ours, do not let a stale
+            roster_status = (
+                player.get(
+                    "roster_status"
+                )
+            )
+
+            if roster_status:
+                # Some Yahoo stat views can briefly disagree
+                # after a transaction. If any snapshot says
+                # the player is ours, do not let a stale
                 # FA/waiver view overwrite that.
                 if (
-                    player["roster_status"]
+                    roster_status
                     == MY_TEAM_NAME
                     or existing.get(
                         "roster_status"
-                    ) != MY_TEAM_NAME
+                    )
+                    != MY_TEAM_NAME
                 ):
                     existing[
                         "roster_status"
-                    ] = player[
-                        "roster_status"
-                    ]
+                    ] = roster_status
 
     return merged
 
+
+def merge_player_data(
+    target,
+    supplement,
+):
+    for (
+        player_id,
+        player,
+    ) in supplement.items():
+        existing = target.get(
+            player_id
+        )
+
+        if existing is None:
+            target[player_id] = (
+                dict(player)
+            )
+            continue
+
+        for key, value in (
+            player.items()
+        ):
+            if value is None:
+                continue
+
+            if (
+                key
+                == "roster_status"
+                and existing.get(key)
+                == MY_TEAM_NAME
+                and value
+                != MY_TEAM_NAME
+            ):
+                continue
+
+            existing[key] = value
 
 
 def write_players(
@@ -732,12 +918,6 @@ def write_players(
         merged.values(),
         key=lambda item: (
             item["position"],
-            -(
-                item.get(
-                    "week_1_projection"
-                )
-                or 0
-            ),
             item["name"],
         ),
     )
@@ -767,101 +947,160 @@ def write_players(
 
 
 def main():
-    print("COMBINED YAHOO PLAYER SNAPSHOT")
-    print("=============================")
+    print(
+        "COMBINED YAHOO PLAYER SNAPSHOT"
+    )
+    print(
+        "============================="
+    )
 
-    combined = merge_projection_sources(
-        SOURCE_PATTERNS
+    player_sources = (
+        discover_source_files(
+            PLAYER_SOURCE_PREFIX
+        )
+    )
+
+    if not player_sources:
+        raise SystemExit(
+            "No Yahoo player-list HTML "
+            "files found in data/"
+        )
+
+    print()
+    print("DISCOVERED PLAYER SNAPSHOTS")
+    print("===========================")
+
+    for snapshot_name in sorted(
+        player_sources,
+        key=snapshot_sort_key,
+    ):
+        print(
+            f"{snapshot_name}: "
+            f"{len(player_sources[snapshot_name])} "
+            "file(s)"
+        )
+
+    combined = (
+        merge_projection_sources(
+            player_sources
+        )
     )
 
     my_team = {
-        player_id: player
-        for player_id, player
-        in combined.items()
-        if player.get("roster_status")
+        player_id: dict(player)
+        for (
+            player_id,
+            player,
+        ) in combined.items()
+        if player.get(
+            "roster_status"
+        )
         == MY_TEAM_NAME
     }
+
+    my_team_sources = (
+        discover_source_files(
+            MY_TEAM_SOURCE_PREFIX
+        )
+    )
 
     print()
     print("MY TEAM SUPPLEMENT")
     print("==================")
 
-    my_team_supplement = (
-        merge_projection_sources(
-            MY_TEAM_SOURCE_PATTERNS
+    if my_team_sources:
+        for snapshot_name in sorted(
+            my_team_sources,
+            key=snapshot_sort_key,
+        ):
+            print(
+                f"{snapshot_name}: "
+                f"{len(my_team_sources[snapshot_name])} "
+                "file(s)"
+            )
+
+        supplement = (
+            merge_projection_sources(
+                my_team_sources
+            )
         )
-    )
 
-    for (
-        player_id,
-        player,
-    ) in my_team_supplement.items():
-        existing = my_team.get(
-            player_id
+        merge_player_data(
+            my_team,
+            supplement,
         )
 
-        if existing is None:
-            my_team[player_id] = player
-            continue
+    else:
+        print(
+            "No My Team HTML pages found; "
+            "using player-list ownership "
+            "data only."
+        )
 
-        for key, value in player.items():
-            if (
-                existing.get(key) is None
-                and value is not None
-            ):
-                existing[key] = value
-
-    local_roster = load_season_roster(
-        2026
+    local_roster = (
+        load_season_roster(
+            SEASON
+        )
     )
 
     local_names = {
-        player["player_name"].lower()
-        for player in local_roster
+        player[
+            "player_name"
+        ].lower()
+        for player
+        in local_roster
     }
 
     local_dst_teams = {
         player.get("team")
-        for player in local_roster
-        if player.get("position")
+        for player
+        in local_roster
+        if player.get(
+            "position"
+        )
         in {"DEF", "DST"}
     }
 
-    my_team = {
-        player_id: player
-        for player_id, player
-        in my_team.items()
-        if (
+    def is_local_roster_player(
+        player,
+    ):
+        return (
             player.get(
                 "name",
                 "",
             ).lower()
             in local_names
             or (
-                player.get("position")
+                player.get(
+                    "position"
+                )
                 == "DST"
-                and player.get("team")
+                and player.get(
+                    "team"
+                )
                 in local_dst_teams
             )
+        )
+
+    my_team = {
+        player_id: player
+        for (
+            player_id,
+            player,
+        ) in my_team.items()
+        if is_local_roster_player(
+            player
         )
     }
 
     available = {
         player_id: player
-        for player_id, player
-        in combined.items()
-        if not (
-            player.get(
-                "name",
-                "",
-            ).lower()
-            in local_names
-            or (
-                player.get("position")
-                == "DST"
-                and player.get("team")
-                in local_dst_teams
-            )
+        for (
+            player_id,
+            player,
+        ) in combined.items()
+        if not is_local_roster_player(
+            player
         )
     }
 
@@ -874,18 +1113,13 @@ def main():
         OUTPUT_FILE,
     )
 
-    my_team_output = (
-        DATA_DIR
-        / "yahoo_my_team.json"
-    )
-
     print()
     print("MY TEAM ENRICHMENT")
     print("==================")
 
     write_players(
         my_team,
-        my_team_output,
+        MY_TEAM_OUTPUT_FILE,
     )
 
     print()

@@ -73,7 +73,9 @@
 <div class="yahoo-data-status">
     Yahoo data:
     <strong>
-        {% if data.weekly.provider_status.source == "manual_import" %}
+        {% if data.weekly.provider_status.source == "manual_html" %}
+Manual HTML snapshot
+{% elif data.weekly.provider_status.source == "manual_import" %}
 Manual snapshot
 {% else %}
 {{ data.weekly.provider_status.source }}
@@ -225,7 +227,7 @@ Manual snapshot
                     "%.2f"
                     | format(
                         item.player
-                        .week_1_projection
+                        .current_week_projection
                         or 0
                     )
                 }}
@@ -308,7 +310,7 @@ Manual snapshot
                         "%.2f"
                         | format(
                             item.player
-                            .week_1_projection
+                            .current_week_projection
                             or 0
                         )
                     }}
@@ -317,7 +319,7 @@ Manual snapshot
                 <td class="weekly-actual">
                     {% set actual =
                         item.player.get(
-                            "week_1_actual"
+                            "current_week_actual"
                         )
                     %}
 
@@ -389,7 +391,7 @@ Manual snapshot
                     {{
                         "%.2f"
                         | format(
-                            player.week_1_projection
+                            player.current_week_projection
                             or 0
                         )
                     }}
@@ -397,13 +399,13 @@ Manual snapshot
 
                 <td class="weekly-actual">
                     {% if
-                        player.week_1_actual
+                        player.current_week_actual
                         is not none
                     %}
                     {{
                         "%.2f"
                         | format(
-                            player.week_1_actual
+                            player.current_week_actual
                         )
                     }}
                     {% else %}
@@ -483,14 +485,20 @@ Manual snapshot
                 <th>Player</th>
                 <th>Pos</th>
                 <th>Status</th>
-                <th>Week 1</th>
-                <th>Week 2</th>
+                <th>Current week</th>
+                <th>Next week</th>
                 <th>Next 4</th>
             </tr>
         </thead>
 
         <tbody>
             {% for player in data.weekly.ir_review %}
+            {% set next_week =
+                player.get("weeks", {}).get(
+                    ((data.weekly.week + 1) | string),
+                    {}
+                ).get("projection")
+            %}
             <tr>
                 <td>
                     {{ player.name }}
@@ -508,7 +516,7 @@ Manual snapshot
                     {{
                         "%.2f"
                         | format(
-                            player.week_1_projection
+                            player.current_week_projection
                             or 0
                         )
                     }}
@@ -518,7 +526,7 @@ Manual snapshot
                     {{
                         "%.2f"
                         | format(
-                            player.week_2_projection
+                            next_week
                             or 0
                         )
                     }}
@@ -724,7 +732,7 @@ Manual snapshot
 
             <div class="transaction-metrics">
                 <div>
-                    <span>Week 1</span>
+                    <span>Current week</span>
                     <strong>
                         {{
                             "%+.2f"
@@ -779,7 +787,7 @@ Manual snapshot
                 <ul>
                     {% for reason in move.reasons %}
                     <li>
-                        {{ reason }}
+                        {{ reason | replace("Week 1", "current week") }}
                     </li>
                     {% endfor %}
                 </ul>
