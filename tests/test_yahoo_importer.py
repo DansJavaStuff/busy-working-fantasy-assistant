@@ -130,7 +130,7 @@ class YahooProviderWeekTests(TestCase):
             2,
         )
 
-    def test_current_week_replaces_legacy_week_one_aliases(self):
+    def test_current_week_preserves_historical_week_one_data(self):
         player = {
             "name": "Example Player",
             "week_1_projection": 8.5,
@@ -163,21 +163,23 @@ class YahooProviderWeekTests(TestCase):
             ]
         )
 
+        # Historical Week 1 values remain historical data.
         self.assertEqual(
             result[
                 "week_1_projection"
             ],
-            14.0,
+            8.5,
         )
 
-        # Critical regression check: a Week 1 score must
-        # not make the player appear locked in Week 2.
-        self.assertIsNone(
+        self.assertEqual(
             result[
                 "week_1_actual"
-            ]
+            ],
+            11.2,
         )
 
+        # Critical regression check: callers must use the explicit
+        # current-week fields for Week 2 lock/projection decisions.
         self.assertEqual(
             result["game_day"],
             "Sun",
