@@ -1,13 +1,15 @@
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from league_settings import (
+    CHAMPIONSHIP_WEEK,
+    FINAL_FANTASY_WEEK,
+    PLAYOFF_START_WEEK,
+    REGULAR_SEASON_WEEKS,
+)
+
 
 UK_TIME = ZoneInfo("Europe/London")
-
-REGULAR_SEASON_WEEKS = 14
-PLAYOFF_START_WEEK = 15
-CHAMPIONSHIP_WEEK = 17
-FINAL_FANTASY_WEEK = CHAMPIONSHIP_WEEK
 
 
 def fantasy_season_for_date(today=None):
@@ -76,3 +78,23 @@ def game_date_for_week(season, week, game_day):
 
     week_thursday = week_1_thursday(season) + timedelta(weeks=week - 1)
     return week_thursday + timedelta(days=offset)
+
+
+def fantasy_season_end(season):
+    """Return the Monday that ends Busy Working's Week 17 championship."""
+    return game_date_for_week(
+        season,
+        CHAMPIONSHIP_WEEK,
+        "Mon",
+    )
+
+
+def fantasy_season_is_complete(season=None, today=None):
+    """Return True after the league's Week 17 championship has finished."""
+    if today is None:
+        today = datetime.now(UK_TIME).date()
+
+    if season is None:
+        season = fantasy_season_for_date(today)
+
+    return today > fantasy_season_end(season)
