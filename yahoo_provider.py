@@ -111,10 +111,8 @@ def normalise_week(
     are exposed explicitly as ``current_week_projection`` and
     ``current_week_actual``. Historical week-specific fields remain untouched.
 
-    ``week_1_actual`` is retained temporarily as a compatibility alias for the
-    My Team roster-lock checks until that route is migrated. Legacy imported
-    players are still accepted during the transition so a missing normalized
-    file does not make the fallback path unusable.
+    Legacy imported players are still accepted during the transition so a
+    missing normalized file does not make the fallback path unusable.
     """
 
     if week is None:
@@ -179,11 +177,6 @@ def normalise_week(
     ] = current_projection
     output[
         "current_week_actual"
-    ] = current_actual
-
-    # Temporary compatibility for My Team move-lock validation only.
-    output[
-        "week_1_actual"
     ] = current_actual
 
     return output
