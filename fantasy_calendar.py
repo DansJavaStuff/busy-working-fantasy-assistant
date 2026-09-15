@@ -4,6 +4,11 @@ from zoneinfo import ZoneInfo
 
 UK_TIME = ZoneInfo("Europe/London")
 
+REGULAR_SEASON_WEEKS = 14
+PLAYOFF_START_WEEK = 15
+CHAMPIONSHIP_WEEK = 17
+FINAL_FANTASY_WEEK = CHAMPIONSHIP_WEEK
+
 
 def fantasy_season_for_date(today=None):
     """Return the NFL season that contains the supplied calendar date."""
@@ -36,7 +41,7 @@ def week_1_start(season):
 
 
 def current_fantasy_week(season=None, today=None):
-    """Return fantasy week 1-18 for the supplied/current UK date."""
+    """Return Busy Working fantasy week 1-17 for the supplied/current UK date."""
     if today is None:
         today = datetime.now(UK_TIME).date()
 
@@ -50,7 +55,7 @@ def current_fantasy_week(season=None, today=None):
 
     week = ((today - start).days // 7) + 1
 
-    return max(1, min(18, week))
+    return max(1, min(FINAL_FANTASY_WEEK, week))
 
 
 def game_date_for_week(season, week, game_day):
