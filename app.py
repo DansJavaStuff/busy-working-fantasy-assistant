@@ -558,7 +558,7 @@ def move_my_team_player():
     if (
         moving_player
         and moving_player.get(
-            "week_1_actual"
+            "current_week_actual"
         ) is not None
     ):
         return redirect(
@@ -574,7 +574,7 @@ def move_my_team_player():
     if (
         target_player
         and target_player.get(
-            "week_1_actual"
+            "current_week_actual"
         ) is not None
     ):
         return redirect(
