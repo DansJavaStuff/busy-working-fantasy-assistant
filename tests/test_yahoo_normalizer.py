@@ -5,6 +5,7 @@ from yahoo_normalizer import (
     build_dataset,
     normalise_player,
     player_for_week,
+    preserve_locked_projections,
 )
 
 
@@ -110,4 +111,161 @@ class YahooNormalizerTests(TestCase):
         self.assertEqual(
             result["players"]["1"]["weeks"]["2"]["projection"],
             10.0,
+        )
+
+    def test_projection_can_change_before_kickoff(self):
+        previous = {
+            "players": {
+                "1": {
+                    "weeks": {
+                        "2": {
+                            "projection": 23.4,
+                            "actual": None,
+                            "game": {
+                                "day": "Thu",
+                                "time": "8:15 pm",
+                            },
+                        }
+                    }
+                }
+            }
+        }
+
+        new = {
+            "players": {
+                "1": {
+                    "weeks": {
+                        "2": {
+                            "projection": 24.6,
+                            "actual": None,
+                            "game": {
+                                "day": "Thu",
+                                "time": "8:15 pm",
+                            },
+                        }
+                    }
+                }
+            }
+        }
+
+        result = preserve_locked_projections(
+            previous,
+            new,
+            season=2026,
+            now=datetime(
+                2026,
+                9,
+                17,
+                20,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
+
+        self.assertEqual(
+            result["players"]["1"]["weeks"]["2"]["projection"],
+            24.6,
+        )
+
+    def test_projection_is_frozen_after_kickoff(self):
+        previous = {
+            "players": {
+                "1": {
+                    "weeks": {
+                        "2": {
+                            "projection": 22.1,
+                            "actual": None,
+                            "game": {
+                                "day": "Thu",
+                                "time": "8:15 pm",
+                            },
+                        }
+                    }
+                }
+            }
+        }
+
+        new = {
+            "players": {
+                "1": {
+                    "weeks": {
+                        "2": {
+                            "projection": 18.0,
+                            "actual": None,
+                            "game": {
+                                "day": "Thu",
+                                "time": "8:15 pm",
+                            },
+                        }
+                    }
+                }
+            }
+        }
+
+        result = preserve_locked_projections(
+            previous,
+            new,
+            season=2026,
+            now=datetime(
+                2026,
+                9,
+                18,
+                1,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
+
+        self.assertEqual(
+            result["players"]["1"]["weeks"]["2"]["projection"],
+            22.1,
+        )
+
+    def test_actual_score_also_freezes_projection(self):
+        previous = {
+            "players": {
+                "1": {
+                    "weeks": {
+                        "2": {
+                            "projection": 22.1,
+                        }
+                    }
+                }
+            }
+        }
+
+        new = {
+            "players": {
+                "1": {
+                    "weeks": {
+                        "2": {
+                            "projection": 18.0,
+                            "actual": 7.3,
+                        }
+                    }
+                }
+            }
+        }
+
+        result = preserve_locked_projections(
+            previous,
+            new,
+            season=2026,
+            now=datetime(
+                2026,
+                9,
+                15,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
+
+        self.assertEqual(
+            result["players"]["1"]["weeks"]["2"]["projection"],
+            22.1,
+        )
+        self.assertEqual(
+            result["players"]["1"]["weeks"]["2"]["actual"],
+            7.3,
         )
