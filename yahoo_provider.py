@@ -105,15 +105,16 @@ def normalise_week(
     player,
     week=None,
 ):
-    """Expose one normalized player's selected week to legacy callers.
+    """Expose one player's selected scoring week to application callers.
 
-    The canonical source is now ``player['weeks'][week]``.  The old
-    ``week_1_projection``/``week_1_actual`` and flat matchup fields remain
-    temporary compatibility aliases for Weekly and Transactions while those
-    engines are migrated to the arbitrary-week model.
+    The canonical source is ``player['weeks'][week]``. Current-week values
+    are exposed explicitly as ``current_week_projection`` and
+    ``current_week_actual``. Historical week-specific fields remain untouched.
 
-    Legacy imported players are still accepted during the transition so a
-    missing normalized file does not make the fallback path unusable.
+    ``week_1_actual`` is retained temporarily as a compatibility alias for the
+    My Team roster-lock checks until that route is migrated. Legacy imported
+    players are still accepted during the transition so a missing normalized
+    file does not make the fallback path unusable.
     """
 
     if week is None:
@@ -180,11 +181,7 @@ def normalise_week(
         "current_week_actual"
     ] = current_actual
 
-    # Temporary aliases for code that still uses Week 1 names as shorthand
-    # for the current scoring week.
-    output[
-        "week_1_projection"
-    ] = current_projection
+    # Temporary compatibility for My Team move-lock validation only.
     output[
         "week_1_actual"
     ] = current_actual
@@ -195,8 +192,8 @@ def normalise_week(
 class YahooDataProvider:
     """Provide one normalized Yahoo dataset to the application.
 
-    The provider is intentionally source-agnostic.  Today the normalized file
-    is produced by the emergency HTML fallback importer.  The Yahoo API path
+    The provider is intentionally source-agnostic. Today the normalized file
+    is produced by the emergency HTML fallback importer. The Yahoo API path
     will produce the same schema, allowing Weekly and Transactions to consume
     identical player objects regardless of source.
     """
