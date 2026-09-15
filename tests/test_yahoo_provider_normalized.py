@@ -83,7 +83,7 @@ class YahooProviderNormalizedTests(TestCase):
         player = roster[0]
         self.assertEqual(player["current_week_projection"], 24.5)
         self.assertIsNone(player["current_week_actual"])
-        self.assertEqual(player["week_1_projection"], 24.5)
+        self.assertNotIn("week_1_projection", player)
         self.assertIsNone(player["week_1_actual"])
         self.assertEqual(player["game_day"], "Sun")
         self.assertEqual(player["opponent"], "MIA")
@@ -111,7 +111,27 @@ class YahooProviderNormalizedTests(TestCase):
 
         self.assertEqual(result["current_week"], 17)
         self.assertEqual(result["current_week_projection"], 18.4)
-        self.assertEqual(result["week_1_projection"], 18.4)
+        self.assertNotIn("week_1_projection", result)
+
+    def test_historical_week_one_projection_is_not_overwritten(self):
+        player = {
+            "name": "History Preserved",
+            "week_1_projection": 99.9,
+            "weeks": {
+                "2": {
+                    "projection": 15.5,
+                    "actual": None,
+                }
+            },
+        }
+
+        result = yahoo_provider.normalise_week(
+            player,
+            2,
+        )
+
+        self.assertEqual(result["current_week_projection"], 15.5)
+        self.assertEqual(result["week_1_projection"], 99.9)
 
     def test_legacy_player_shape_still_works_during_migration(self):
         player = {
