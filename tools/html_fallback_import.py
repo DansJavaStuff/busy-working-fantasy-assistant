@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import sys
 
 
@@ -9,6 +10,13 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from tools import import_yahoo_players as importer
 from tools.yahoo_html_metadata import inspect_path
+from yahoo_normalizer import build_dataset
+
+
+NORMALIZED_OUTPUT_FILE = (
+    importer.DATA_DIR
+    / "yahoo_normalized.json"
+)
 
 
 def classify_snapshot(path, prefix):
@@ -108,13 +116,92 @@ def html_first_discovery(prefix):
     return discovered
 
 
+def load_json(path):
+    return json.loads(
+        path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def write_normalized_dataset():
+    roster = load_json(
+        importer.MY_TEAM_OUTPUT_FILE
+    )
+    available = load_json(
+        importer.OUTPUT_FILE
+    )
+
+    dataset = build_dataset(
+        roster,
+        available,
+        source="manual_html",
+    )
+
+    NORMALIZED_OUTPUT_FILE.write_text(
+        json.dumps(
+            dataset,
+            indent=2,
+            sort_keys=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    week_numbers = sorted(
+        {
+            int(week)
+            for player in dataset[
+                "players"
+            ].values()
+            for week in player.get(
+                "weeks",
+                {},
+            )
+        }
+    )
+
+    print()
+    print("NORMALIZED YAHOO DATASET")
+    print("========================")
+    print(
+        f"Players:    "
+        f"{len(dataset['players'])}"
+    )
+    print(
+        f"My Team:    "
+        f"{len(dataset['my_team_ids'])}"
+    )
+    print(
+        f"Available:  "
+        f"{len(dataset['available_ids'])}"
+    )
+    print(
+        "Weeks:      "
+        + (
+            ", ".join(
+                str(week)
+                for week in week_numbers
+            )
+            if week_numbers
+            else "none"
+        )
+    )
+    print(
+        f"Output:     "
+        f"{NORMALIZED_OUTPUT_FILE}"
+    )
+
+    return dataset
+
+
 def main():
     # Reuse the already-tested row parser/merger/output path, replacing only
-    # source discovery.  This is intentionally a small intermediate step;
-    # the next refactor will replace the legacy week_N fields with the common
-    # normalized weeks{} structure consumed by API and HTML providers alike.
+    # source discovery.  Legacy JSON outputs are retained temporarily while
+    # Weekly/Transactions migrate to the common normalized weeks{} model.
     importer.discover_source_files = html_first_discovery
     importer.main()
+    write_normalized_dataset()
 
 
 if __name__ == "__main__":
