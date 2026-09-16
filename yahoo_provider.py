@@ -347,17 +347,22 @@ yahoo_provider = YahooDataProvider()
 def enrich_local_roster(
     local_roster,
 ):
-    """Combine local roster layout with the current Yahoo snapshot."""
+    """Combine local roster layout with the current Yahoo snapshot.
 
-    yahoo_roster = (
-        yahoo_provider
-        .get_roster()
+    Local roster membership is authoritative. A recently added player can
+    still appear in Yahoo's saved available-player snapshot until the next
+    Yahoo refresh, so enrichment searches both snapshot membership lists.
+    """
+
+    yahoo_players = (
+        yahoo_provider.get_roster()
+        + yahoo_provider.get_available_players()
     )
 
     by_name = {
         player["name"].lower():
             player
-        for player in yahoo_roster
+        for player in yahoo_players
     }
 
     enriched = []
@@ -387,14 +392,15 @@ def enrich_local_roster(
             ].lower()
         )
 
-        # Defence names differ: "Houston Texans" locally, "Texans" in Yahoo.
+        # Defence names can differ locally (for example "Tampa Bay
+        # Buccaneers") from Yahoo's shorter display name ("Buccaneers").
         if (
             yahoo_player is None
             and local_player[
                 "position"
             ] in {"DEF", "DST"}
         ):
-            for candidate in yahoo_roster:
+            for candidate in yahoo_players:
                 if (
                     candidate[
                         "position"
