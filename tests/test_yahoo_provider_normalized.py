@@ -158,3 +158,56 @@ class YahooProviderNormalizedTests(TestCase):
         self.assertIsNone(result["current_week_actual"])
         self.assertEqual(result["game_day"], "Mon")
         self.assertEqual(result["opponent"], "DAL")
+
+    def test_local_transaction_can_enrich_from_available_snapshot(self):
+        class SnapshotProvider:
+            @staticmethod
+            def get_roster():
+                return [
+                    {
+                        "yahoo_player_id": "det-dst",
+                        "name": "Lions",
+                        "team": "DET",
+                        "position": "DST",
+                        "current_week_projection": 5.0,
+                    }
+                ]
+
+            @staticmethod
+            def get_available_players():
+                return [
+                    {
+                        "yahoo_player_id": "tb-dst",
+                        "name": "Buccaneers",
+                        "team": "TB",
+                        "position": "DST",
+                        "current_week_projection": 8.3,
+                        "next_4_weeks_projection": 30.0,
+                    }
+                ]
+
+        local_roster = [
+            {
+                "player_id": "buccaneers",
+                "player_name": "Buccaneers",
+                "team": "TB",
+                "position": "DST",
+                "roster_slot": "DEF",
+                "slot_index": 1,
+            }
+        ]
+
+        with patch.object(
+            yahoo_provider,
+            "yahoo_provider",
+            SnapshotProvider(),
+        ):
+            enriched = yahoo_provider.enrich_local_roster(
+                local_roster
+            )
+
+        self.assertEqual(len(enriched), 1)
+        player = enriched[0]
+        self.assertEqual(player["yahoo_player_id"], "tb-dst")
+        self.assertEqual(player["current_week_projection"], 8.3)
+        self.assertEqual(player["next_4_weeks_projection"], 30.0)
