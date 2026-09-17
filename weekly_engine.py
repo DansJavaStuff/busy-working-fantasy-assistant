@@ -12,6 +12,7 @@ from fantasy_calendar import (
 )
 from yahoo_provider import (
     enrich_local_roster,
+    get_effective_available_players,
     yahoo_provider,
 )
 from transaction_engine import (
@@ -865,9 +866,11 @@ def build_weekly_data(
         local_roster
     )
 
-    available = (
-        yahoo_provider
-        .get_available_players()
+    # Local My Team membership is authoritative. Yahoo snapshots can lag a
+    # manual transaction, so the effective available pool must be rebuilt
+    # against the local roster before transaction recommendations are scored.
+    available = get_effective_available_players(
+        local_roster
     )
 
     roster = [
