@@ -3,7 +3,7 @@ import json
 
 from database import load_season_roster
 from fantasy_calendar import current_fantasy_week
-from fantasypros_compare import fetch_targeted_comparison
+from fantasypros_targeted import fetch_targeted_comparison
 from yahoo_provider import enrich_local_roster
 
 
