@@ -43,6 +43,26 @@ class FantasyProsCompareTests(TestCase):
 
         self.assertEqual(result["id"], "123")
 
+    def test_resolves_canonical_catalog_shape(self):
+        result = fantasypros_compare.resolve_fantasypros_player(
+            {
+                "name": "Mike Evans",
+                "position": "WR",
+                "team": "SF",
+            },
+            database=[
+                {
+                    "player_id": 9999,
+                    "player_name": "Mike Evans",
+                    "position_id": "WR",
+                    "team_id": "SF",
+                }
+            ],
+        )
+
+        self.assertEqual(result["id"], "9999")
+        self.assertEqual(result["position"], "WR")
+
     def test_rejects_synthetic_database_id(self):
         result = fantasypros_compare.resolve_fantasypros_player(
             {
@@ -62,6 +82,43 @@ class FantasyProsCompareTests(TestCase):
 
         self.assertIsNone(result)
 
+    def test_refresh_player_catalog_caches_players(self):
+        with TemporaryDirectory() as directory:
+            catalog_file = Path(directory) / "players.json"
+            payload = {
+                "players": [
+                    {
+                        "player_id": 101,
+                        "player_name": "Example Player",
+                        "position_id": "QB",
+                        "team_id": "BUF",
+                    }
+                ]
+            }
+
+            with patch.object(
+                fantasypros_compare,
+                "API_KEY",
+                "test-key",
+            ), patch.object(
+                fantasypros_compare,
+                "PLAYER_CATALOG_FILE",
+                catalog_file,
+            ), patch.object(
+                fantasypros_compare.requests,
+                "get",
+                return_value=FakeResponse(payload),
+            ) as request, patch.object(
+                fantasypros_compare,
+                "record_api_call",
+                Mock(),
+            ):
+                players = fantasypros_compare.refresh_player_catalog()
+
+            self.assertEqual(players, payload["players"])
+            self.assertTrue(catalog_file.exists())
+            self.assertTrue(request.call_args.args[0].endswith("/players"))
+
     def test_fetches_specific_half_ppr_players_and_caches(self):
         with TemporaryDirectory() as directory:
             cache_file = Path(directory) / "comparisons.json"
@@ -71,20 +128,20 @@ class FantasyProsCompareTests(TestCase):
                 calls.append((url, params.copy()))
                 return FakeResponse({"ok": True})
 
-            resolved = {
-                "A": {
+            resolved = [
+                {
                     "id": "101",
                     "name": "A",
                     "position": "QB",
                     "team": "BUF",
                 },
-                "B": {
+                {
                     "id": "202",
                     "name": "B",
                     "position": "QB",
                     "team": "CIN",
                 },
-            }
+            ]
 
             with patch.object(
                 fantasypros_compare,
@@ -96,8 +153,8 @@ class FantasyProsCompareTests(TestCase):
                 cache_file,
             ), patch.object(
                 fantasypros_compare,
-                "resolve_fantasypros_player",
-                side_effect=lambda player: resolved[player["name"]],
+                "_resolve_players",
+                return_value=resolved,
             ), patch.object(
                 fantasypros_compare.requests,
                 "get",
@@ -142,20 +199,20 @@ class FantasyProsCompareTests(TestCase):
                 calls.append((url, params.copy()))
                 return FakeResponse({"ok": True})
 
-            resolved = {
-                "WR": {
+            resolved = [
+                {
                     "id": "301",
                     "name": "WR",
                     "position": "WR",
                     "team": "TB",
                 },
-                "RB": {
+                {
                     "id": "302",
                     "name": "RB",
                     "position": "RB",
                     "team": "TEN",
                 },
-            }
+            ]
 
             with patch.object(
                 fantasypros_compare,
@@ -167,8 +224,8 @@ class FantasyProsCompareTests(TestCase):
                 cache_file,
             ), patch.object(
                 fantasypros_compare,
-                "resolve_fantasypros_player",
-                side_effect=lambda player: resolved[player["name"]],
+                "_resolve_players",
+                return_value=resolved,
             ), patch.object(
                 fantasypros_compare.requests,
                 "get",
