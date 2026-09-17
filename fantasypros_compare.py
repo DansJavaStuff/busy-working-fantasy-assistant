@@ -13,6 +13,11 @@ from player_database import normalise_name
 
 BASE_URL = "https://api.fantasypros.com/public/v2/json/nfl"
 PLAYER_DATABASE_FILE = Path("player_database.json")
+PLAYER_CATALOG_FILE = (
+    Path(__file__).resolve().parent
+    / "data"
+    / "fantasypros_players.json"
+)
 CACHE_FILE = (
     Path(__file__).resolve().parent
     / "data"
@@ -23,6 +28,30 @@ CACHE_FILE = (
 def _normalise_position(position):
     value = (position or "").upper()
     return "DST" if value == "DEF" else value
+
+
+def _load_json_list(path, key=None):
+    if not path.exists():
+        return []
+
+    try:
+        data = json.loads(
+            path.read_text(encoding="utf-8")
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ):
+        return []
+
+    if key and isinstance(data, dict):
+        value = data.get(key, [])
+        return value if isinstance(value, list) else []
+
+    if isinstance(data, list):
+        return data
+
+    return []
 
 
 def _load_player_database(path=None):
@@ -50,14 +79,78 @@ def _load_player_database(path=None):
     return []
 
 
+def _catalog_player(candidate):
+    """Convert the canonical /nfl/players shape to our resolver shape."""
+
+    return {
+        "id": candidate.get("player_id"),
+        "name": candidate.get("player_name"),
+        "position": (
+            candidate.get("position_id")
+            or candidate.get("player_position_id")
+        ),
+        "team": (
+            candidate.get("team_id")
+            or candidate.get("player_team_id")
+        ),
+        "yahoo_id": (
+            candidate.get("yahoo_id")
+            or candidate.get("player_yahoo_id")
+        ),
+    }
+
+
+def load_player_catalog(path=None):
+    path = path or PLAYER_CATALOG_FILE
+    return _load_json_list(path, key="players")
+
+
+def refresh_player_catalog():
+    """Fetch and cache FantasyPros' canonical NFL player catalogue."""
+
+    if not API_KEY:
+        raise RuntimeError(
+            "FANTASYPROS_API_KEY missing from .env"
+        )
+
+    response = requests.get(
+        f"{BASE_URL}/players",
+        headers={"x-api-key": API_KEY},
+        timeout=30,
+    )
+    record_api_call(response)
+    response.raise_for_status()
+
+    payload = response.json()
+    players = payload.get("players", [])
+
+    cache = {
+        "updated": datetime.now().isoformat(),
+        "count": len(players),
+        "players": players,
+    }
+
+    PLAYER_CATALOG_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    PLAYER_CATALOG_FILE.write_text(
+        json.dumps(cache, indent=2),
+        encoding="utf-8",
+    )
+
+    return players
+
+
 def resolve_fantasypros_player(
     player,
     database=None,
 ):
     """Resolve a Yahoo/local player to its FantasyPros player ID.
 
-    The merged player database stores the FantasyPros player ID in ``id`` for
-    matched records. Synthetic ``adp-``/``ffc-`` IDs are deliberately rejected.
+    ``database`` may contain either our merged player database shape or the
+    canonical FantasyPros /nfl/players response shape. Synthetic local IDs are
+    rejected.
     """
 
     database = (
@@ -85,7 +178,13 @@ def resolve_fantasypros_player(
 
     candidates = []
 
-    for candidate in database:
+    for raw_candidate in database:
+        candidate = (
+            _catalog_player(raw_candidate)
+            if "player_id" in raw_candidate
+            else raw_candidate
+        )
+
         candidate_id = candidate.get("id")
 
         if candidate_id is None:
@@ -169,6 +268,80 @@ def resolve_fantasypros_player(
     }
 
 
+def _resolve_players(players):
+    """Resolve all players, refreshing the canonical catalogue once if needed."""
+
+    local_database = _load_player_database()
+    catalog = load_player_catalog()
+    resolved = []
+    unresolved = []
+
+    for player in players:
+        match = resolve_fantasypros_player(
+            player,
+            database=local_database,
+        )
+
+        if match is None and catalog:
+            match = resolve_fantasypros_player(
+                player,
+                database=catalog,
+            )
+
+        if match is None:
+            unresolved.append(player)
+        else:
+            resolved.append((player, match))
+
+    if unresolved:
+        catalog = refresh_player_catalog()
+        retry = []
+
+        for player in unresolved:
+            match = resolve_fantasypros_player(
+                player,
+                database=catalog,
+            )
+
+            if match is None:
+                retry.append(player)
+            else:
+                resolved.append((player, match))
+
+        unresolved = retry
+
+    if unresolved:
+        names = ", ".join(
+            str(
+                player.get("name")
+                or player.get("player_name")
+            )
+            for player in unresolved
+        )
+        raise LookupError(
+            "Could not resolve FantasyPros ID for: "
+            + names
+        )
+
+    by_input_name = {
+        normalise_name(
+            original.get("name")
+            or original.get("player_name")
+        ): match
+        for original, match in resolved
+    }
+
+    return [
+        by_input_name[
+            normalise_name(
+                player.get("name")
+                or player.get("player_name")
+            )
+        ]
+        for player in players
+    ]
+
+
 def _load_cache():
     if not CACHE_FILE.exists():
         return {"comparisons": {}}
@@ -233,21 +406,7 @@ def fetch_targeted_comparison(
             "FantasyPros comparisons require 2 to 4 players"
         )
 
-    resolved = []
-
-    for player in players:
-        match = resolve_fantasypros_player(
-            player
-        )
-        if match is None:
-            raise LookupError(
-                "Could not resolve FantasyPros ID for "
-                + str(
-                    player.get("name")
-                    or player.get("player_name")
-                )
-            )
-        resolved.append(match)
+    resolved = _resolve_players(players)
 
     fp_ids = [
         player["id"]
