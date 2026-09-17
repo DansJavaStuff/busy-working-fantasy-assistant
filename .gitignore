@@ -28,8 +28,9 @@ backups/
 # Local FantasyPros API usage counter
 data/fantasypros_usage.json
 
-# Local FantasyPros in-season cache
+# Local FantasyPros in-season caches
 data/fantasypros_weekly.json
+data/fantasypros_comparisons.json
 
 # Local test output
 tests/fantasypros_test.json
