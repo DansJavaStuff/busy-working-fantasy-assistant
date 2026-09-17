@@ -82,6 +82,19 @@ def discover_source_files(prefix):
 
         discovered.setdefault(snapshot_name, []).append(path)
 
+    # The legacy merger applies files in list order and later rows win.
+    # Browsers often save a newly-downloaded Yahoo page as "... (1).html";
+    # filename sorting can therefore put the older base file last and make a
+    # refresh appear stale.  Sort each snapshot oldest -> newest by mtime so
+    # the most recently downloaded page is authoritative.
+    for paths in discovered.values():
+        paths.sort(
+            key=lambda path: (
+                path.stat().st_mtime_ns,
+                path.name,
+            )
+        )
+
     return discovered, diagnostics
 
 
