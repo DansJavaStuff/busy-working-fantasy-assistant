@@ -131,6 +131,7 @@ class YahooDataProvider:
         self._loaded_at = None
         self._source = None
         self._captured_at = None
+        self._generated_at = None
 
     @staticmethod
     def _load_json(path):
@@ -138,6 +139,27 @@ class YahooDataProvider:
             path.read_text(
                 encoding="utf-8",
             )
+        )
+
+    @staticmethod
+    def _parse_timestamp(value):
+        if not value:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(
+                str(value).replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            return None
+
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(
+                tzinfo=timezone.utc
+            )
+
+        return parsed.astimezone(
+            timezone.utc
         )
 
     def _load_normalized(self):
@@ -174,6 +196,11 @@ class YahooDataProvider:
         self._source = dataset.get(
             "source"
         ) or "normalized_snapshot"
+        self._generated_at = (
+            self._parse_timestamp(
+                dataset.get("generated_at")
+            )
+        )
 
     def _load_legacy(self):
         self._roster = self._load_json(
@@ -186,6 +213,7 @@ class YahooDataProvider:
 
         self._dataset = None
         self._source = "manual_import_legacy"
+        self._generated_at = None
 
     def refresh(self):
         """Reload the latest normalized Yahoo snapshot from disk.
@@ -278,6 +306,17 @@ class YahooDataProvider:
                 )
             )
 
+        snapshot_current = None
+
+        if (
+            self._generated_at is not None
+            and self._captured_at is not None
+        ):
+            snapshot_current = (
+                self._generated_at
+                >= self._captured_at
+            )
+
         return {
             "source":
                 self._source,
@@ -314,10 +353,21 @@ class YahooDataProvider:
                     self._captured_at
                 ),
 
+            "generated_at":
+                self._generated_at,
+
+            "generated_at_display":
+                self._format_timestamp(
+                    self._generated_at
+                ),
+
             "loaded_at_display":
                 self._format_timestamp(
                     self._loaded_at
                 ),
+
+            "snapshot_current":
+                snapshot_current,
         }
 
     def _manual_snapshot_time(self):
