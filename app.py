@@ -714,7 +714,7 @@ def refresh_yahoo_data():
     importer = (
         project_root
         / "tools"
-        / "import_yahoo_players.py"
+        / "html_fallback_import.py"
     )
 
     try:
@@ -936,7 +936,10 @@ def rebuild_player_data():
 
     if state["session_type"] != "mock":
         return redirect(
-            url_for("settings_page")
+            url_for(
+                "settings_page",
+                refreshed="rebuild",
+            )
         )
 
     rebuild_database()
