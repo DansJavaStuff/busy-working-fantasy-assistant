@@ -1,6 +1,6 @@
 from fantasy_calendar import current_fantasy_week
 from fantasypros_weekly import (
-    POSITIONS,
+    FEEDS,
     refresh_weekly_cache,
 )
 
@@ -21,7 +21,7 @@ def main():
         f"Saved Week {cache['week']} weekly rankings."
     )
 
-    for position in POSITIONS:
+    for position in FEEDS:
         print(
             f"  {position}: "
             f"{len(cache['feeds'].get(position, []))} players"
