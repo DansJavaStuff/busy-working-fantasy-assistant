@@ -29,9 +29,11 @@ class SleeperCompareTests(TestCase):
         rows = {
             "RB": [
                 {
+                    "team": "TEN",
                     "player": {
-                        "full_name": "Tony Pollard",
-                        "team": "TEN",
+                        "first_name": "Tony",
+                        "last_name": "Pollard",
+                        "position": "RB",
                     },
                     "stats": {
                         "rush_yd": 60,
@@ -43,9 +45,11 @@ class SleeperCompareTests(TestCase):
             ],
             "WR": [
                 {
+                    "team": "SF",
                     "player": {
-                        "full_name": "Mike Evans",
-                        "team": "SF",
+                        "first_name": "Mike",
+                        "last_name": "Evans",
+                        "position": "WR",
                     },
                     "stats": {
                         "rec": 4,
@@ -100,6 +104,20 @@ class SleeperCompareTests(TestCase):
         self.assertEqual(
             result[1]["sleeper_yahoo_projection"],
             9.0,
+        )
+
+    def test_row_name_combines_first_and_last_name(self):
+        row = {
+            "player": {
+                "first_name": "Courtland",
+                "last_name": "Sutton",
+                "position": "WR",
+            }
+        }
+
+        self.assertEqual(
+            sleeper_compare._row_name(row),
+            "Courtland Sutton",
         )
 
 
