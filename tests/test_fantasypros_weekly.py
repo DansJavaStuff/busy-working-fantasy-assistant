@@ -78,7 +78,7 @@ class FantasyProsWeeklyTests(TestCase):
 
             self.assertEqual(
                 len(calls),
-                len(fantasypros_weekly.POSITIONS),
+                len(fantasypros_weekly.FEEDS),
             )
 
             self.assertTrue(
@@ -88,11 +88,23 @@ class FantasyProsWeeklyTests(TestCase):
                 )
             )
 
+            requested_positions = [
+                call["params"]["position"]
+                for call in calls
+            ]
+
+            self.assertEqual(
+                requested_positions,
+                ["QB", "RB", "WR", "TE", "OP"],
+            )
+
             self.assertEqual(cache["week"], 2)
             self.assertEqual(
                 set(cache["feeds"]),
-                set(fantasypros_weekly.POSITIONS),
+                set(fantasypros_weekly.FEEDS),
             )
+            self.assertIn("FLEX", cache["feeds"])
+            self.assertNotIn("OP", cache["feeds"])
             self.assertTrue(cache_file.exists())
 
     def test_cache_from_another_week_is_not_used(self):
