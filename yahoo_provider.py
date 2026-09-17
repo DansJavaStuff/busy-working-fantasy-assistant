@@ -317,6 +317,35 @@ class YahooDataProvider:
                 >= self._captured_at
             )
 
+        captured_display = (
+            self._format_timestamp(
+                self._captured_at
+            )
+        )
+        generated_display = (
+            self._format_timestamp(
+                self._generated_at
+            )
+        )
+
+        freshness_display = captured_display
+
+        if (
+            captured_display
+            and generated_display
+        ):
+            freshness = (
+                "CURRENT"
+                if snapshot_current
+                else "STALE"
+            )
+
+            freshness_display = (
+                f"{captured_display} · "
+                f"normalized {generated_display} · "
+                f"{freshness}"
+            )
+
         return {
             "source":
                 self._source,
@@ -349,17 +378,16 @@ class YahooDataProvider:
                 self._captured_at,
 
             "captured_at_display":
-                self._format_timestamp(
-                    self._captured_at
-                ),
+                freshness_display,
+
+            "captured_at_only_display":
+                captured_display,
 
             "generated_at":
                 self._generated_at,
 
             "generated_at_display":
-                self._format_timestamp(
-                    self._generated_at
-                ),
+                generated_display,
 
             "loaded_at_display":
                 self._format_timestamp(
