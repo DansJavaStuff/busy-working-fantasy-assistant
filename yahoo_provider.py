@@ -344,6 +344,62 @@ class YahooDataProvider:
 yahoo_provider = YahooDataProvider()
 
 
+def _player_key(player):
+    """Return a stable key for de-duplicating Yahoo snapshot players."""
+
+    yahoo_id = player.get(
+        "yahoo_player_id"
+    )
+
+    if yahoo_id is not None:
+        return ("id", str(yahoo_id))
+
+    return (
+        "fallback",
+        (player.get("position") or "").upper(),
+        (player.get("team") or "").upper(),
+        (player.get("name") or "").lower(),
+    )
+
+
+def _snapshot_player_pool():
+    """Return every known Yahoo player once, regardless of stale membership."""
+
+    players = (
+        yahoo_provider.get_roster()
+        + yahoo_provider.get_available_players()
+    )
+
+    unique = {}
+
+    for player in players:
+        unique[_player_key(player)] = player
+
+    return list(unique.values())
+
+
+def _matches_local_player(
+    yahoo_player,
+    local_player,
+):
+    """Match a Yahoo player to one locally authoritative roster row."""
+
+    if (
+        (yahoo_player.get("name") or "").lower()
+        ==
+        (local_player.get("player_name") or "").lower()
+    ):
+        return True
+
+    return (
+        local_player.get("position")
+        in {"DEF", "DST"}
+        and yahoo_player.get("position") == "DST"
+        and yahoo_player.get("team")
+        == local_player.get("team")
+    )
+
+
 def enrich_local_roster(
     local_roster,
 ):
@@ -354,16 +410,7 @@ def enrich_local_roster(
     Yahoo refresh, so enrichment searches both snapshot membership lists.
     """
 
-    yahoo_players = (
-        yahoo_provider.get_roster()
-        + yahoo_provider.get_available_players()
-    )
-
-    by_name = {
-        player["name"].lower():
-            player
-        for player in yahoo_players
-    }
+    yahoo_players = _snapshot_player_pool()
 
     enriched = []
 
@@ -386,34 +433,17 @@ def enrich_local_roster(
             local_player["player_name"]
         )
 
-        yahoo_player = by_name.get(
-            local_player[
-                "player_name"
-            ].lower()
+        yahoo_player = next(
+            (
+                candidate
+                for candidate in yahoo_players
+                if _matches_local_player(
+                    candidate,
+                    local_player,
+                )
+            ),
+            None,
         )
-
-        # Defence names can differ locally (for example "Tampa Bay
-        # Buccaneers") from Yahoo's shorter display name ("Buccaneers").
-        if (
-            yahoo_player is None
-            and local_player[
-                "position"
-            ] in {"DEF", "DST"}
-        ):
-            for candidate in yahoo_players:
-                if (
-                    candidate[
-                        "position"
-                    ] == "DST"
-                    and candidate.get(
-                        "team"
-                    )
-                    == local_player.get(
-                        "team"
-                    )
-                ):
-                    yahoo_player = candidate
-                    break
 
         if yahoo_player:
             for key, value in (
@@ -429,6 +459,30 @@ def enrich_local_roster(
         )
 
     return enriched
+
+
+def get_effective_available_players(
+    local_roster,
+):
+    """Return availability after applying authoritative local membership.
+
+    Saved Yahoo HTML can lag a manual transaction. Re-partition the complete
+    known Yahoo player pool using the local roster so a newly added player is
+    immediately removed from available players and a newly dropped player is
+    immediately eligible to appear there.
+    """
+
+    return [
+        player
+        for player in _snapshot_player_pool()
+        if not any(
+            _matches_local_player(
+                player,
+                local_player,
+            )
+            for local_player in local_roster
+        )
+    ]
 
 
 def get_yahoo_provider_status():
