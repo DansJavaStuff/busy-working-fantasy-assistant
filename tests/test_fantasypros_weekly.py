@@ -95,7 +95,7 @@ class FantasyProsWeeklyTests(TestCase):
 
             self.assertEqual(
                 requested_positions,
-                ["QB", "RB", "WR", "TE", "OP"],
+                ["QB", "RB", "WR", "TE"],
             )
 
             self.assertEqual(cache["week"], 2)
@@ -103,7 +103,7 @@ class FantasyProsWeeklyTests(TestCase):
                 set(cache["feeds"]),
                 set(fantasypros_weekly.FEEDS),
             )
-            self.assertIn("FLEX", cache["feeds"])
+            self.assertNotIn("FLEX", cache["feeds"])
             self.assertNotIn("OP", cache["feeds"])
             self.assertTrue(cache_file.exists())
 
