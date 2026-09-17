@@ -22,6 +22,35 @@ CACHE_FILE = (
 )
 
 
+class FantasyProsLimitedAccessError(RuntimeError):
+    """Raised when FantasyPros returns its limited/sample public dataset."""
+
+
+def _limited_access_message(payload=None):
+    payload = payload or {}
+    tier = payload.get("tier")
+    limit = payload.get("limit")
+
+    detail = []
+    if tier:
+        detail.append(f"tier={tier}")
+    if limit is not None:
+        detail.append(f"limit={limit}")
+
+    suffix = (
+        " (" + ", ".join(detail) + ")"
+        if detail
+        else ""
+    )
+
+    return (
+        "FantasyPros returned the limited public/sample player catalogue"
+        + suffix
+        + ". Targeted comparisons need full player metadata access, "
+        "so arbitrary roster players cannot be resolved with this API key."
+    )
+
+
 def _normalise_position(position):
     if isinstance(position, list):
         position = position[0] if position else ""
@@ -228,6 +257,14 @@ def load_player_catalog():
     if data is None:
         return []
 
+    if (
+        isinstance(data, dict)
+        and data.get("public_api_limited") is True
+    ):
+        raise FantasyProsLimitedAccessError(
+            _limited_access_message(data)
+        )
+
     if isinstance(data, dict) and isinstance(
         data.get("players"), list
     ):
@@ -235,8 +272,6 @@ def load_player_catalog():
     else:
         raw = data
 
-    # New caches are already normalized, but this also repairs any old raw
-    # catalogue cache left by an earlier implementation.
     normalized = []
     for candidate in raw if isinstance(raw, list) else []:
         if (
@@ -277,17 +312,38 @@ def refresh_player_catalog():
         parents=True,
         exist_ok=True,
     )
-    PLAYER_CATALOG_FILE.write_text(
-        json.dumps(
-            {
-                "updated": datetime.now().isoformat(),
-                "count": len(players),
-                "players": players,
-            },
-            indent=2,
+
+    limited = (
+        isinstance(payload, dict)
+        and payload.get("public_api_limited") is True
+    )
+
+    cache = {
+        "updated": datetime.now().isoformat(),
+        "count": len(players),
+        "players": players,
+        "public_api_limited": limited,
+        "tier": (
+            payload.get("tier")
+            if isinstance(payload, dict)
+            else None
         ),
+        "limit": (
+            payload.get("limit")
+            if isinstance(payload, dict)
+            else None
+        ),
+    }
+
+    PLAYER_CATALOG_FILE.write_text(
+        json.dumps(cache, indent=2),
         encoding="utf-8",
     )
+
+    if limited:
+        raise FantasyProsLimitedAccessError(
+            _limited_access_message(payload)
+        )
 
     return players
 
