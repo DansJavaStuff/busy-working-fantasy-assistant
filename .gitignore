@@ -31,6 +31,7 @@ data/fantasypros_usage.json
 # Local FantasyPros in-season caches
 data/fantasypros_weekly.json
 data/fantasypros_comparisons.json
+data/fantasypros_players.json
 
 # Local test output
 tests/fantasypros_test.json
@@ -46,5 +47,4 @@ data/yahoo_my_team.json
 private/
 
 data/archive/
-
 data/yahoo_normalized.json
