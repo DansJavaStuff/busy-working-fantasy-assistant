@@ -14,14 +14,17 @@ from fantasypros import (
 SEASON = 2026
 SCORING = "HALF"
 
-# FLEX is included so RB/WR/TE choices can be compared across positions.
-POSITIONS = [
-    "QB",
-    "RB",
-    "WR",
-    "TE",
-    "FLEX",
-]
+# FantasyPros labels the cross-position RB/WR/TE ranking as FLEX in its UI,
+# but the API expects position=OP. Keep our internal feed name as FLEX so the
+# rest of the application does not need to know about the provider-specific
+# parameter.
+FEEDS = {
+    "QB": "QB",
+    "RB": "RB",
+    "WR": "WR",
+    "TE": "TE",
+    "FLEX": "OP",
+}
 
 CACHE_FILE = (
     Path(__file__).resolve().parent
@@ -57,14 +60,14 @@ def refresh_weekly_cache(week):
 
     feeds = {}
 
-    for position in POSITIONS:
+    for feed_name, api_position in FEEDS.items():
         response = requests.get(
             BASE_URL,
             headers={
                 "x-api-key": API_KEY,
             },
             params={
-                "position": position,
+                "position": api_position,
                 "scoring": SCORING,
                 "week": int(week),
             },
@@ -76,7 +79,7 @@ def refresh_weekly_cache(week):
 
         data = response.json()
 
-        feeds[position] = [
+        feeds[feed_name] = [
             convert_player(player)
             for player in data.get(
                 "players",
