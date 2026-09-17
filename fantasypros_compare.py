@@ -271,15 +271,25 @@ def fetch_targeted_comparison(
 
     ids_text = ":".join(fp_ids)
 
+    projection_params = {
+        "week": int(week),
+        "scoring": "HALF",
+        "players": ids_text,
+    }
+
+    if lookup_position == "FLEX":
+        projection_params[
+            "positions"
+        ] = "RB:WR:TE"
+    else:
+        projection_params[
+            "position"
+        ] = lookup_position
+
     projection_response = requests.get(
         f"{BASE_URL}/2026/projections",
         headers={"x-api-key": API_KEY},
-        params={
-            "week": int(week),
-            "position": lookup_position,
-            "scoring": "HALF",
-            "players": ids_text,
-        },
+        params=projection_params,
         timeout=30,
     )
     record_api_call(projection_response)
