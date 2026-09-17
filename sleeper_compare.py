@@ -99,12 +99,24 @@ def _projection_player(row):
 
 def _row_name(row):
     player = _projection_player(row)
-    return (
+
+    explicit = (
         player.get("full_name")
         or player.get("player_name")
         or player.get("name")
-        or ""
     )
+    if explicit:
+        return explicit
+
+    parts = [
+        str(value).strip()
+        for value in (
+            player.get("first_name"),
+            player.get("last_name"),
+        )
+        if value
+    ]
+    return " ".join(parts)
 
 
 def _row_team(row):
