@@ -14,16 +14,14 @@ from fantasypros import (
 SEASON = 2026
 SCORING = "HALF"
 
-# FantasyPros labels the cross-position RB/WR/TE ranking as FLEX in its UI,
-# but the API expects position=OP. Keep our internal feed name as FLEX so the
-# rest of the application does not need to know about the provider-specific
-# parameter.
+# Weekly in-season expert rankings. We deliberately keep these feeds
+# position-specific. FantasyPros' OP feed behaves like an overall offensive
+# ranking and includes QBs, so it is not useful for our RB/WR/TE FLEX choices.
 FEEDS = {
     "QB": "QB",
     "RB": "RB",
     "WR": "WR",
     "TE": "TE",
-    "FLEX": "OP",
 }
 
 CACHE_FILE = (
