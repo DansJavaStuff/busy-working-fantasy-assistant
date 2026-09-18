@@ -711,17 +711,12 @@ def refresh_yahoo_data():
         __file__
     ).resolve().parent
 
-    importer = (
-        project_root
-        / "tools"
-        / "html_fallback_import.py"
-    )
-
     try:
         subprocess.run(
             [
                 sys.executable,
-                str(importer),
+                "-m",
+                "tools.html_fallback_import",
             ],
             cwd=project_root,
             check=True,
