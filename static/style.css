@@ -1284,6 +1284,40 @@ footer {
     @media (
         max-width: 700px
     ) {
+        .weekly-section {
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 18px 14px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .weekly-table {
+            min-width: 680px;
+        }
+
+        .weekly-table th,
+        .weekly-table td {
+            padding: 10px 12px;
+        }
+
+        .weekly-table td:nth-child(4) {
+            white-space: nowrap;
+        }
+
+        .next-decision-heading {
+            flex-direction: column;
+        }
+
+        .next-decision-player {
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+        }
+
+        .next-decision-player > div:last-child {
+            grid-column: 2;
+        }
+
         .lock-player {
             grid-template-columns:
                 60px 1fr;
