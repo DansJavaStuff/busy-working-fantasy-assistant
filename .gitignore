@@ -49,4 +49,4 @@ private/
 data/archive/
 
 data/yahoo_normalized.json
-data/yahoo_html_parse_cache.json
+data/yahoo_html_store.json
