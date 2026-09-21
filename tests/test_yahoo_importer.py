@@ -189,3 +189,147 @@ class YahooProviderWeekTests(TestCase):
             result["opponent"],
             "BUF",
         )
+
+
+class YahooImporterParseCacheTests(TestCase):
+    def test_unchanged_file_reuses_cached_parse(self):
+        with TemporaryDirectory() as directory:
+            path = (
+                Path(directory)
+                / "Yahoo_MyTeam_week2-Actual.html"
+            )
+            path.write_text(
+                "first snapshot",
+                encoding="utf-8",
+            )
+
+            cache = {
+                "version":
+                    import_yahoo_players
+                    .PARSE_CACHE_VERSION,
+                "files": {},
+            }
+
+            parsed = {
+                "1": {
+                    "name": "Example Player",
+                }
+            }
+
+            with patch.object(
+                import_yahoo_players,
+                "parse_page",
+                return_value=parsed,
+            ) as parser:
+                first, first_cached = (
+                    import_yahoo_players
+                    .parse_page_cached(
+                        path,
+                        cache,
+                    )
+                )
+
+                second, second_cached = (
+                    import_yahoo_players
+                    .parse_page_cached(
+                        path,
+                        cache,
+                    )
+                )
+
+            self.assertFalse(first_cached)
+            self.assertTrue(second_cached)
+            self.assertEqual(first, parsed)
+            self.assertEqual(second, parsed)
+            self.assertEqual(
+                parser.call_count,
+                1,
+            )
+
+    def test_changed_file_is_reparsed(self):
+        with TemporaryDirectory() as directory:
+            path = (
+                Path(directory)
+                / "Yahoo_MyTeam_week2-Actual.html"
+            )
+            path.write_text(
+                "first",
+                encoding="utf-8",
+            )
+
+            cache = {
+                "version":
+                    import_yahoo_players
+                    .PARSE_CACHE_VERSION,
+                "files": {},
+            }
+
+            with patch.object(
+                import_yahoo_players,
+                "parse_page",
+                side_effect=[
+                    {"1": {"projection": 1.0}},
+                    {"1": {"projection": 2.0}},
+                ],
+            ) as parser:
+                (
+                    import_yahoo_players
+                    .parse_page_cached(
+                        path,
+                        cache,
+                    )
+                )
+
+                path.write_text(
+                    "second snapshot is larger",
+                    encoding="utf-8",
+                )
+
+                second, second_cached = (
+                    import_yahoo_players
+                    .parse_page_cached(
+                        path,
+                        cache,
+                    )
+                )
+
+            self.assertFalse(second_cached)
+            self.assertEqual(
+                second["1"]["projection"],
+                2.0,
+            )
+            self.assertEqual(
+                parser.call_count,
+                2,
+            )
+
+    def test_old_cache_version_is_discarded(self):
+        with TemporaryDirectory() as directory:
+            cache_path = (
+                Path(directory)
+                / "cache.json"
+            )
+            cache_path.write_text(
+                '{"version": 0, "files": {"old": {}}}',
+                encoding="utf-8",
+            )
+
+            with patch.object(
+                import_yahoo_players,
+                "PARSE_CACHE_FILE",
+                cache_path,
+            ):
+                cache = (
+                    import_yahoo_players
+                    .load_parse_cache()
+                )
+
+            self.assertEqual(
+                cache["version"],
+                import_yahoo_players
+                .PARSE_CACHE_VERSION,
+            )
+            self.assertEqual(
+                cache["files"],
+                {},
+            )
