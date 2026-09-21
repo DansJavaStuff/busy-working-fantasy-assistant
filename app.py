@@ -712,7 +712,7 @@ def refresh_yahoo_data():
     ).resolve().parent
 
     try:
-        subprocess.run(
+        result = subprocess.run(
             [
                 sys.executable,
                 "-m",
@@ -720,8 +720,16 @@ def refresh_yahoo_data():
             ],
             cwd=project_root,
             check=True,
-            timeout=180,
+            timeout=600,
+            capture_output=True,
+            text=True,
         )
+
+        if result.stdout:
+            app.logger.info(
+                "Yahoo refresh output:\n%s",
+                result.stdout,
+            )
 
         yahoo_provider.refresh()
 
@@ -732,14 +740,36 @@ def refresh_yahoo_data():
             )
         )
 
-    except (
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-    ):
+    except subprocess.CalledProcessError as exc:
+        app.logger.error(
+            "Yahoo refresh failed with exit code %s.\n"
+            "stdout:\n%s\n"
+            "stderr:\n%s",
+            exc.returncode,
+            exc.stdout or "(empty)",
+            exc.stderr or "(empty)",
+        )
+
         return redirect(
             url_for(
                 "weekly",
-                refresh_error="1",
+                refresh_error="process",
+            )
+        )
+
+    except subprocess.TimeoutExpired as exc:
+        app.logger.error(
+            "Yahoo refresh timed out after 600 seconds.\n"
+            "stdout:\n%s\n"
+            "stderr:\n%s",
+            exc.stdout or "(empty)",
+            exc.stderr or "(empty)",
+        )
+
+        return redirect(
+            url_for(
+                "weekly",
+                refresh_error="timeout",
             )
         )
 
