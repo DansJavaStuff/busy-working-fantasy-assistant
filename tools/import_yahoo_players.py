@@ -1156,6 +1156,12 @@ def main():
         )
     )
 
+    # Persist the first pass before metadata discovery for the My Team pages.
+    # The fallback discoverer shares this same local JSON store.
+    save_parse_cache(
+        parse_cache
+    )
+
     my_team = {
         player_id: dict(player)
         for (
@@ -1179,6 +1185,12 @@ def main():
     print("==================")
 
     if my_team_sources:
+        # My Team discovery may have added classification metadata to the
+        # store, so reload it before parsing those pages.
+        parse_cache = (
+            load_parse_cache()
+        )
+
         for snapshot_name in sorted(
             my_team_sources,
             key=snapshot_sort_key,
