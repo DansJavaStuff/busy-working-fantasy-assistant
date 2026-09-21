@@ -370,7 +370,7 @@ def build_available_rankings(
                     (
                         move.get("label")
                         if move
-                        else "WATCH"
+                        else "SHORTLIST"
                     ),
                 "move_type":
                     (
