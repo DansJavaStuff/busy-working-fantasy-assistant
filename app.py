@@ -322,14 +322,6 @@ def available_players():
         season
     )
 
-    available_data = (
-        build_available_rankings(
-            season=season,
-            week=week,
-            limit=20,
-        )
-    )
-
     data = {
         "league": {
             "name":
@@ -341,13 +333,38 @@ def available_players():
             load_team_identity(
                 season
             ),
-        "available":
-            available_data,
+        "week":
+            week,
+        "target_week":
+            week + 1,
+        "yahoo_status":
+            get_yahoo_provider_status(),
     }
 
     return render_template(
         "available.html",
         data=data,
+    )
+
+
+@app.get("/available/rankings")
+def available_rankings():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    available_data = (
+        build_available_rankings(
+            season=season,
+            week=week,
+            limit=20,
+        )
+    )
+
+    return render_template(
+        "_available_rankings.html",
+        available=available_data,
     )
 
 
