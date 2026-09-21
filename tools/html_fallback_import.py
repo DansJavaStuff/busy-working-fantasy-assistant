@@ -65,12 +65,40 @@ def discover_source_files(prefix):
         "filename_fallback": 0,
         "unknown": 0,
         "unknown_files": [],
+        "classification_reused": 0,
+        "classification_read": 0,
     }
+    store = importer.load_parse_cache()
+    files = store.setdefault("files", {})
 
     for path in sorted(
         importer.DATA_DIR.glob(f"{prefix}*.html")
     ):
-        result = classify_snapshot(path, prefix)
+        signature = importer.file_signature(path)
+        entry = files.get(path.name) or {}
+
+        if (
+            entry.get("size") == signature["size"]
+            and entry.get("mtime_ns") == signature["mtime_ns"]
+            and isinstance(
+                entry.get("classification"),
+                dict,
+            )
+        ):
+            result = entry["classification"]
+            diagnostics["classification_reused"] += 1
+        else:
+            result = classify_snapshot(path, prefix)
+            diagnostics["classification_read"] += 1
+
+            # A changed file invalidates the old parsed rows.  Keep only the
+            # fresh signature/classification; the player parser will rebuild
+            # the rows later in this same import.
+            files[path.name] = {
+                **signature,
+                "classification": result,
+            }
+
         source = result["source"]
         snapshot_name = result["snapshot_name"]
 
@@ -81,6 +109,8 @@ def discover_source_files(prefix):
             continue
 
         discovered.setdefault(snapshot_name, []).append(path)
+
+    importer.save_parse_cache(store)
 
     # The legacy merger applies files in list order and later rows win.
     # Browsers often save a newly-downloaded Yahoo page as "... (1).html";
@@ -113,6 +143,14 @@ def print_diagnostics(label, diagnostics):
     print(
         "Unclassified:        "
         f"{diagnostics['unknown']} file(s)"
+    )
+    print(
+        "Metadata reused:     "
+        f"{diagnostics['classification_reused']} file(s)"
+    )
+    print(
+        "Metadata read:       "
+        f"{diagnostics['classification_read']} file(s)"
     )
 
     for filename in diagnostics["unknown_files"]:
