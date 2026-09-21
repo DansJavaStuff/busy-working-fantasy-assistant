@@ -19,6 +19,9 @@ from transaction_engine import (
     build_bye_coverage,
     build_transaction_recommendations,
 )
+from weekly_evidence import (
+    build_start_sit_evidence,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -53,6 +56,95 @@ _TRANSACTION_CACHE = {
     "snapshot_key": None,
     "recommendations": None,
 }
+
+_START_SIT_CACHE = {
+    "snapshot_key": None,
+    "evidence": None,
+}
+
+
+def cached_start_sit_evidence(
+    lineup,
+    bench,
+    provider_status,
+    week,
+):
+    captured_at = provider_status.get(
+        "captured_at"
+    )
+
+    decision_key = tuple(
+        sorted(
+            (
+                item["slot"],
+                item["player"].get(
+                    "name",
+                    "",
+                ),
+                item["player"].get(
+                    "current_week_projection",
+                ),
+                item["player"].get(
+                    "current_week_actual",
+                ),
+            )
+            for item in lineup
+        )
+    ) + tuple(
+        sorted(
+            (
+                "BN",
+                player.get(
+                    "name",
+                    "",
+                ),
+                player.get(
+                    "current_week_projection",
+                ),
+                player.get(
+                    "current_week_actual",
+                ),
+            )
+            for player in bench
+        )
+    )
+
+    snapshot_key = (
+        (
+            captured_at.isoformat()
+            if captured_at
+            else None
+        ),
+        week,
+        decision_key,
+    )
+
+    if (
+        _START_SIT_CACHE[
+            "snapshot_key"
+        ] == snapshot_key
+        and _START_SIT_CACHE[
+            "evidence"
+        ] is not None
+    ):
+        return _START_SIT_CACHE[
+            "evidence"
+        ]
+
+    evidence = build_start_sit_evidence(
+        lineup,
+        bench,
+        week,
+    )
+
+    _START_SIT_CACHE[
+        "snapshot_key"
+    ] = snapshot_key
+    _START_SIT_CACHE[
+        "evidence"
+    ] = evidence
+
+    return evidence
 
 
 def cached_transaction_recommendations(
@@ -954,6 +1046,15 @@ def build_weekly_data(
         reverse=True,
     )
 
+    start_sit_evidence = (
+        cached_start_sit_evidence(
+            lineup,
+            bench,
+            provider_status,
+            week,
+        )
+    )
+
     status_watch = [
         item
         for item in lineup
@@ -1073,6 +1174,10 @@ def build_weekly_data(
         "roster": roster,
         "lineup": lineup,
         "bench": bench,
+
+        "start_sit_evidence":
+            start_sit_evidence,
+
         "status_watch":
             status_watch,
 
