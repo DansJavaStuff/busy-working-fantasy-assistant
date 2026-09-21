@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}
+Available Players · {{ data.team.team_name }}
+{% endblock %}
+
+{% block favicon %}
+{% if data.team.logo_path %}
+<link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for(
+        'static',
+        filename=data.team.logo_path
+    ) }}"
+>
+{% else %}
+{{ super() }}
+{% endif %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+    :root {
+        --team-primary:
+            {{ data.team.primary_colour }};
+        --team-secondary:
+            {{ data.team.secondary_colour }};
+        --team-accent:
+            {{ data.team.accent_colour }};
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<header class="topbar weekly-topbar">
+    <div>
+        <div class="eyebrow">
+            WEEK {{ data.available.week }}
+        </div>
+
+        <h1>
+            🧭 Available Players
+        </h1>
+
+        <div class="subtitle">
+            Ranked for {{ data.team.team_name }}
+        </div>
+    </div>
+
+    <div class="topbar-actions">
+        {% if data.team.logo_path %}
+        <img
+            src="{{ url_for(
+                'static',
+                filename=data.team.logo_path
+            ) }}"
+            alt="{{ data.team.team_name }}"
+            style="
+                max-height: 64px;
+                max-width: 160px;
+            "
+        >
+        {% endif %}
+
+        {% include "_app_nav.html" %}
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+
+<div class="yahoo-data-status">
+    Yahoo data:
+    <strong>
+        {% if data.available.provider_status.source == "manual_html" %}
+            Manual HTML snapshot
+        {% else %}
+            {{ data.available.provider_status.source }}
+        {% endif %}
+    </strong>
+    · captured
+    {{ data.available.provider_status.captured_at_display }}
+    {% if data.available.provider_status.generated_at_display %}
+        · normalized
+        {{ data.available.provider_status.generated_at_display }}
+    {% endif %}
+    ·
+    {% if data.available.provider_status.snapshot_current %}
+        CURRENT
+    {% else %}
+        STALE
+    {% endif %}
+</div>
+
+<section class="weekly-section">
+    <h2>
+        Free Agent Shortlist
+    </h2>
+
+    <p class="weekly-card-detail">
+        Ranked for Week {{ data.available.target_week }} and the next few weeks.
+        Yahoo supplies the baseline; Sleeper is used as an independent second
+        opinion for shortlisted offensive players. Roster fit and bye coverage
+        are also included.
+    </p>
+
+    {% if data.available.sleeper_error %}
+    <p class="weekly-card-detail">
+        Sleeper was unavailable for this refresh, so the ranking is using
+        Yahoo and roster-fit evidence only.
+    </p>
+    {% endif %}
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Player</th>
+                <th>Pos</th>
+                <th>Team</th>
+                <th>Yahoo W{{ data.available.target_week }}</th>
+                <th>Sleeper W{{ data.available.target_week }}</th>
+                <th>4-week avg</th>
+                <th>Best drop</th>
+                <th>Roster gain</th>
+                <th>Call</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in data.available.rankings %}
+            <tr>
+                <td>
+                    <strong>{{ item.rank }}</strong>
+                </td>
+
+                <td>
+                    <strong>{{ item.player.name }}</strong>
+
+                    {% if item.reasons %}
+                    <div class="weekly-card-detail">
+                        {{ item.reasons | join(" ") }}
+                    </div>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {{ item.player.position }}
+                </td>
+
+                <td>
+                    {{ item.player.team }}
+                </td>
+
+                <td class="weekly-projection">
+                    {{
+                        "%.2f"
+                        | format(
+                            item.next_week_projection
+                        )
+                    }}
+                </td>
+
+                <td class="weekly-projection">
+                    {% if item.sleeper_next_week is not none %}
+                    {{
+                        "%.2f"
+                        | format(
+                            item.sleeper_next_week
+                        )
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {{
+                        "%.2f"
+                        | format(
+                            item.four_week_average
+                        )
+                    }}
+                </td>
+
+                <td>
+                    {% if item.best_drop %}
+                        {{ item.best_drop.name }}
+                        ({{ item.best_drop.position }})
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if item.best_drop %}
+                    {{
+                        "%+.2f"
+                        | format(
+                            item.roster_gain
+                        )
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
+                <td>
+                    <span class="transaction-label">
+                        {{ item.move_label }}
+                    </span>
+                    <div class="weekly-card-detail">
+                        {{ item.move_type }}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}
