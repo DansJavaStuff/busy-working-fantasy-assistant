@@ -35,6 +35,13 @@ MY_TEAM_OUTPUT_FILE = (
     / "yahoo_my_team.json"
 )
 
+PARSE_CACHE_FILE = (
+    DATA_DIR
+    / "yahoo_html_parse_cache.json"
+)
+
+PARSE_CACHE_VERSION = 1
+
 SEASON = 2026
 MY_TEAM_NAME = "Allen Wrench"
 
@@ -576,6 +583,118 @@ def parse_page(path):
     return players
 
 
+def file_signature(path):
+    stat = path.stat()
+
+    return {
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
+
+
+def load_parse_cache():
+    if not PARSE_CACHE_FILE.exists():
+        return {
+            "version": PARSE_CACHE_VERSION,
+            "files": {},
+        }
+
+    try:
+        cache = json.loads(
+            PARSE_CACHE_FILE.read_text(
+                encoding="utf-8",
+            )
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ):
+        return {
+            "version": PARSE_CACHE_VERSION,
+            "files": {},
+        }
+
+    if (
+        cache.get("version")
+        != PARSE_CACHE_VERSION
+        or not isinstance(
+            cache.get("files"),
+            dict,
+        )
+    ):
+        return {
+            "version": PARSE_CACHE_VERSION,
+            "files": {},
+        }
+
+    return cache
+
+
+def save_parse_cache(cache):
+    PARSE_CACHE_FILE.write_text(
+        json.dumps(
+            {
+                "version":
+                    PARSE_CACHE_VERSION,
+                "files":
+                    cache.get(
+                        "files",
+                        {},
+                    ),
+            },
+            indent=2,
+            sort_keys=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def parse_page_cached(
+    path,
+    cache,
+):
+    signature = file_signature(
+        path
+    )
+    cache_key = path.name
+
+    entry = (
+        cache.get(
+            "files",
+            {},
+        ).get(cache_key)
+    )
+
+    if (
+        entry
+        and entry.get("size")
+        == signature["size"]
+        and entry.get("mtime_ns")
+        == signature["mtime_ns"]
+        and isinstance(
+            entry.get("players"),
+            dict,
+        )
+    ):
+        return (
+            entry["players"],
+            True,
+        )
+
+    players = parse_page(path)
+
+    cache.setdefault(
+        "files",
+        {},
+    )[cache_key] = {
+        **signature,
+        "players": players,
+    }
+
+    return players, False
+
+
 def snapshot_name_from_filename(
     path,
     prefix,
@@ -708,6 +827,8 @@ def snapshot_sort_key(
 
 def merge_projection_sources(
     source_files,
+    parse_cache=None,
+    cache_stats=None,
 ):
     merged = {}
 
@@ -731,14 +852,47 @@ def merge_projection_sources(
         )
 
         for path in paths:
-            print(
-                f"Reading "
-                f"{path.name}"
-            )
+            if parse_cache is None:
+                print(
+                    f"Reading "
+                    f"{path.name}"
+                )
 
-            page_players = (
-                parse_page(path)
-            )
+                page_players = (
+                    parse_page(path)
+                )
+                cache_hit = False
+            else:
+                (
+                    page_players,
+                    cache_hit,
+                ) = parse_page_cached(
+                    path,
+                    parse_cache,
+                )
+
+                print(
+                    (
+                        "Cached "
+                        if cache_hit
+                        else "Reading "
+                    )
+                    + path.name
+                )
+
+                if cache_stats is not None:
+                    key = (
+                        "hits"
+                        if cache_hit
+                        else "misses"
+                    )
+                    cache_stats[key] = (
+                        cache_stats.get(
+                            key,
+                            0,
+                        )
+                        + 1
+                    )
 
             print(
                 f"  Found "
@@ -980,9 +1134,19 @@ def main():
             "file(s)"
         )
 
+    parse_cache = (
+        load_parse_cache()
+    )
+    cache_stats = {
+        "hits": 0,
+        "misses": 0,
+    }
+
     combined = (
         merge_projection_sources(
-            player_sources
+            player_sources,
+            parse_cache=parse_cache,
+            cache_stats=cache_stats,
         )
     )
 
@@ -1021,7 +1185,9 @@ def main():
 
         supplement = (
             merge_projection_sources(
-                my_team_sources
+                my_team_sources,
+                parse_cache=parse_cache,
+                cache_stats=cache_stats,
             )
         )
 
@@ -1136,6 +1302,26 @@ def main():
     print(
         f"Available: "
         f"{len(available)}"
+    )
+
+    save_parse_cache(
+        parse_cache
+    )
+
+    print()
+    print("HTML PARSE CACHE")
+    print("================")
+    print(
+        f"Reused:      "
+        f"{cache_stats['hits']} file(s)"
+    )
+    print(
+        f"Reparsed:    "
+        f"{cache_stats['misses']} file(s)"
+    )
+    print(
+        f"Cache file:  "
+        f"{PARSE_CACHE_FILE}"
     )
 
     print()
