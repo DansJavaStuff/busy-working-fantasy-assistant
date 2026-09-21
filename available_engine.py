@@ -77,6 +77,7 @@ def _qb_bye_context(roster):
             "primary": None,
             "bye_week": None,
             "conflict": False,
+            "bye_conflict_drop": None,
         }
 
     primary = max(
@@ -104,10 +105,27 @@ def _qb_bye_context(roster):
         )
     )
 
+    bye_conflict_drop = None
+
+    if conflict:
+        alternatives = [
+            player
+            for player in qbs
+            if player is not primary
+        ]
+
+        if alternatives:
+            bye_conflict_drop = min(
+                alternatives,
+                key=four_week_average,
+            )
+
     return {
         "primary": primary,
         "bye_week": primary_bye,
         "conflict": conflict,
+        "bye_conflict_drop":
+            bye_conflict_drop,
     }
 
 
@@ -535,28 +553,56 @@ def build_available_rankings(
     ):
         move = item["move"]
 
+        bye_fix = (
+            item[
+                "qb_bye_adjustment"
+            ] > 0
+        )
+
+        best_drop = (
+            move.get("drop")
+            if move
+            else None
+        )
+
+        if (
+            bye_fix
+            and best_drop is None
+        ):
+            best_drop = qb_context.get(
+                "bye_conflict_drop"
+            )
+
+        move_label = (
+            "BYE FIX"
+            if bye_fix
+            else (
+                move.get("label")
+                if move
+                else "SHORTLIST"
+            )
+        )
+
+        move_type_label = (
+            "QB COVER"
+            if bye_fix
+            else (
+                move.get("move_type")
+                if move
+                else "FREE AGENT"
+            )
+        )
+
         ranked.append(
             {
                 **item,
                 "rank": index,
                 "best_drop":
-                    (
-                        move.get("drop")
-                        if move
-                        else None
-                    ),
+                    best_drop,
                 "move_label":
-                    (
-                        move.get("label")
-                        if move
-                        else "SHORTLIST"
-                    ),
+                    move_label,
                 "move_type":
-                    (
-                        move.get("move_type")
-                        if move
-                        else "FREE AGENT"
-                    ),
+                    move_type_label,
                 "roster_gain":
                     (
                         float(
