@@ -81,6 +81,10 @@ class HtmlFallbackImportTests(TestCase):
                 import_yahoo_players,
                 "DATA_DIR",
                 data_dir,
+            ), patch.object(
+                import_yahoo_players,
+                "PARSE_CACHE_FILE",
+                data_dir / "yahoo_html_store.json",
             ):
                 discovered, diagnostics = (
                     html_fallback_import.discover_source_files(
@@ -126,6 +130,10 @@ class HtmlFallbackImportTests(TestCase):
                 import_yahoo_players,
                 "DATA_DIR",
                 data_dir,
+            ), patch.object(
+                import_yahoo_players,
+                "PARSE_CACHE_FILE",
+                data_dir / "yahoo_html_store.json",
             ):
                 discovered, _ = (
                     html_fallback_import.discover_source_files(
@@ -136,3 +144,71 @@ class HtmlFallbackImportTests(TestCase):
         paths = discovered["week_2_projection"]
         self.assertEqual(paths[0].name, older.name)
         self.assertEqual(paths[-1].name, newer.name)
+
+
+    def test_unchanged_file_reuses_cached_metadata(self):
+        html = """
+        <html><body><select>
+        <option value="S_PW_2" selected>Week 2 (proj)</option>
+        </select></body></html>
+        """
+
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+            path = (
+                data_dir
+                / "Yahoo_Player_list_week2-Proj.html"
+            )
+            path.write_text(
+                html,
+                encoding="utf-8",
+            )
+            store_path = (
+                data_dir
+                / "yahoo_html_store.json"
+            )
+
+            with patch.object(
+                import_yahoo_players,
+                "DATA_DIR",
+                data_dir,
+            ), patch.object(
+                import_yahoo_players,
+                "PARSE_CACHE_FILE",
+                store_path,
+            ):
+                _, first = (
+                    html_fallback_import
+                    .discover_source_files(
+                        import_yahoo_players
+                        .PLAYER_SOURCE_PREFIX
+                    )
+                )
+
+                with patch.object(
+                    html_fallback_import,
+                    "classify_snapshot",
+                    side_effect=AssertionError(
+                        "unchanged HTML should not be reopened"
+                    ),
+                ):
+                    discovered, second = (
+                        html_fallback_import
+                        .discover_source_files(
+                            import_yahoo_players
+                            .PLAYER_SOURCE_PREFIX
+                        )
+                    )
+
+        self.assertEqual(
+            first["classification_read"],
+            1,
+        )
+        self.assertEqual(
+            second["classification_reused"],
+            1,
+        )
+        self.assertEqual(
+            len(discovered["week_2_projection"]),
+            1,
+        )
