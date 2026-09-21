@@ -37,7 +37,7 @@ MY_TEAM_OUTPUT_FILE = (
 
 PARSE_CACHE_FILE = (
     DATA_DIR
-    / "yahoo_html_parse_cache.json"
+    / "yahoo_html_store.json"
 )
 
 PARSE_CACHE_VERSION = 1
@@ -684,10 +684,16 @@ def parse_page_cached(
 
     players = parse_page(path)
 
-    cache.setdefault(
-        "files",
-        {},
-    )[cache_key] = {
+    existing = (
+        cache.setdefault(
+            "files",
+            {},
+        ).get(cache_key)
+        or {}
+    )
+
+    cache["files"][cache_key] = {
+        **existing,
         **signature,
         "players": players,
     }
