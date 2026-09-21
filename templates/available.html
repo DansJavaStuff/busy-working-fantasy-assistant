@@ -36,7 +36,7 @@ Available Players · {{ data.team.team_name }}
 <header class="topbar weekly-topbar">
     <div>
         <div class="eyebrow">
-            WEEK {{ data.available.week }}
+            WEEK {{ data.week }}
         </div>
 
         <h1>
@@ -73,20 +73,20 @@ Available Players · {{ data.team.team_name }}
 <div class="yahoo-data-status">
     Yahoo data:
     <strong>
-        {% if data.available.provider_status.source == "manual_html" %}
+        {% if data.yahoo_status.source == "manual_html" %}
             Manual HTML snapshot
         {% else %}
-            {{ data.available.provider_status.source }}
+            {{ data.yahoo_status.source }}
         {% endif %}
     </strong>
     · captured
-    {{ data.available.provider_status.captured_at_display }}
-    {% if data.available.provider_status.generated_at_display %}
+    {{ data.yahoo_status.captured_at_display }}
+    {% if data.yahoo_status.generated_at_display %}
         · normalized
-        {{ data.available.provider_status.generated_at_display }}
+        {{ data.yahoo_status.generated_at_display }}
     {% endif %}
     ·
-    {% if data.available.provider_status.snapshot_current %}
+    {% if data.yahoo_status.snapshot_current %}
         CURRENT
     {% else %}
         STALE
@@ -99,125 +99,70 @@ Available Players · {{ data.team.team_name }}
     </h2>
 
     <p class="weekly-card-detail">
-        Ranked for Week {{ data.available.target_week }} and the next few weeks.
+        Ranked for Week {{ data.target_week }} and the next few weeks.
         Yahoo supplies the baseline; Sleeper is used as an independent second
         opinion for shortlisted offensive players. Roster fit and bye coverage
         are also included.
     </p>
 
-    {% if data.available.sleeper_error %}
-    <p class="weekly-card-detail">
-        Sleeper was unavailable for this refresh, so the ranking is using
-        Yahoo and roster-fit evidence only.
-    </p>
-    {% endif %}
-
-    <table class="weekly-table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Player</th>
-                <th>Pos</th>
-                <th>Team</th>
-                <th>Yahoo W{{ data.available.target_week }}</th>
-                <th>Sleeper W{{ data.available.target_week }}</th>
-                <th>4-week avg</th>
-                <th>Best drop</th>
-                <th>Roster gain</th>
-                <th>Call</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for item in data.available.rankings %}
-            <tr>
-                <td>
-                    <strong>{{ item.rank }}</strong>
-                </td>
-
-                <td>
-                    <strong>{{ item.player.name }}</strong>
-
-                    {% if item.reasons %}
-                    <div class="weekly-card-detail">
-                        {{ item.reasons | join(" ") }}
-                    </div>
-                    {% endif %}
-                </td>
-
-                <td>
-                    {{ item.player.position }}
-                </td>
-
-                <td>
-                    {{ item.player.team }}
-                </td>
-
-                <td class="weekly-projection">
-                    {{
-                        "%.2f"
-                        | format(
-                            item.next_week_projection
-                        )
-                    }}
-                </td>
-
-                <td class="weekly-projection">
-                    {% if item.sleeper_next_week is not none %}
-                    {{
-                        "%.2f"
-                        | format(
-                            item.sleeper_next_week
-                        )
-                    }}
-                    {% else %}
-                    —
-                    {% endif %}
-                </td>
-
-                <td>
-                    {{
-                        "%.2f"
-                        | format(
-                            item.four_week_average
-                        )
-                    }}
-                </td>
-
-                <td>
-                    {% if item.best_drop %}
-                        {{ item.best_drop.name }}
-                        ({{ item.best_drop.position }})
-                    {% else %}
-                        —
-                    {% endif %}
-                </td>
-
-                <td>
-                    {% if item.best_drop %}
-                    {{
-                        "%+.2f"
-                        | format(
-                            item.roster_gain
-                        )
-                    }}
-                    {% else %}
-                    —
-                    {% endif %}
-                </td>
-
-                <td>
-                    <span class="transaction-label">
-                        {{ item.move_label }}
-                    </span>
-                    <div class="weekly-card-detail">
-                        {{ item.move_type }}
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div
+        id="available-rankings"
+        data-rankings-url="{{ url_for('available_rankings') }}"
+        aria-live="polite"
+    >
+        <div class="available-loading">
+            <div class="available-loading-spinner" aria-hidden="true"></div>
+            <div>
+                <strong>Loading rankings…</strong>
+                <span>
+                    Comparing free agents, roster fit and Sleeper projections.
+                </span>
+            </div>
+        </div>
+    </div>
 </section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const target = document.getElementById(
+        "available-rankings"
+    );
+
+    if (!target) {
+        return;
+    }
+
+    fetch(target.dataset.rankingsUrl, {
+        headers: {
+            "X-Requested-With": "fetch"
+        }
+    })
+        .then(function (response) {
+            if (!response.ok) {
+                throw new Error(
+                    "HTTP " + response.status
+                );
+            }
+
+            return response.text();
+        })
+        .then(function (html) {
+            target.innerHTML = html;
+        })
+        .catch(function (error) {
+            target.innerHTML =
+                '<div class="available-load-error">'
+                + '<strong>Could not load rankings.</strong>'
+                + '<span>Refresh the page to try again. '
+                + 'The rest of the app is unaffected.</span>'
+                + '</div>';
+
+            console.error(
+                "Available rankings failed:",
+                error
+            );
+        });
+});
+</script>
 
 {% endblock %}
