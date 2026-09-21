@@ -18,6 +18,15 @@
     </a>
 
     <a
+        {% if request.endpoint == 'available_players' %}
+        class="active"
+        {% endif %}
+        href="{{ url_for('available_players') }}"
+    >
+        Available
+    </a>
+
+    <a
         {% if request.endpoint == 'my_team' %}
         class="active"
         {% endif %}
