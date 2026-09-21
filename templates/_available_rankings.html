@@ -80,7 +80,7 @@
             </td>
 
             <td>
-                {% if item.best_drop %}
+                {% if item.roster_gain is not none %}
                 {{
                     "%+.2f"
                     | format(
