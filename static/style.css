@@ -1572,3 +1572,52 @@ footer {
     color: #92400e;
 }
 
+
+
+.available-loading,
+.available-load-error {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 18px;
+    padding: 18px;
+    border: 1px solid #e3e7ed;
+    border-radius: 12px;
+    background: #fbfcfd;
+}
+
+.available-loading strong,
+.available-loading span,
+.available-load-error strong,
+.available-load-error span {
+    display: block;
+}
+
+.available-loading span,
+.available-load-error span {
+    margin-top: 4px;
+    color: #697586;
+    font-size: 13px;
+}
+
+.available-loading-spinner {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border: 3px solid #d8dde6;
+    border-top-color: #313946;
+    border-radius: 50%;
+    animation: available-spin 0.8s linear infinite;
+}
+
+.available-load-error {
+    border-color: #f0b8b8;
+    background: #fff0f0;
+    color: #8a1c1c;
+}
+
+@keyframes available-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
