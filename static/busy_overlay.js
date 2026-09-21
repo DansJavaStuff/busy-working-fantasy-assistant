@@ -281,6 +281,51 @@
         lineupSection.insertAdjacentElement("afterend", section);
     }
 
+    function showYahooRefreshResult() {
+        const params = new URLSearchParams(
+            window.location.search
+        );
+        const error = params.get("refresh_error");
+
+        if (!error) {
+            return;
+        }
+
+        const form = document.querySelector(
+            ".yahoo-refresh-form"
+        );
+
+        if (!form) {
+            return;
+        }
+
+        const banner = document.createElement("div");
+        banner.setAttribute("role", "alert");
+        banner.style.margin = "0 0 16px";
+        banner.style.padding = "12px 14px";
+        banner.style.border = "1px solid #f0b8b8";
+        banner.style.borderRadius = "10px";
+        banner.style.background = "#fff0f0";
+        banner.style.color = "#8a1c1c";
+        banner.style.fontWeight = "700";
+
+        if (error === "timeout") {
+            banner.textContent =
+                "Yahoo refresh timed out before the import finished. "
+                + "The previous dataset is still in use. "
+                + "Check the busy-working service log for details.";
+        } else {
+            banner.textContent =
+                "Yahoo refresh failed, so the previous dataset is still in use. "
+                + "Check the busy-working service log for details.";
+        }
+
+        form.insertAdjacentElement(
+            "beforebegin",
+            banner
+        );
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll(
             ".yahoo-refresh-form, .js-busy-form"
@@ -290,6 +335,7 @@
             });
         });
 
+        showYahooRefreshResult();
         buildCloseStartSitDecisions();
     });
 
