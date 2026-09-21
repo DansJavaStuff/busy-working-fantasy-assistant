@@ -346,6 +346,83 @@ Manual snapshot
     </table>
 </section>
 
+{% if data.weekly.start_sit_evidence %}
+<section class="weekly-section">
+    <h2>
+        Start / Sit Evidence
+    </h2>
+
+    <p class="weekly-card-detail">
+        Sleeper projections are rescored to Busy Working Yahoo points.
+    </p>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Call</th>
+                <th>Start</th>
+                <th>Sit</th>
+                <th>Yahoo Edge</th>
+                <th>Sleeper Edge</th>
+                <th>Evidence</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in data.weekly.start_sit_evidence %}
+            <tr>
+                <td>
+                    <strong>
+                        {{ item.recommendation }}
+                    </strong>
+                </td>
+
+                <td>
+                    {{ item.start.name }}
+                    ({{ item.start.slot }})
+                </td>
+
+                <td>
+                    {{ item.sit.name }}
+                    ({{ item.sit.position }})
+                </td>
+
+                <td>
+                    {{
+                        "%+.2f"
+                        | format(item.yahoo_edge)
+                    }}
+                </td>
+
+                <td>
+                    {% if item.sleeper.edge is not none %}
+                    {{
+                        "%+.2f"
+                        | format(item.sleeper.edge)
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if item.sleeper.agreement == "agree" %}
+                        AGREE
+                    {% elif item.sleeper.agreement == "disagree" %}
+                        DISAGREE
+                    {% elif item.sleeper.error %}
+                        Sleeper unavailable
+                    {% else %}
+                        Yahoo only
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
 
 <section class="weekly-section">
     <h2>
