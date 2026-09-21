@@ -18,6 +18,9 @@ from draft_engine import (
     update_settings,
 )
 from player_database import load_players
+from available_engine import (
+    build_available_rankings,
+)
 from recommendation_engine import get_recommendations
 from simulator import choose_opponent_pick
 from database import (
@@ -308,6 +311,42 @@ def weekly():
 
     return render_template(
         "weekly.html",
+        data=data,
+    )
+
+
+@app.get("/available")
+def available_players():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    available_data = (
+        build_available_rankings(
+            season=season,
+            week=week,
+            limit=20,
+        )
+    )
+
+    data = {
+        "league": {
+            "name":
+                CURRENT_LEAGUE_NAME,
+            "season":
+                season,
+        },
+        "team":
+            load_team_identity(
+                season
+            ),
+        "available":
+            available_data,
+    }
+
+    return render_template(
+        "available.html",
         data=data,
     )
 
