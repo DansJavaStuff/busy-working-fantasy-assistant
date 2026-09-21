@@ -47,6 +47,102 @@ def _sleeper_index(results):
     }
 
 
+def _bye_week(player):
+    try:
+        return int(
+            player.get("bye_week")
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return None
+
+
+def _qb_bye_context(roster):
+    qbs = [
+        player
+        for player in roster
+        if (
+            player.get("position")
+            == "QB"
+            and player.get(
+                "roster_slot"
+            ) != "IR"
+        )
+    ]
+
+    if not qbs:
+        return {
+            "primary": None,
+            "bye_week": None,
+            "conflict": False,
+        }
+
+    primary = max(
+        qbs,
+        key=four_week_average,
+    )
+
+    primary_bye = _bye_week(
+        primary
+    )
+
+    known_byes = [
+        _bye_week(player)
+        for player in qbs
+        if _bye_week(player)
+        is not None
+    ]
+
+    conflict = (
+        len(known_byes) >= 2
+        and primary_bye is not None
+        and all(
+            bye == primary_bye
+            for bye in known_byes
+        )
+    )
+
+    return {
+        "primary": primary,
+        "bye_week": primary_bye,
+        "conflict": conflict,
+    }
+
+
+def _qb_bye_adjustment(
+    player,
+    qb_context,
+):
+    if (
+        player.get("position")
+        != "QB"
+        or not qb_context[
+            "conflict"
+        ]
+    ):
+        return 0.0
+
+    primary_bye = qb_context[
+        "bye_week"
+    ]
+    candidate_bye = _bye_week(
+        player
+    )
+
+    if (
+        candidate_bye is None
+        or primary_bye is None
+    ):
+        return 0.0
+
+    if candidate_bye != primary_bye:
+        return 4.0
+
+    return -4.0
+
+
 def build_available_rankings(
     season,
     week,
@@ -103,6 +199,12 @@ def build_available_rankings(
         is not None
     ):
         return _AVAILABLE_CACHE["data"]
+
+    qb_context = (
+        _qb_bye_context(
+            roster
+        )
+    )
 
     moves = (
         build_transaction_recommendations(
@@ -166,14 +268,23 @@ def build_available_rankings(
             else 0.0
         )
 
+        qb_bye_adjustment = (
+            _qb_bye_adjustment(
+                player,
+                qb_context,
+            )
+        )
+
         # First-pass score selects the shortlist before the
-        # independent Sleeper call.  It deliberately favours
-        # forward value and roster fit over this week's score.
+        # independent Sleeper call.  A QB who actually fixes
+        # our QB1/QB2 shared bye gets explicit roster-need
+        # credit rather than all QBs being treated equally.
         preliminary = (
             next_week * 0.55
             + four_week * 0.45
             + roster_gain * 1.25
             + bye_gain
+            + qb_bye_adjustment
         )
 
         candidates.append(
@@ -184,6 +295,8 @@ def build_available_rankings(
                 "four_week_average":
                     four_week,
                 "move": move,
+                "qb_bye_adjustment":
+                    qb_bye_adjustment,
                 "preliminary_score":
                     preliminary,
             }
@@ -302,9 +415,31 @@ def build_available_rankings(
             ] * 0.45
             + roster_gain * 1.25
             + bye_gain
+            + item[
+                "qb_bye_adjustment"
+            ]
         )
 
         reasons = []
+
+        if (
+            item[
+                "qb_bye_adjustment"
+            ] > 0
+        ):
+            reasons.append(
+                "Covers the shared QB bye "
+                f"in Week {qb_context['bye_week']}."
+            )
+        elif (
+            item[
+                "qb_bye_adjustment"
+            ] < 0
+        ):
+            reasons.append(
+                "Does not solve the shared QB "
+                f"bye in Week {qb_context['bye_week']}."
+            )
 
         if move:
             reasons.extend(
@@ -349,9 +484,53 @@ def build_available_rankings(
     )
 
     ranked = []
+    position_counts = {}
+    position_limits = {
+        "QB": 3,
+        "RB": 6,
+        "WR": 6,
+        "TE": 3,
+        "K": 2,
+        "DST": 2,
+    }
+
+    selected = []
+
+    for item in candidates:
+        position = item[
+            "player"
+        ].get("position")
+
+        limit_for_position = (
+            position_limits.get(
+                position,
+                limit,
+            )
+        )
+
+        if (
+            position_counts.get(
+                position,
+                0,
+            )
+            >= limit_for_position
+        ):
+            continue
+
+        selected.append(item)
+        position_counts[position] = (
+            position_counts.get(
+                position,
+                0,
+            )
+            + 1
+        )
+
+        if len(selected) >= limit:
+            break
 
     for index, item in enumerate(
-        candidates[:limit],
+        selected,
         start=1,
     ):
         move = item["move"]
