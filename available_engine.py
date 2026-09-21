@@ -612,7 +612,7 @@ def build_available_rankings(
                             )
                         )
                         if move
-                        else 0.0
+                        else None
                     ),
                 "bye_gain":
                     (
