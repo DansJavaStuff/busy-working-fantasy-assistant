@@ -1,0 +1,250 @@
+from datetime import datetime, timezone
+from unittest import TestCase
+from unittest.mock import patch
+
+import available_engine
+from available_engine import (
+    build_available_rankings,
+    next_week_projection,
+)
+
+
+class AvailableEngineTests(TestCase):
+    def setUp(self):
+        available_engine._AVAILABLE_CACHE[
+            "snapshot_key"
+        ] = None
+        available_engine._AVAILABLE_CACHE[
+            "data"
+        ] = None
+
+    def test_next_week_projection_reads_weeks_model(self):
+        player = {
+            "weeks": {
+                "3": {
+                    "projection": 12.5,
+                }
+            }
+        }
+
+        self.assertEqual(
+            next_week_projection(
+                player,
+                2,
+            ),
+            12.5,
+        )
+
+    def test_rankings_use_sleeper_and_roster_fit(self):
+        roster = [
+            {
+                "yahoo_player_id": "r1",
+                "name": "Roster Player",
+                "position": "WR",
+            }
+        ]
+
+        available = [
+            {
+                "yahoo_player_id": "a1",
+                "name": "Alpha Receiver",
+                "position": "WR",
+                "team": "AAA",
+                "weeks": {
+                    "3": {
+                        "projection": 10.0,
+                    }
+                },
+                "next_4_weeks_projection": 40.0,
+            },
+            {
+                "yahoo_player_id": "a2",
+                "name": "Beta Receiver",
+                "position": "WR",
+                "team": "BBB",
+                "weeks": {
+                    "3": {
+                        "projection": 9.0,
+                    }
+                },
+                "next_4_weeks_projection": 36.0,
+            },
+        ]
+
+        moves = [
+            {
+                "add": available[0],
+                "drop": roster[0],
+                "score": 1.0,
+                "bye_score_adjustment": 0.0,
+                "label": "WATCH",
+                "move_type": "DEPTH UPGRADE",
+                "reasons": [
+                    "Improves depth.",
+                ],
+            }
+        ]
+
+        provider_status = {
+            "captured_at": datetime(
+                2026,
+                9,
+                21,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            )
+        }
+
+        sleeper = [
+            {
+                "name": "Alpha Receiver",
+                "sleeper_yahoo_projection": 12.0,
+            },
+            {
+                "name": "Beta Receiver",
+                "sleeper_yahoo_projection": 8.0,
+            },
+        ]
+
+        with patch.object(
+            available_engine,
+            "load_season_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "enrich_local_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "get_effective_available_players",
+            return_value=available,
+        ), patch.object(
+            available_engine.yahoo_provider,
+            "get_status",
+            return_value=provider_status,
+        ), patch.object(
+            available_engine,
+            "build_transaction_recommendations",
+            return_value=moves,
+        ), patch.object(
+            available_engine,
+            "four_week_average",
+            side_effect=lambda player:
+                float(
+                    player.get(
+                        "next_4_weeks_projection",
+                        0,
+                    )
+                )
+                / 4.0,
+        ):
+            result = build_available_rankings(
+                2026,
+                2,
+                limit=2,
+                sleeper_fetch=lambda *args, **kwargs:
+                    sleeper,
+            )
+
+        self.assertEqual(
+            result["rankings"][0][
+                "player"
+            ]["name"],
+            "Alpha Receiver",
+        )
+
+        self.assertEqual(
+            result["rankings"][0][
+                "best_drop"
+            ]["name"],
+            "Roster Player",
+        )
+
+        self.assertEqual(
+            result["rankings"][0][
+                "sleeper_next_week"
+            ],
+            12.0,
+        )
+
+    def test_rankings_survive_sleeper_failure(self):
+        roster = []
+        available = [
+            {
+                "yahoo_player_id": "a1",
+                "name": "Example Player",
+                "position": "WR",
+                "team": "AAA",
+                "weeks": {
+                    "3": {
+                        "projection": 8.0,
+                    }
+                },
+                "next_4_weeks_projection": 32.0,
+            }
+        ]
+
+        provider_status = {
+            "captured_at": datetime(
+                2026,
+                9,
+                21,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            )
+        }
+
+        def fail(*args, **kwargs):
+            raise RuntimeError(
+                "Sleeper unavailable"
+            )
+
+        with patch.object(
+            available_engine,
+            "load_season_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "enrich_local_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "get_effective_available_players",
+            return_value=available,
+        ), patch.object(
+            available_engine.yahoo_provider,
+            "get_status",
+            return_value=provider_status,
+        ), patch.object(
+            available_engine,
+            "build_transaction_recommendations",
+            return_value=[],
+        ), patch.object(
+            available_engine,
+            "four_week_average",
+            return_value=8.0,
+        ):
+            result = build_available_rankings(
+                2026,
+                2,
+                limit=1,
+                sleeper_fetch=fail,
+            )
+
+        self.assertEqual(
+            len(result["rankings"]),
+            1,
+        )
+
+        self.assertIn(
+            "Sleeper unavailable",
+            result["sleeper_error"],
+        )
+
+
+if __name__ == "__main__":
+    import unittest
+
+    unittest.main()
