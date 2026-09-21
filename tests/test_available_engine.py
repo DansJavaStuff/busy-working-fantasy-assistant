@@ -168,6 +168,107 @@ class AvailableEngineTests(TestCase):
             12.0,
         )
 
+    def test_shared_qb_bye_is_presented_as_bye_fix(self):
+        roster = [
+            {
+                "yahoo_player_id": "qb1",
+                "name": "Josh Allen",
+                "position": "QB",
+                "bye_week": 7,
+                "next_4_weeks_projection": 100.0,
+            },
+            {
+                "yahoo_player_id": "qb2",
+                "name": "Trevor Lawrence",
+                "position": "QB",
+                "bye_week": 7,
+                "next_4_weeks_projection": 60.0,
+            },
+        ]
+
+        available = [
+            {
+                "yahoo_player_id": "fa1",
+                "name": "Jared Goff",
+                "position": "QB",
+                "team": "DET",
+                "bye_week": 8,
+                "weeks": {
+                    "3": {
+                        "projection": 20.0,
+                    }
+                },
+                "next_4_weeks_projection": 80.0,
+            }
+        ]
+
+        provider_status = {
+            "captured_at": datetime(
+                2026,
+                9,
+                21,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            )
+        }
+
+        with patch.object(
+            available_engine,
+            "load_season_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "enrich_local_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "get_effective_available_players",
+            return_value=available,
+        ), patch.object(
+            available_engine.yahoo_provider,
+            "get_status",
+            return_value=provider_status,
+        ), patch.object(
+            available_engine,
+            "build_transaction_recommendations",
+            return_value=[],
+        ), patch.object(
+            available_engine,
+            "four_week_average",
+            side_effect=lambda player:
+                float(
+                    player.get(
+                        "next_4_weeks_projection",
+                        0,
+                    )
+                )
+                / 4.0,
+        ):
+            result = build_available_rankings(
+                2026,
+                2,
+                limit=1,
+                sleeper_fetch=lambda *args, **kwargs:
+                    [],
+            )
+
+        top = result["rankings"][0]
+
+        self.assertEqual(
+            top["move_label"],
+            "BYE FIX",
+        )
+        self.assertEqual(
+            top["move_type"],
+            "QB COVER",
+        )
+        self.assertEqual(
+            top["best_drop"]["name"],
+            "Trevor Lawrence",
+        )
+
+
     def test_rankings_survive_sleeper_failure(self):
         roster = []
         available = [
