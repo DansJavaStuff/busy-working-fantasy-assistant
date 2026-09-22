@@ -263,18 +263,6 @@ def add_roster_slots(
         season
     )
 
-    league_state = (
-        load_season_league_state(
-            season
-        )
-    )
-
-    waiver_priority = (
-        league_state.get(
-            "waiver_priority"
-        )
-    )
-
     by_name = {
         player["player_name"].lower():
             player
@@ -968,6 +956,18 @@ def build_weekly_data(
 
     local_roster = load_season_roster(
         season
+    )
+
+    league_state = (
+        load_season_league_state(
+            season
+        )
+    )
+
+    waiver_priority = (
+        league_state.get(
+            "waiver_priority"
+        )
     )
 
     roster = enrich_local_roster(
