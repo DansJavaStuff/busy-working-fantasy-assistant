@@ -4,6 +4,8 @@ from unittest.mock import patch
 
 import available_engine
 from available_engine import (
+    _position_baselines,
+    _position_value,
     build_available_rankings,
     next_week_projection,
 )
@@ -33,6 +35,72 @@ class AvailableEngineTests(TestCase):
                 2,
             ),
             12.5,
+        )
+
+    def test_position_value_compares_with_same_position(self):
+        players = []
+
+        for index, projection in enumerate(
+            [
+                12.0,
+                11.0,
+                10.0,
+                9.0,
+                8.0,
+                7.0,
+                6.0,
+                5.0,
+                4.0,
+                3.0,
+            ],
+            start=1,
+        ):
+            players.append(
+                {
+                    "name":
+                        f"Receiver {index}",
+                    "position": "WR",
+                    "weeks": {
+                        "3": {
+                            "projection":
+                                projection,
+                        }
+                    },
+                    "next_4_weeks_projection":
+                        projection * 4,
+                }
+            )
+
+        baselines = (
+            _position_baselines(
+                players,
+                2,
+            )
+        )
+
+        top_value = _position_value(
+            "WR",
+            12.0,
+            12.0,
+            baselines,
+        )
+
+        replacement_value = (
+            _position_value(
+                "WR",
+                3.0,
+                3.0,
+                baselines,
+            )
+        )
+
+        self.assertGreater(
+            top_value["value"],
+            0,
+        )
+        self.assertEqual(
+            replacement_value["value"],
+            0,
         )
 
     def test_rankings_use_sleeper_and_roster_fit(self):
@@ -115,6 +183,12 @@ class AvailableEngineTests(TestCase):
             available_engine,
             "enrich_local_roster",
             return_value=roster,
+        ), patch.object(
+            available_engine,
+            "load_season_league_state",
+            return_value={
+                "waiver_priority": 11,
+            },
         ), patch.object(
             available_engine,
             "get_effective_available_players",
@@ -223,6 +297,12 @@ class AvailableEngineTests(TestCase):
             return_value=roster,
         ), patch.object(
             available_engine,
+            "load_season_league_state",
+            return_value={
+                "waiver_priority": 11,
+            },
+        ), patch.object(
+            available_engine,
             "get_effective_available_players",
             return_value=available,
         ), patch.object(
@@ -310,6 +390,12 @@ class AvailableEngineTests(TestCase):
             available_engine,
             "enrich_local_roster",
             return_value=roster,
+        ), patch.object(
+            available_engine,
+            "load_season_league_state",
+            return_value={
+                "waiver_priority": 11,
+            },
         ), patch.object(
             available_engine,
             "get_effective_available_players",
