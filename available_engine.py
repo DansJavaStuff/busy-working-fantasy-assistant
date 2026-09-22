@@ -851,7 +851,7 @@ def build_available_rankings(
             }
         )
 
-    waiver_queue = []
+    waiver_candidates = []
 
     for item in ranked:
         roster_status = str(
@@ -872,31 +872,111 @@ def build_available_rankings(
         ):
             continue
 
-        waiver_queue.append(
-            {
-                "priority":
-                    len(waiver_queue) + 1,
-                "rank":
-                    item["rank"],
-                "add":
-                    item["player"],
-                "drop":
-                    item["best_drop"],
-                "call":
-                    item["move_label"],
-                "move_type":
-                    item["move_type"],
-                "score":
-                    item["score"],
-                "reasons":
-                    item["reasons"],
-            }
+        waiver_candidates.append(
+            item
         )
+
+    waiver_queue = []
+    waiver_focus = None
+
+    if waiver_candidates:
+        first = waiver_candidates[0]
+
+        focus_drop = first[
+            "best_drop"
+        ]
+
+        focus_key = (
+            str(
+                focus_drop.get(
+                    "yahoo_player_id",
+                    focus_drop.get(
+                        "name",
+                        "",
+                    ),
+                )
+            ),
+            first.get(
+                "move_type"
+            ),
+        )
+
+        waiver_focus = {
+            "drop": focus_drop,
+            "move_type":
+                first.get(
+                    "move_type"
+                ),
+            "call":
+                first.get(
+                    "move_label"
+                ),
+        }
+
+        for item in waiver_candidates:
+            drop = item[
+                "best_drop"
+            ]
+
+            item_key = (
+                str(
+                    drop.get(
+                        "yahoo_player_id",
+                        drop.get(
+                            "name",
+                            "",
+                        ),
+                    )
+                ),
+                item.get(
+                    "move_type"
+                ),
+            )
+
+            if item_key != focus_key:
+                continue
+
+            waiver_queue.append(
+                {
+                    "priority":
+                        len(
+                            waiver_queue
+                        ) + 1,
+                    "rank":
+                        item["rank"],
+                    "add":
+                        item["player"],
+                    "drop":
+                        drop,
+                    "call":
+                        item[
+                            "move_label"
+                        ],
+                    "move_type":
+                        item[
+                            "move_type"
+                        ],
+                    "score":
+                        item["score"],
+                    "reasons":
+                        item[
+                            "reasons"
+                        ],
+                }
+            )
+
+            if len(
+                waiver_queue
+            ) >= 3:
+                break
 
     data = {
         "rankings": ranked,
         "waiver_queue":
             waiver_queue,
+
+        "waiver_focus":
+            waiver_focus,
         "provider_status":
             provider_status,
         "sleeper_error":
