@@ -20,6 +20,19 @@ _AVAILABLE_CACHE = {
 }
 
 
+# Replacement level is deliberately based on the available pool rather than
+# absolute fantasy points.  In a 12-team league these cut-offs represent the
+# sort of player likely to remain obtainable if we pass on the current option.
+REPLACEMENT_RANK = {
+    "QB": 6,
+    "RB": 10,
+    "WR": 10,
+    "TE": 6,
+    "K": 5,
+    "DST": 5,
+}
+
+
 def next_week_projection(player, week):
     value = (
         player.get("weeks", {})
@@ -47,6 +60,144 @@ def _sleeper_index(results):
             item
         for item in (results or [])
         if item.get("name")
+    }
+
+
+def _position_baselines(
+    available,
+    week,
+):
+    grouped = {}
+
+    for player in available:
+        position = player.get(
+            "position"
+        )
+
+        if position not in (
+            REPLACEMENT_RANK
+        ):
+            continue
+
+        grouped.setdefault(
+            position,
+            [],
+        ).append(player)
+
+    baselines = {}
+
+    for position, players in (
+        grouped.items()
+    ):
+        rank = REPLACEMENT_RANK[
+            position
+        ]
+
+        next_values = sorted(
+            (
+                next_week_projection(
+                    player,
+                    week,
+                )
+                for player in players
+            ),
+            reverse=True,
+        )
+
+        four_values = sorted(
+            (
+                four_week_average(
+                    player
+                )
+                for player in players
+            ),
+            reverse=True,
+        )
+
+        next_index = min(
+            rank - 1,
+            len(next_values) - 1,
+        )
+
+        four_index = min(
+            rank - 1,
+            len(four_values) - 1,
+        )
+
+        baselines[position] = {
+            "rank": rank,
+            "next_week":
+                (
+                    next_values[
+                        next_index
+                    ]
+                    if next_values
+                    else 0.0
+                ),
+            "four_week":
+                (
+                    four_values[
+                        four_index
+                    ]
+                    if four_values
+                    else 0.0
+                ),
+        }
+
+    return baselines
+
+
+def _position_value(
+    position,
+    next_week,
+    four_week,
+    baselines,
+):
+    baseline = baselines.get(
+        position,
+        {
+            "next_week": 0.0,
+            "four_week": 0.0,
+        },
+    )
+
+    next_edge = (
+        float(next_week)
+        - float(
+            baseline[
+                "next_week"
+            ]
+        )
+    )
+
+    four_edge = (
+        float(four_week)
+        - float(
+            baseline[
+                "four_week"
+            ]
+        )
+    )
+
+    value = (
+        next_edge * 0.55
+        + four_edge * 0.45
+    )
+
+    return {
+        "value": round(
+            value,
+            2,
+        ),
+        "next_edge": round(
+            next_edge,
+            2,
+        ),
+        "four_edge": round(
+            four_edge,
+            2,
+        ),
+        "baseline": baseline,
     }
 
 
@@ -240,6 +391,13 @@ def build_available_rankings(
         )
     )
 
+    position_baselines = (
+        _position_baselines(
+            available,
+            week,
+        )
+    )
+
     moves = (
         build_transaction_recommendations(
             roster,
@@ -310,13 +468,24 @@ def build_available_rankings(
             )
         )
 
-        # First-pass score selects the shortlist before the
-        # independent Sleeper call.  A QB who actually fixes
-        # our QB1/QB2 shared bye gets explicit roster-need
-        # credit rather than all QBs being treated equally.
+        position_value = (
+            _position_value(
+                player.get(
+                    "position"
+                ),
+                next_week,
+                four_week,
+                position_baselines,
+            )
+        )
+
+        # First-pass score is now position-relative: a 7-point TE can outrank
+        # a 19-point QB if the TE is exceptional compared with other available
+        # TEs.  Roster need and bye coverage remain separate signals.
         preliminary = (
-            next_week * 0.55
-            + four_week * 0.45
+            position_value[
+                "value"
+            ]
             + roster_gain * 1.25
             + bye_gain
             + qb_bye_adjustment
@@ -332,6 +501,8 @@ def build_available_rankings(
                 "move": move,
                 "qb_bye_adjustment":
                     qb_bye_adjustment,
+                "position_value":
+                    position_value,
                 "preliminary_score":
                     preliminary,
             }
@@ -443,11 +614,27 @@ def build_available_rankings(
             else 0.0
         )
 
+        position_value = (
+            _position_value(
+                player.get(
+                    "position"
+                ),
+                consensus_next_week,
+                item[
+                    "four_week_average"
+                ],
+                position_baselines,
+            )
+        )
+
+        item[
+            "position_value"
+        ] = position_value
+
         item["score"] = (
-            consensus_next_week * 0.55
-            + item[
-                "four_week_average"
-            ] * 0.45
+            position_value[
+                "value"
+            ]
             + roster_gain * 1.25
             + bye_gain
             + item[
@@ -456,6 +643,25 @@ def build_available_rankings(
         )
 
         reasons = []
+
+        if (
+            position_value[
+                "value"
+            ] >= 1.0
+        ):
+            reasons.append(
+                "Projects clearly above the available "
+                f"{player.get('position')} replacement level."
+            )
+        elif (
+            position_value[
+                "value"
+            ] <= -1.0
+        ):
+            reasons.append(
+                "Projects below the available "
+                f"{player.get('position')} replacement level."
+            )
 
         if (
             item[
@@ -658,6 +864,9 @@ def build_available_rankings(
 
         "waiver_priority":
             waiver_priority,
+
+        "position_baselines":
+            position_baselines,
     }
 
     _AVAILABLE_CACHE[
