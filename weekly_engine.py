@@ -3,7 +3,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
 
-from database import load_season_roster
+from database import (
+    load_season_league_state,
+    load_season_roster,
+)
 from fantasy_calendar import (
     UK_TIME,
     current_fantasy_week,
@@ -257,6 +260,18 @@ def add_roster_slots(
 ):
     local_roster = load_season_roster(
         season
+    )
+
+    league_state = (
+        load_season_league_state(
+            season
+        )
+    )
+
+    waiver_priority = (
+        league_state.get(
+            "waiver_priority"
+        )
     )
 
     by_name = {
@@ -1007,6 +1022,8 @@ def build_weekly_data(
             available,
             provider_status,
             week,
+            waiver_priority=
+                waiver_priority,
         )
     )
 
@@ -1215,4 +1232,7 @@ def build_weekly_data(
 
         "provider_status":
             provider_status,
+
+        "waiver_priority":
+            waiver_priority,
     }
