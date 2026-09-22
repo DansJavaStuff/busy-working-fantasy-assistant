@@ -25,13 +25,16 @@ from recommendation_engine import get_recommendations
 from simulator import choose_opponent_pick
 from database import (
     CURRENT_LEAGUE_NAME,
+    list_recommendation_actions,
     list_seasons,
     load_current_draft_order,
     load_season_league_state,
     load_season_roster,
     load_team_identity,
+    record_recommendation_action,
     save_current_draft_order,
     save_waiver_priority,
+    update_recommendation_action_status,
 )
 from data_status import get_data_status
 from fantasypros import get_api_usage
@@ -383,9 +386,114 @@ def available_players():
             get_yahoo_provider_status(),
     }
 
+    data[
+        "recommendation_actions"
+    ] = list_recommendation_actions(
+        season,
+        limit=20,
+    )
+
     return render_template(
         "available.html",
         data=data,
+    )
+
+
+@app.post("/available/track")
+def track_available_recommendation():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    add_name = request.form.get(
+        "add_player_name",
+        "",
+    ).strip()
+
+    if not add_name:
+        return redirect(
+            url_for(
+                "available_players",
+                track_error="1",
+            )
+        )
+
+    record_recommendation_action(
+        season=season,
+        week=week,
+        action_type=request.form.get(
+            "action_type",
+            "waiver_claim",
+        ),
+        priority=request.form.get(
+            "priority",
+            type=int,
+        ),
+        add_player_id=request.form.get(
+            "add_player_id",
+        ),
+        add_player_name=add_name,
+        add_position=request.form.get(
+            "add_position",
+        ),
+        drop_player_id=request.form.get(
+            "drop_player_id",
+        ),
+        drop_player_name=request.form.get(
+            "drop_player_name",
+        ),
+        drop_position=request.form.get(
+            "drop_position",
+        ),
+        recommendation_label=request.form.get(
+            "recommendation_label",
+        ),
+        move_type=request.form.get(
+            "move_type",
+        ),
+        recommendation_rank=request.form.get(
+            "recommendation_rank",
+            type=int,
+        ),
+    )
+
+    return redirect(
+        url_for(
+            "available_players",
+            tracked="1",
+        )
+    )
+
+
+@app.post("/available/action/<int:action_id>/status")
+def update_available_action_status(
+    action_id,
+):
+    status = request.form.get(
+        "status",
+        "",
+    ).strip()
+
+    try:
+        update_recommendation_action_status(
+            action_id,
+            status,
+            season=2026,
+        )
+    except ValueError:
+        return redirect(
+            url_for(
+                "available_players",
+                status_error="1",
+            )
+        )
+
+    return redirect(
+        url_for(
+            "available_players",
+            status_saved="1",
+        )
     )
 
 
