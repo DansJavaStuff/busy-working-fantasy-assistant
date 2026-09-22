@@ -93,6 +93,137 @@ Available Players · {{ data.team.team_name }}
     {% endif %}
 </div>
 
+{% if data.recommendation_actions %}
+<section class="weekly-section">
+    <h2>
+        Tracked Moves
+    </h2>
+
+    <p class="weekly-card-detail">
+        Recommendations you chose to act on. Resolve them after Yahoo processes
+        the move so we can compare recommendations with real outcomes.
+    </p>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Week</th>
+                <th>Add</th>
+                <th>Drop</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Outcome</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for action in data.recommendation_actions %}
+            <tr>
+                <td>
+                    {{ action.week }}
+                    {% if action.priority %}
+                    <div class="weekly-card-detail">
+                        Claim {{ action.priority }}
+                    </div>
+                    {% endif %}
+                </td>
+
+                <td>
+                    <strong>
+                        {{ action.add_player_name }}
+                    </strong>
+                    {% if action.add_position %}
+                    <div class="weekly-card-detail">
+                        {{ action.add_position }}
+                    </div>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if action.drop_player_name %}
+                    <strong>
+                        {{ action.drop_player_name }}
+                    </strong>
+                    {% if action.drop_position %}
+                    <div class="weekly-card-detail">
+                        {{ action.drop_position }}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {{ action.move_type or action.action_type }}
+                </td>
+
+                <td>
+                    <strong>
+                        {{ action.status | upper }}
+                    </strong>
+                    <div class="weekly-card-detail">
+                        {{ action.submitted_at }}
+                    </div>
+                </td>
+
+                <td>
+                    {% if action.status == "pending" %}
+                    <form
+                        method="post"
+                        action="{{ url_for(
+                            'update_available_action_status',
+                            action_id=action.id
+                        ) }}"
+                        style="display: inline;"
+                    >
+                        <button
+                            type="submit"
+                            name="status"
+                            value="succeeded"
+                            class="secondary-button"
+                        >
+                            Succeeded
+                        </button>
+
+                        <button
+                            type="submit"
+                            name="status"
+                            value="failed"
+                            class="secondary-button"
+                        >
+                            Failed
+                        </button>
+
+                        <button
+                            type="submit"
+                            name="status"
+                            value="superseded"
+                            class="secondary-button"
+                        >
+                            Superseded
+                        </button>
+
+                        <button
+                            type="submit"
+                            name="status"
+                            value="cancelled"
+                            class="secondary-button"
+                        >
+                            Cancelled
+                        </button>
+                    </form>
+                    {% else %}
+                        {{ action.resolved_at or "—" }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
 <section class="weekly-section">
     <h2>
         Available Players Shortlist
