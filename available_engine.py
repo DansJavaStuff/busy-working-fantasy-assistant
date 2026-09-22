@@ -851,8 +851,52 @@ def build_available_rankings(
             }
         )
 
+    waiver_queue = []
+
+    for item in ranked:
+        roster_status = str(
+            item["player"].get(
+                "roster_status",
+                "",
+            )
+            or ""
+        ).upper()
+
+        if not roster_status.startswith(
+            "W"
+        ):
+            continue
+
+        if not item.get(
+            "best_drop"
+        ):
+            continue
+
+        waiver_queue.append(
+            {
+                "priority":
+                    len(waiver_queue) + 1,
+                "rank":
+                    item["rank"],
+                "add":
+                    item["player"],
+                "drop":
+                    item["best_drop"],
+                "call":
+                    item["move_label"],
+                "move_type":
+                    item["move_type"],
+                "score":
+                    item["score"],
+                "reasons":
+                    item["reasons"],
+            }
+        )
+
     data = {
         "rankings": ranked,
+        "waiver_queue":
+            waiver_queue,
         "provider_status":
             provider_status,
         "sleeper_error":
