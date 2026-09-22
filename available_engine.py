@@ -33,10 +33,10 @@ REPLACEMENT_RANK = {
 }
 
 
-def next_week_projection(player, week):
+def target_week_projection(player, week):
     value = (
         player.get("weeks", {})
-        .get(str(int(week) + 1), {})
+        .get(str(int(week)), {})
         .get("projection")
     )
 
@@ -95,7 +95,7 @@ def _position_baselines(
 
         next_values = sorted(
             (
-                next_week_projection(
+                target_week_projection(
                     player,
                     week,
                 )
@@ -420,7 +420,7 @@ def build_available_rankings(
     candidates = []
 
     for player in available:
-        next_week = next_week_projection(
+        next_week = target_week_projection(
             player,
             week,
         )
@@ -494,7 +494,7 @@ def build_available_rankings(
         candidates.append(
             {
                 "player": player,
-                "next_week_projection":
+                "target_week_projection":
                     next_week,
                 "four_week_average":
                     four_week,
@@ -538,7 +538,7 @@ def build_available_rankings(
         sleeper_results = (
             sleeper_fetch(
                 sleeper_targets,
-                week=int(week) + 1,
+                week=int(week),
                 season=season,
             )
             if sleeper_targets
@@ -576,14 +576,14 @@ def build_available_rankings(
         if sleeper_projection is None:
             consensus_next_week = (
                 item[
-                    "next_week_projection"
+                    "target_week_projection"
                 ]
             )
         else:
             consensus_next_week = (
                 (
                     item[
-                        "next_week_projection"
+                        "target_week_projection"
                     ]
                     + float(
                         sleeper_projection
@@ -696,7 +696,7 @@ def build_available_rankings(
                     sleeper_projection
                 )
                 - item[
-                    "next_week_projection"
+                    "target_week_projection"
                 ]
             )
 
@@ -860,7 +860,7 @@ def build_available_rankings(
         "week":
             int(week),
         "target_week":
-            int(week) + 1,
+            int(week),
 
         "waiver_priority":
             waiver_priority,
