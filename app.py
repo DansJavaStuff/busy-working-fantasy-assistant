@@ -512,9 +512,38 @@ def available_rankings():
         )
     )
 
+    pending_actions = [
+        action
+        for action in list_recommendation_actions(
+            season,
+            limit=50,
+        )
+        if action["status"] == "pending"
+    ]
+
+    tracked_keys = {
+        (
+            str(
+                action.get(
+                    "add_player_id"
+                )
+                or ""
+            )
+            + "::"
+            + str(
+                action.get(
+                    "drop_player_id"
+                )
+                or ""
+            )
+        )
+        for action in pending_actions
+    }
+
     return render_template(
         "_available_rankings.html",
         available=available_data,
+        tracked_keys=tracked_keys,
     )
 
 
