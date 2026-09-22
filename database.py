@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -206,6 +206,52 @@ def initialise_database():
                     season_id,
                     player_id
                 ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS recommendation_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                action_type TEXT NOT NULL
+                    DEFAULT 'waiver_claim',
+
+                priority INTEGER,
+
+                add_player_id TEXT,
+                add_player_name TEXT NOT NULL,
+                add_position TEXT,
+
+                drop_player_id TEXT,
+                drop_player_name TEXT,
+                drop_position TEXT,
+
+                recommendation_label TEXT,
+                move_type TEXT,
+                recommendation_rank INTEGER,
+
+                status TEXT NOT NULL
+                    DEFAULT 'pending'
+                    CHECK (
+                        status IN (
+                            'pending',
+                            'succeeded',
+                            'failed',
+                            'superseded',
+                            'cancelled'
+                        )
+                    ),
+
+                notes TEXT,
+
+                submitted_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                resolved_at TEXT,
 
                 FOREIGN KEY (season_id)
                     REFERENCES seasons(id)
@@ -747,6 +793,197 @@ def save_waiver_priority(
         )
 
     return value
+
+
+def record_recommendation_action(
+    week,
+    add_player_name,
+    drop_player_name=None,
+    season=None,
+    action_type="waiver_claim",
+    priority=None,
+    add_player_id=None,
+    add_position=None,
+    drop_player_id=None,
+    drop_position=None,
+    recommendation_label=None,
+    move_type=None,
+    recommendation_rank=None,
+    notes=None,
+):
+    """Record a recommendation the user chose to act on."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        cursor = db.execute(
+            """
+            INSERT INTO recommendation_actions (
+                season_id,
+                week,
+                action_type,
+                priority,
+                add_player_id,
+                add_player_name,
+                add_position,
+                drop_player_id,
+                drop_player_name,
+                drop_position,
+                recommendation_label,
+                move_type,
+                recommendation_rank,
+                notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                season_id,
+                int(week),
+                str(action_type),
+                (
+                    int(priority)
+                    if priority is not None
+                    else None
+                ),
+                (
+                    str(add_player_id)
+                    if add_player_id
+                    else None
+                ),
+                str(add_player_name),
+                add_position,
+                (
+                    str(drop_player_id)
+                    if drop_player_id
+                    else None
+                ),
+                drop_player_name,
+                drop_position,
+                recommendation_label,
+                move_type,
+                (
+                    int(recommendation_rank)
+                    if recommendation_rank
+                    is not None
+                    else None
+                ),
+                notes,
+            ),
+        )
+
+        return cursor.lastrowid
+
+
+def list_recommendation_actions(
+    season=None,
+    limit=25,
+):
+    """Return newest recorded recommendation actions."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                id,
+                week,
+                action_type,
+                priority,
+                add_player_id,
+                add_player_name,
+                add_position,
+                drop_player_id,
+                drop_player_name,
+                drop_position,
+                recommendation_label,
+                move_type,
+                recommendation_rank,
+                status,
+                notes,
+                submitted_at,
+                resolved_at
+            FROM recommendation_actions
+            WHERE season_id = ?
+            ORDER BY
+                CASE status
+                    WHEN 'pending' THEN 0
+                    ELSE 1
+                END,
+                submitted_at DESC,
+                id DESC
+            LIMIT ?
+            """,
+            (
+                season_id,
+                int(limit),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def update_recommendation_action_status(
+    action_id,
+    status,
+    season=None,
+):
+    """Resolve or update a recorded recommendation action."""
+
+    valid = {
+        "pending",
+        "succeeded",
+        "failed",
+        "superseded",
+        "cancelled",
+    }
+
+    if status not in valid:
+        raise ValueError(
+            "Invalid recommendation action status"
+        )
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            UPDATE recommendation_actions
+            SET
+                status = ?,
+                resolved_at = CASE
+                    WHEN ? = 'pending'
+                    THEN NULL
+                    ELSE CURRENT_TIMESTAMP
+                END
+            WHERE id = ?
+              AND season_id = ?
+            """,
+            (
+                status,
+                status,
+                int(action_id),
+                season_id,
+            ),
+        )
 
 
 def load_season_roster(season=None):
