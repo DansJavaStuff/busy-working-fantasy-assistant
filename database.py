@@ -647,6 +647,41 @@ def load_season_league_state(season=None):
             (season_id,),
         ).fetchone()
 
+        requested_season = (
+            int(season)
+            if season is not None
+            else date.today().year
+        )
+
+        if (
+            row is None
+            and requested_season == 2026
+        ):
+            db.execute(
+                """
+                INSERT INTO season_league_state (
+                    season_id,
+                    waiver_priority,
+                    waiver_priority_source,
+                    updated_at
+                )
+                VALUES (?, 11, 'manual', CURRENT_TIMESTAMP)
+                """,
+                (season_id,),
+            )
+
+            row = db.execute(
+                """
+                SELECT
+                    waiver_priority,
+                    waiver_priority_source,
+                    updated_at
+                FROM season_league_state
+                WHERE season_id = ?
+                """,
+                (season_id,),
+            ).fetchone()
+
     if row is None:
         return {
             "waiver_priority": None,
