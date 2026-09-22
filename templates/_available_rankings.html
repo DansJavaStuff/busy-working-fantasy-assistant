@@ -19,6 +19,7 @@
                 <th>Drop</th>
                 <th>Type</th>
                 <th>Why</th>
+                <th>Track</th>
             </tr>
         </thead>
 
@@ -65,6 +66,31 @@
                     {% else %}
                         Ranked #{{ claim.rank }} overall.
                     {% endif %}
+                </td>
+
+                <td>
+                    <form
+                        method="post"
+                        action="{{ url_for('track_available_recommendation') }}"
+                    >
+                        <input type="hidden" name="action_type" value="waiver_claim">
+                        <input type="hidden" name="priority" value="{{ claim.priority }}">
+                        <input type="hidden" name="recommendation_rank" value="{{ claim.rank }}">
+                        <input type="hidden" name="add_player_id" value="{{ claim.add.yahoo_player_id }}">
+                        <input type="hidden" name="add_player_name" value="{{ claim.add.name }}">
+                        <input type="hidden" name="add_position" value="{{ claim.add.position }}">
+                        <input type="hidden" name="drop_player_id" value="{{ claim.drop.yahoo_player_id }}">
+                        <input type="hidden" name="drop_player_name" value="{{ claim.drop.name }}">
+                        <input type="hidden" name="drop_position" value="{{ claim.drop.position }}">
+                        <input type="hidden" name="recommendation_label" value="{{ claim.call }}">
+                        <input type="hidden" name="move_type" value="{{ claim.move_type }}">
+                        <button
+                            type="submit"
+                            class="secondary-button"
+                        >
+                            Record submitted
+                        </button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
@@ -189,6 +215,35 @@
                 <div class="weekly-card-detail">
                     {{ item.move_type }}
                 </div>
+
+                {% if item.best_drop %}
+                <form
+                    method="post"
+                    action="{{ url_for('track_available_recommendation') }}"
+                    style="margin-top: 8px;"
+                >
+                    <input
+                        type="hidden"
+                        name="action_type"
+                        value="{% if (item.player.roster_status or '')|upper|first == 'W' %}waiver_claim{% else %}free_agent_add{% endif %}"
+                    >
+                    <input type="hidden" name="recommendation_rank" value="{{ item.rank }}">
+                    <input type="hidden" name="add_player_id" value="{{ item.player.yahoo_player_id }}">
+                    <input type="hidden" name="add_player_name" value="{{ item.player.name }}">
+                    <input type="hidden" name="add_position" value="{{ item.player.position }}">
+                    <input type="hidden" name="drop_player_id" value="{{ item.best_drop.yahoo_player_id }}">
+                    <input type="hidden" name="drop_player_name" value="{{ item.best_drop.name }}">
+                    <input type="hidden" name="drop_position" value="{{ item.best_drop.position }}">
+                    <input type="hidden" name="recommendation_label" value="{{ item.move_label }}">
+                    <input type="hidden" name="move_type" value="{{ item.move_type }}">
+                    <button
+                        type="submit"
+                        class="secondary-button"
+                    >
+                        Record submitted
+                    </button>
+                </form>
+                {% endif %}
             </td>
         </tr>
         {% endfor %}
