@@ -220,6 +220,32 @@ Manual snapshot
                     {% endif %}
                     · {{ item.matchup }}
                 </span>
+
+                {% if item.best_alternative %}
+                <span>
+                    Best bench alternative:
+                    {{ item.best_alternative.name }}
+                    ({{
+                        "%.2f"
+                        | format(
+                            item.best_alternative
+                            .current_week_projection
+                            or 0
+                        )
+                    }})
+                    · edge
+                    {{
+                        "%+.2f"
+                        | format(
+                            item.projection_edge
+                        )
+                    }}
+                </span>
+                {% else %}
+                <span>
+                    No eligible bench alternative.
+                </span>
+                {% endif %}
             </div>
 
             <div class="next-decision-proj">
@@ -234,13 +260,19 @@ Manual snapshot
             </div>
 
             <div>
+                <span class="
+                    {% if item.decision_call in ['REVIEW', 'CLOSE'] %}
+                        status-warning
+                    {% else %}
+                        status-clear
+                    {% endif %}
+                ">
+                    {{ item.decision_call }}
+                </span>
+
                 {% if item.player.status %}
                 <span class="status-warning">
                     {{ item.player.status }}
-                </span>
-                {% else %}
-                <span class="status-clear">
-                    Clear
                 </span>
                 {% endif %}
             </div>
@@ -249,11 +281,17 @@ Manual snapshot
     </div>
 
     {% if
-        data.weekly.next_decision.concern_count == 0
+        data.weekly.next_decision.review_count == 0
     %}
     <div class="next-decision-note">
-        No current status concerns for players
-        locking at this time.
+        No close start/sit calls or current status concerns
+        for players locking at this time.
+    </div>
+    {% else %}
+    <div class="next-decision-note">
+        {{ data.weekly.next_decision.review_count }}
+        decision{% if data.weekly.next_decision.review_count != 1 %}s{% endif %}
+        worth reviewing before this lock.
     </div>
     {% endif %}
 </section>
