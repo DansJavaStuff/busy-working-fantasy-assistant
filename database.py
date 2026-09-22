@@ -821,6 +821,39 @@ def record_recommendation_action(
             season,
         )
 
+        existing = db.execute(
+            """
+            SELECT id
+            FROM recommendation_actions
+            WHERE season_id = ?
+              AND week = ?
+              AND action_type = ?
+              AND COALESCE(add_player_id, '') = COALESCE(?, '')
+              AND COALESCE(drop_player_id, '') = COALESCE(?, '')
+              AND status = 'pending'
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (
+                season_id,
+                int(week),
+                str(action_type),
+                (
+                    str(add_player_id)
+                    if add_player_id
+                    else None
+                ),
+                (
+                    str(drop_player_id)
+                    if drop_player_id
+                    else None
+                ),
+            ),
+        ).fetchone()
+
+        if existing is not None:
+            return existing["id"]
+
         cursor = db.execute(
             """
             INSERT INTO recommendation_actions (
@@ -920,8 +953,18 @@ def list_recommendation_actions(
                     WHEN 'pending' THEN 0
                     ELSE 1
                 END,
-                submitted_at DESC,
-                id DESC
+                CASE
+                    WHEN status = 'pending'
+                    THEN submitted_at
+                END ASC,
+                CASE
+                    WHEN status != 'pending'
+                    THEN COALESCE(
+                        resolved_at,
+                        submitted_at
+                    )
+                END DESC,
+                id ASC
             LIMIT ?
             """,
             (
