@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -154,6 +154,26 @@ def initialise_database():
                     ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS season_league_state (
+                season_id INTEGER PRIMARY KEY,
+
+                waiver_priority INTEGER
+                    CHECK (
+                        waiver_priority IS NULL
+                        OR waiver_priority >= 1
+                    ),
+
+                waiver_priority_source TEXT NOT NULL
+                    DEFAULT 'manual',
+
+                updated_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS season_roster (
                 season_id INTEGER NOT NULL,
 
@@ -261,6 +281,31 @@ def initialise_database():
                 )
             );
             """
+        )
+
+        # Seed the known current 2026 waiver position once. Future
+        # seasons start unset and can be maintained manually until the
+        # Yahoo API can supply this league state directly.
+        db.execute(
+            """
+            INSERT INTO season_league_state (
+                season_id,
+                waiver_priority,
+                waiver_priority_source
+            )
+            SELECT
+                s.id,
+                11,
+                'manual'
+            FROM seasons s
+            JOIN leagues l
+              ON l.id = s.league_id
+            WHERE l.league_key = ?
+              AND s.season = 2026
+            ON CONFLICT(season_id)
+            DO NOTHING
+            """,
+            (CURRENT_LEAGUE_KEY,),
         )
 
         db.execute(
@@ -575,6 +620,98 @@ def save_team_identity(
                 accent_colour,
             ),
         )
+
+
+
+
+def load_season_league_state(season=None):
+    """Return mutable in-season league state for a Busy Working season."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        row = db.execute(
+            """
+            SELECT
+                waiver_priority,
+                waiver_priority_source,
+                updated_at
+            FROM season_league_state
+            WHERE season_id = ?
+            """,
+            (season_id,),
+        ).fetchone()
+
+    if row is None:
+        return {
+            "waiver_priority": None,
+            "waiver_priority_source": "manual",
+            "updated_at": None,
+        }
+
+    return dict(row)
+
+
+def save_waiver_priority(
+    waiver_priority,
+    season=None,
+    source="manual",
+):
+    """Persist the current waiver priority for a season."""
+
+    initialise_database()
+
+    if waiver_priority in {
+        None,
+        "",
+    }:
+        value = None
+    else:
+        value = int(
+            waiver_priority
+        )
+
+        if value < 1:
+            raise ValueError(
+                "Waiver priority must be 1 or higher"
+            )
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            INSERT INTO season_league_state (
+                season_id,
+                waiver_priority,
+                waiver_priority_source,
+                updated_at
+            )
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(season_id)
+            DO UPDATE SET
+                waiver_priority =
+                    excluded.waiver_priority,
+                waiver_priority_source =
+                    excluded.waiver_priority_source,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                season_id,
+                value,
+                str(source or "manual"),
+            ),
+        )
+
+    return value
 
 
 def load_season_roster(season=None):
