@@ -551,6 +551,7 @@ Manual snapshot
     <table class="weekly-table">
         <thead>
             <tr>
+                <th>Role</th>
                 <th>Slot</th>
                 <th>Player</th>
                 <th>Status</th>
@@ -561,6 +562,12 @@ Manual snapshot
         <tbody>
             {% for item in data.weekly.status_watch %}
             <tr>
+                <td>
+                    <strong>
+                        {{ item.role }}
+                    </strong>
+                </td>
+
                 <td>
                     {{ item.slot }}
                 </td>
