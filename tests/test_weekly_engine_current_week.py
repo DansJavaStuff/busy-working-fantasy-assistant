@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import weekly_engine
 from weekly_engine import (
+    build_status_watch,
     cached_start_sit_evidence,
     has_played,
     projection,
@@ -36,6 +37,51 @@ class WeeklyEngineCurrentWeekTests(TestCase):
 
         self.assertTrue(
             has_played(player)
+        )
+
+    def test_status_watch_includes_starter_and_bench_concerns(self):
+        starter = {
+            "yahoo_player_id": "1",
+            "name": "Starter",
+            "position": "WR",
+            "status": "Q",
+            "roster_slot": "WR",
+        }
+
+        bench = {
+            "yahoo_player_id": "2",
+            "name": "Bench",
+            "position": "WR",
+            "status": "O",
+            "roster_slot": "BN",
+        }
+
+        ir = {
+            "yahoo_player_id": "3",
+            "name": "IR Player",
+            "position": "WR",
+            "status": "IR",
+            "roster_slot": "IR",
+        }
+
+        watch = build_status_watch(
+            [starter, bench, ir],
+            [
+                {
+                    "slot": "WR",
+                    "player": starter,
+                }
+            ],
+        )
+
+        self.assertEqual(
+            [item["role"] for item in watch],
+            ["STARTER", "BENCH"],
+        )
+
+        self.assertEqual(
+            [item["player"]["name"] for item in watch],
+            ["Starter", "Bench"],
         )
 
     def test_start_sit_evidence_is_cached_for_same_snapshot(self):
