@@ -7,7 +7,7 @@ from available_engine import (
     _position_baselines,
     _position_value,
     build_available_rankings,
-    next_week_projection,
+    target_week_projection,
 )
 
 
@@ -20,7 +20,7 @@ class AvailableEngineTests(TestCase):
             "data"
         ] = None
 
-    def test_next_week_projection_reads_weeks_model(self):
+    def test_target_week_projection_reads_weeks_model(self):
         player = {
             "weeks": {
                 "3": {
@@ -30,9 +30,9 @@ class AvailableEngineTests(TestCase):
         }
 
         self.assertEqual(
-            next_week_projection(
+            target_week_projection(
                 player,
-                2,
+                3,
             ),
             12.5,
         )
@@ -74,7 +74,7 @@ class AvailableEngineTests(TestCase):
         baselines = (
             _position_baselines(
                 players,
-                2,
+                3,
             )
         )
 
