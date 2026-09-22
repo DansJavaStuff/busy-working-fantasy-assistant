@@ -1376,6 +1376,36 @@ def move_type(
     return "ROSTER MOVE"
 
 
+def protects_core_starter(
+    drop_player,
+    result,
+):
+    """Avoid recommending a depth move that sacrifices a current skill starter."""
+
+    if (
+        drop_player.get("position")
+        not in {"QB", "RB", "WR", "TE"}
+    ):
+        return False
+
+    if (
+        drop_player.get("roster_slot")
+        in {"BN", "IR", None, ""}
+    ):
+        return False
+
+    # A starter can still be replaced when the transaction genuinely improves
+    # the starting lineup or the four-week starting outlook.  What we reject
+    # is sacrificing a starter merely to gain a little bench/depth value.
+    return (
+        result.get("week_gain", 0.0) < 0.75
+        and result.get(
+            "four_week_gain",
+            0.0,
+        ) < 0.75
+    )
+
+
 def build_transaction_recommendations(
     roster,
     available,
@@ -1486,6 +1516,12 @@ def build_transaction_recommendations(
                     "bye_score_adjustment"
                 ]
             )
+
+            if protects_core_starter(
+                drop_player,
+                result,
+            ):
+                continue
 
             if result["score"] <= 0.10:
                 continue
