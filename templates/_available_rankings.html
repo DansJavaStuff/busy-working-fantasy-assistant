@@ -1,3 +1,77 @@
+{% if available.waiver_queue %}
+<section class="waiver-queue">
+    <h3>
+        Waiver Queue
+    </h3>
+
+    <p class="weekly-card-detail">
+        Submit these claims in this order. If an earlier player is gone when
+        your waiver position is processed, Yahoo can move on to the next claim.
+        Current waiver priority: #{{ available.waiver_priority or "—" }}.
+    </p>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Priority</th>
+                <th>Add</th>
+                <th>Drop</th>
+                <th>Type</th>
+                <th>Why</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for claim in available.waiver_queue %}
+            <tr>
+                <td>
+                    <strong>
+                        {{ claim.priority }}
+                    </strong>
+                </td>
+
+                <td>
+                    <strong>
+                        {{ claim.add.name }}
+                    </strong>
+                    <div class="weekly-card-detail">
+                        {{ claim.add.position }}
+                        · {{ claim.add.team }}
+                    </div>
+                </td>
+
+                <td>
+                    <strong>
+                        {{ claim.drop.name }}
+                    </strong>
+                    <div class="weekly-card-detail">
+                        {{ claim.drop.position }}
+                    </div>
+                </td>
+
+                <td>
+                    <span class="transaction-label">
+                        {{ claim.call }}
+                    </span>
+                    <div class="weekly-card-detail">
+                        {{ claim.move_type }}
+                    </div>
+                </td>
+
+                <td>
+                    {% if claim.reasons %}
+                        {{ claim.reasons[0] }}
+                    {% else %}
+                        Ranked #{{ claim.rank }} overall.
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
 {% if available.sleeper_error %}
 <p class="weekly-card-detail">
     Sleeper was unavailable for this refresh, so the ranking is using
