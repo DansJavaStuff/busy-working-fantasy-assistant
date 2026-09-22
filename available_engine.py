@@ -1,4 +1,7 @@
-from database import load_season_roster
+from database import (
+    load_season_league_state,
+    load_season_roster,
+)
 from sleeper_compare import compare_players
 from transaction_engine import (
     build_transaction_recommendations,
@@ -175,6 +178,18 @@ def build_available_rankings(
         local_roster
     )
 
+    league_state = (
+        load_season_league_state(
+            season
+        )
+    )
+
+    waiver_priority = (
+        league_state.get(
+            "waiver_priority"
+        )
+    )
+
     available = (
         get_effective_available_players(
             local_roster
@@ -208,6 +223,7 @@ def build_available_rankings(
             )
         ),
         int(limit),
+        waiver_priority,
     )
 
     if (
@@ -230,6 +246,7 @@ def build_available_rankings(
             available,
             limit=40,
             current_week=week,
+            waiver_priority=waiver_priority,
         )
     )
 
@@ -638,6 +655,9 @@ def build_available_rankings(
             int(week),
         "target_week":
             int(week) + 1,
+
+        "waiver_priority":
+            waiver_priority,
     }
 
     _AVAILABLE_CACHE[
