@@ -365,6 +365,82 @@ def slot_accepts_position(
     return slot == position
 
 
+def build_status_watch(
+    roster,
+    lineup,
+):
+    starter_slots = {
+        item["player"][
+            "yahoo_player_id"
+        ]: item["slot"]
+        for item in lineup
+    }
+
+    watch = []
+
+    for player in roster:
+        status = player.get(
+            "status"
+        )
+
+        if (
+            not status
+            or player.get(
+                "roster_slot"
+            ) == "IR"
+        ):
+            continue
+
+        player_id = player.get(
+            "yahoo_player_id"
+        )
+
+        if player_id in starter_slots:
+            role = "STARTER"
+            slot = starter_slots[
+                player_id
+            ]
+        else:
+            role = "BENCH"
+            slot = (
+                player.get(
+                    "roster_slot"
+                )
+                or "BN"
+            )
+
+        watch.append(
+            {
+                "role": role,
+                "slot": slot,
+                "player": player,
+            }
+        )
+
+    role_order = {
+        "STARTER": 0,
+        "BENCH": 1,
+    }
+
+    watch.sort(
+        key=lambda item: (
+            role_order.get(
+                item["role"],
+                9,
+            ),
+            game_sort_key(
+                item["player"]
+            ),
+            item["player"].get(
+                "name",
+                "",
+            ),
+        )
+    )
+
+    return watch
+
+
 def build_lock_alternatives(
     starter_item,
     bench,
@@ -1142,13 +1218,12 @@ def build_weekly_data(
         )
     )
 
-    status_watch = [
-        item
-        for item in lineup
-        if item["player"].get(
-            "status"
+    status_watch = (
+        build_status_watch(
+            roster,
+            lineup,
         )
-    ]
+    )
 
     ir_review = [
         player
