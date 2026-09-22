@@ -27,9 +27,11 @@ from database import (
     CURRENT_LEAGUE_NAME,
     list_seasons,
     load_current_draft_order,
+    load_season_league_state,
     load_season_roster,
     load_team_identity,
     save_current_draft_order,
+    save_waiver_priority,
 )
 from data_status import get_data_status
 from fantasypros import get_api_usage
@@ -170,6 +172,11 @@ def settings_page():
         },
         "draft_order":
             load_current_draft_order(),
+
+        "league_state":
+            load_season_league_state(
+                state["season"]
+            ),
         "seasons":
             list_seasons(),
         "player_data":
@@ -187,6 +194,41 @@ def settings_page():
         data=data,
     )
       
+@app.post("/settings/waiver-priority")
+def update_waiver_priority():
+    state = load_state()
+
+    waiver_priority = request.form.get(
+        "waiver_priority",
+        type=int,
+    )
+
+    if (
+        waiver_priority is None
+        or waiver_priority < 1
+        or waiver_priority > state["teams"]
+    ):
+        return redirect(
+            url_for(
+                "settings_page",
+                waiver_error="1",
+            )
+        )
+
+    save_waiver_priority(
+        waiver_priority,
+        season=state["season"],
+        source="manual",
+    )
+
+    return redirect(
+        url_for(
+            "settings_page",
+            waiver_saved="1",
+        )
+    )
+
+
 @app.post("/draft/<string:player_id>")
 def make_pick(player_id):
     state = load_state()
