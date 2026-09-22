@@ -12,6 +12,7 @@
             <th>Player</th>
             <th>Pos</th>
             <th>Team</th>
+            <th>Status</th>
             <th>Yahoo W{{ available.target_week }}</th>
             <th>Sleeper W{{ available.target_week }}</th>
             <th>4-week avg</th>
@@ -38,6 +39,10 @@
 
             <td>{{ item.player.position }}</td>
             <td>{{ item.player.team }}</td>
+
+            <td>
+                {{ item.player.roster_status or "FA" }}
+            </td>
 
             <td class="weekly-projection">
                 {{
