@@ -378,7 +378,7 @@ def available_players():
         "week":
             week,
         "target_week":
-            week + 1,
+            week,
         "yahoo_status":
             get_yahoo_provider_status(),
     }
