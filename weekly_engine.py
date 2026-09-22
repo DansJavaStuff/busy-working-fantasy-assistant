@@ -340,6 +340,75 @@ def best_players(
     return selected
 
 
+def slot_accepts_position(
+    slot,
+    position,
+):
+    slot = (
+        "DST"
+        if slot in {"DEF", "DST"}
+        else slot
+    )
+
+    position = (
+        "DST"
+        if position in {"DEF", "DST"}
+        else position
+    )
+
+    if slot == "FLEX":
+        return (
+            position
+            in FLEX_POSITIONS
+        )
+
+    return slot == position
+
+
+def build_lock_alternatives(
+    starter_item,
+    bench,
+):
+    slot = starter_item[
+        "role"
+    ]
+
+    starter = starter_item[
+        "player"
+    ]
+
+    alternatives = [
+        player
+        for player in bench
+        if (
+            not has_played(player)
+            and is_available_to_play(
+                player
+            )
+            and slot_accepts_position(
+                slot,
+                player.get(
+                    "position"
+                ),
+            )
+            and player.get(
+                "yahoo_player_id"
+            )
+            != starter.get(
+                "yahoo_player_id"
+            )
+        )
+    ]
+
+    alternatives.sort(
+        key=lambda player:
+            projection(player),
+        reverse=True,
+    )
+
+    return alternatives[:3]
+
+
 def has_played(player):
     return (
         player.get("current_week_actual")
@@ -1158,11 +1227,70 @@ def build_weekly_data(
     next_decision = None
 
     if first_lock:
-        starters = [
+        raw_starters = [
             item
             for item in first_lock["players"]
             if item["role"] != "BENCH"
         ]
+
+        starters = []
+
+        for item in raw_starters:
+            alternatives = (
+                build_lock_alternatives(
+                    item,
+                    bench,
+                )
+            )
+
+            best_alternative = (
+                alternatives[0]
+                if alternatives
+                else None
+            )
+
+            edge = None
+
+            if best_alternative:
+                edge = (
+                    projection(
+                        item["player"]
+                    )
+                    - projection(
+                        best_alternative
+                    )
+                )
+
+            if item[
+                "player"
+            ].get("status"):
+                decision_call = "REVIEW"
+            elif (
+                edge is not None
+                and edge <= 1.5
+            ):
+                decision_call = "CLOSE"
+            elif (
+                edge is not None
+                and edge <= 3.0
+            ):
+                decision_call = "LEAN START"
+            else:
+                decision_call = "START"
+
+            starters.append(
+                {
+                    **item,
+                    "alternatives":
+                        alternatives,
+                    "best_alternative":
+                        best_alternative,
+                    "projection_edge":
+                        edge,
+                    "decision_call":
+                        decision_call,
+                }
+            )
 
         bench_players = [
             item
@@ -1184,6 +1312,19 @@ def build_weekly_data(
             "starter_count": len(starters),
             "bench_count": len(bench_players),
             "concern_count": len(concerns),
+            "review_count": len(
+                [
+                    item
+                    for item in starters
+                    if item[
+                        "decision_call"
+                    ]
+                    in {
+                        "REVIEW",
+                        "CLOSE",
+                    }
+                ]
+            ),
         }
 
     return {
