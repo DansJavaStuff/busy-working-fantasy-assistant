@@ -225,7 +225,7 @@
                     <input
                         type="hidden"
                         name="action_type"
-                        value="{% if (item.player.roster_status or '')|upper|first == 'W' %}waiver_claim{% else %}free_agent_add{% endif %}"
+                        value="{% if item.player.roster_status and item.player.roster_status[0]|upper == 'W' %}waiver_claim{% else %}free_agent_add{% endif %}"
                     >
                     <input type="hidden" name="recommendation_rank" value="{{ item.rank }}">
                     <input type="hidden" name="add_player_id" value="{{ item.player.yahoo_player_id }}">
