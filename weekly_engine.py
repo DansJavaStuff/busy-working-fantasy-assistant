@@ -187,6 +187,7 @@ def cached_transaction_recommendations(
         ),
         roster_key,
         week,
+        waiver_priority,
     )
 
     if (
