@@ -703,17 +703,17 @@ def build_available_rankings(
             if delta >= 1.0:
                 reasons.append(
                     "Sleeper is more optimistic "
-                    "than Yahoo for next week."
+                    "than Yahoo for this week."
                 )
             elif delta <= -1.0:
                 reasons.append(
                     "Sleeper is more cautious "
-                    "than Yahoo for next week."
+                    "than Yahoo for this week."
                 )
             else:
                 reasons.append(
                     "Yahoo and Sleeper are broadly "
-                    "aligned for next week."
+                    "aligned for this week."
                 )
 
         item["reasons"] = reasons
