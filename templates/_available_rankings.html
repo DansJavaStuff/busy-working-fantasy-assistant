@@ -16,6 +16,7 @@
             <th>Yahoo W{{ available.target_week }}</th>
             <th>Sleeper W{{ available.target_week }}</th>
             <th>4-week avg</th>
+            <th>Pos value</th>
             <th>Best drop</th>
             <th>Roster gain</th>
             <th>Call</th>
@@ -71,6 +72,15 @@
                     "%.2f"
                     | format(
                         item.four_week_average
+                    )
+                }}
+            </td>
+
+            <td>
+                {{
+                    "%+.2f"
+                    | format(
+                        item.position_value.value
                     )
                 }}
             </td>
