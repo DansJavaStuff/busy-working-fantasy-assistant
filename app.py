@@ -19,6 +19,7 @@ from draft_engine import (
     undo_last_pick,
     update_settings,
 )
+from matchup_context import refresh_matchup_cache
 from player_database import load_players
 from available_engine import (
     build_available_rankings,
@@ -1008,6 +1009,26 @@ def refresh_yahoo_data():
             )
 
         yahoo_provider.refresh()
+
+        try:
+            matchup_result = (
+                refresh_matchup_cache(
+                    current_fantasy_week(
+                        2026
+                    ),
+                    season=2026,
+                )
+            )
+
+            app.logger.info(
+                "Sleeper matchup cache: %s",
+                matchup_result,
+            )
+        except Exception:
+            app.logger.exception(
+                "Sleeper matchup refresh failed; "
+                "continuing with cached context."
+            )
 
         return redirect(
             url_for(
