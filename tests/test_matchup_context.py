@@ -79,6 +79,10 @@ class MatchupContextTests(TestCase):
             "FAVOURABLE",
         )
         self.assertEqual(
+            context["display_label"],
+            "EARLY FAVOURABLE",
+        )
+        self.assertEqual(
             context["games"],
             2,
         )
