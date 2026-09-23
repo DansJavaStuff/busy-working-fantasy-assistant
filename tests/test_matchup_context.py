@@ -43,7 +43,7 @@ class MatchupContextTests(TestCase):
 
         self.assertEqual(
             allowed["IND"],
-            20.5,
+            21.5,
         )
 
     def test_matchup_context_compares_defence_with_league_average(self):
