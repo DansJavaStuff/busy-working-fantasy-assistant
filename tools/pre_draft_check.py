@@ -2,10 +2,9 @@ import json
 import sqlite3
 import subprocess
 from pathlib import Path
-from urllib.error import URLError
-from urllib.request import urlopen
-
 from data_status import get_data_status
+import requests
+
 from fantasypros import get_api_usage
 
 
@@ -55,16 +54,14 @@ def check_git():
 
 def check_health():
     try:
-        with urlopen(
+        response = requests.get(
             HEALTH_URL,
             timeout=5,
-        ) as response:
-            body = json.loads(
-                response.read().decode("utf-8")
-            )
+        )
+        body = response.json()
 
         ok = (
-            response.status == 200
+            response.status_code == 200
             and body.get("status") == "ok"
         )
 
@@ -78,7 +75,7 @@ def check_health():
         }
 
     except (
-        URLError,
+        requests.RequestException,
         OSError,
         json.JSONDecodeError,
     ) as exc:
