@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from database import (
+    CURRENT_LEAGUE_KEY,
     active_draft_session,
     backup_database,
     connect,
