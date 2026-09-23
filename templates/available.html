@@ -163,7 +163,7 @@ Available Players · {{ data.team.team_name }}
                         {{ action.status | upper }}
                     </strong>
                     <div class="weekly-card-detail">
-                        {{ action.submitted_at }}
+                        {{ action.submitted_at | local_datetime }}
                     </div>
                 </td>
 
@@ -214,7 +214,7 @@ Available Players · {{ data.team.team_name }}
                         </button>
                     </form>
                     {% else %}
-                        {{ action.resolved_at or "—" }}
+                        {{ action.resolved_at | local_datetime }}
                     {% endif %}
                 </td>
             </tr>
