@@ -1,5 +1,7 @@
 from flask import Flask, redirect, render_template, request, url_for
 from pathlib import Path
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import subprocess
 import sys
 from draft_engine import (
@@ -59,6 +61,45 @@ from yahoo_provider import (
 )
 
 app = Flask(__name__)
+
+UK_TIME = ZoneInfo(
+    "Europe/London"
+)
+
+
+@app.template_filter("local_datetime")
+def local_datetime(value):
+    """Render a stored UTC SQLite timestamp in UK local time."""
+
+    if not value:
+        return "—"
+
+    if isinstance(
+        value,
+        datetime,
+    ):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(
+                str(value)
+            )
+        except ValueError:
+            return str(value)
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(
+            tzinfo=timezone.utc
+        )
+
+    local = parsed.astimezone(
+        UK_TIME
+    )
+
+    return local.strftime(
+        "%d %b %Y · %H:%M:%S %Z"
+    )
+
 
 @app.route("/")
 def dashboard():
