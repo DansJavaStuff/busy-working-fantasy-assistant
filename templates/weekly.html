@@ -402,6 +402,7 @@ Manual snapshot
                 <th>Sit</th>
                 <th>Yahoo Edge</th>
                 <th>Sleeper Edge</th>
+                <th>Matchup Context</th>
                 <th>Evidence</th>
             </tr>
         </thead>
@@ -440,6 +441,46 @@ Manual snapshot
                     }}
                     {% else %}
                     —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if item.matchup.start %}
+                    <div>
+                        <strong>
+                            {{ item.start.name }}:
+                            {{ item.matchup.start.label }}
+                        </strong>
+                        vs {{ item.matchup.start.opponent }}
+                        · {{
+                            "%+.0f%%"
+                            | format(
+                                item.matchup.start.delta_pct
+                            )
+                        }}
+                        · {{ item.matchup.start.games }}
+                        game{% if item.matchup.start.games != 1 %}s{% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if item.matchup.sit %}
+                    <div class="weekly-card-detail">
+                        {{ item.sit.name }}:
+                        {{ item.matchup.sit.label }}
+                        vs {{ item.matchup.sit.opponent }}
+                        · {{
+                            "%+.0f%%"
+                            | format(
+                                item.matchup.sit.delta_pct
+                            )
+                        }}
+                        · {{ item.matchup.sit.games }}
+                        game{% if item.matchup.sit.games != 1 %}s{% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if not item.matchup.start and not item.matchup.sit %}
+                        —
                     {% endif %}
                 </td>
 
