@@ -1,3 +1,7 @@
+from matchup_context import (
+    load_cache as load_matchup_cache,
+    matchup_context,
+)
 from sleeper_compare import compare_players
 from weekly_decisions import (
     build_start_sit_decisions,
@@ -109,6 +113,7 @@ def build_start_sit_evidence(
         sleeper_error = str(exc)
 
     sleeper = _sleeper_index(sleeper_results)
+    matchup_cache = load_matchup_cache()
     output = []
 
     for decision in decisions:
@@ -162,6 +167,17 @@ def build_start_sit_evidence(
             "call": sleeper_call,
             "agreement": agreement,
             "error": sleeper_error,
+        }
+
+        item["matchup"] = {
+            "start": matchup_context(
+                decision["start"],
+                cache=matchup_cache,
+            ),
+            "sit": matchup_context(
+                decision["sit"],
+                cache=matchup_cache,
+            ),
         }
         item["recommendation"] = _recommendation(
             decision,
