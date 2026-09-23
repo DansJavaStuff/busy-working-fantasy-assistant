@@ -16,6 +16,8 @@ if str(PROJECT_ROOT) not in sys.path:
     )
 
 from database import load_season_roster
+from fantasy_calendar import current_fantasy_week
+from roster_manager import replace_roster_player
 
 DATA_DIR = PROJECT_ROOT / "data"
 
@@ -802,6 +804,301 @@ def discover_source_files(
     return discovered
 
 
+def _my_team_page_kind(path):
+    name = path.name
+
+    if name.startswith(
+        f"{MY_TEAM_SOURCE_PREFIX}K_"
+    ):
+        return "K"
+
+    if name.startswith(
+        f"{MY_TEAM_SOURCE_PREFIX}DEF_"
+    ):
+        return "DST"
+
+    return "OFFENSE"
+
+
+def freshest_current_my_team_players(
+    my_team_sources,
+    parse_cache,
+):
+    """Return membership from the freshest current-week My Team pages.
+
+    My Team is small enough to be represented by offense, K and DST pages.
+    When duplicate browser downloads exist, only the newest file for each page
+    kind is authoritative for roster membership.
+    """
+
+    week = current_fantasy_week(
+        SEASON
+    )
+
+    snapshot_name = (
+        f"week_{week}_projection"
+    )
+
+    paths = my_team_sources.get(
+        snapshot_name,
+        [],
+    )
+
+    if not paths:
+        return {}
+
+    newest_by_kind = {}
+
+    for path in paths:
+        kind = _my_team_page_kind(
+            path
+        )
+
+        current = newest_by_kind.get(
+            kind
+        )
+
+        if (
+            current is None
+            or path.stat().st_mtime_ns
+            > current.stat().st_mtime_ns
+        ):
+            newest_by_kind[kind] = path
+
+    players = {}
+
+    for path in newest_by_kind.values():
+        page_players, _ = (
+            parse_page_cached(
+                path,
+                parse_cache,
+            )
+        )
+
+        players.update(
+            page_players
+        )
+
+    return players
+
+
+def _same_roster_player(
+    local_player,
+    yahoo_player,
+):
+    if (
+        local_player.get(
+            "player_name",
+            "",
+        ).lower()
+        == yahoo_player.get(
+            "name",
+            "",
+        ).lower()
+    ):
+        return True
+
+    return (
+        local_player.get(
+            "position"
+        ) in {"DEF", "DST"}
+        and yahoo_player.get(
+            "position"
+        ) == "DST"
+        and local_player.get(
+            "team"
+        )
+        == yahoo_player.get(
+            "team"
+        )
+    )
+
+
+def reconcile_local_roster_from_yahoo(
+    local_roster,
+    yahoo_roster,
+):
+    """Apply unambiguous same-position Yahoo roster changes to SQLite."""
+
+    snapshot_players = list(
+        yahoo_roster.values()
+    )
+
+    if (
+        not snapshot_players
+        or len(snapshot_players)
+        != len(local_roster)
+    ):
+        print(
+            "Roster auto-sync skipped: "
+            "fresh My Team snapshot size "
+            f"{len(snapshot_players)} != local "
+            f"{len(local_roster)}."
+        )
+        return False
+
+    removed = [
+        local
+        for local in local_roster
+        if not any(
+            _same_roster_player(
+                local,
+                yahoo,
+            )
+            for yahoo in snapshot_players
+        )
+    ]
+
+    added = [
+        yahoo
+        for yahoo in snapshot_players
+        if not any(
+            _same_roster_player(
+                local,
+                yahoo,
+            )
+            for local in local_roster
+        )
+    ]
+
+    if not removed and not added:
+        return False
+
+    def normal_position(value):
+        return (
+            "DST"
+            if value in {"DEF", "DST"}
+            else value
+        )
+
+    removed_by_position = {}
+    added_by_position = {}
+
+    for player in removed:
+        removed_by_position.setdefault(
+            normal_position(
+                player.get(
+                    "position"
+                )
+            ),
+            [],
+        ).append(player)
+
+    for player in added:
+        added_by_position.setdefault(
+            normal_position(
+                player.get(
+                    "position"
+                )
+            ),
+            [],
+        ).append(player)
+
+    if (
+        set(removed_by_position)
+        != set(added_by_position)
+        or any(
+            len(
+                removed_by_position[
+                    position
+                ]
+            )
+            != len(
+                added_by_position[
+                    position
+                ]
+            )
+            for position
+            in removed_by_position
+        )
+    ):
+        print(
+            "Roster auto-sync skipped: "
+            "Yahoo/local changes are not an "
+            "unambiguous same-position swap."
+        )
+        return False
+
+    for position in sorted(
+        removed_by_position
+    ):
+        outgoing = sorted(
+            removed_by_position[
+                position
+            ],
+            key=lambda player:
+                player.get(
+                    "player_name",
+                    "",
+                ),
+        )
+
+        incoming = sorted(
+            added_by_position[
+                position
+            ],
+            key=lambda player:
+                player.get(
+                    "name",
+                    "",
+                ),
+        )
+
+        for dropped, added_player in zip(
+            outgoing,
+            incoming,
+        ):
+            local_id = (
+                added_player["name"]
+                .lower()
+                .replace("'", "")
+                .replace(".", "")
+                .replace(" ", "-")
+            )
+
+            replace_roster_player(
+                dropped[
+                    "player_id"
+                ],
+                {
+                    "player_id":
+                        local_id,
+                    "player_name":
+                        added_player[
+                            "name"
+                        ],
+                    "position":
+                        added_player[
+                            "position"
+                        ],
+                    "team":
+                        added_player.get(
+                            "team"
+                        ),
+                    "bye_week":
+                        added_player.get(
+                            "bye_week"
+                        ),
+                    "status":
+                        added_player.get(
+                            "status"
+                        ),
+                    "source":
+                        "yahoo_html_sync",
+                },
+                season=SEASON,
+            )
+
+            print(
+                "Roster auto-sync: "
+                f"{dropped['player_name']} "
+                "-> "
+                f"{added_player['name']}"
+            )
+
+    return True
+
+
 def snapshot_sort_key(
     snapshot_name,
 ):
@@ -1226,6 +1523,27 @@ def main():
             SEASON
         )
     )
+
+    fresh_yahoo_roster = (
+        freshest_current_my_team_players(
+            my_team_sources,
+            parse_cache,
+        )
+        if my_team_sources
+        else {}
+    )
+
+    if fresh_yahoo_roster:
+        reconcile_local_roster_from_yahoo(
+            local_roster,
+            fresh_yahoo_roster,
+        )
+
+        local_roster = (
+            load_season_roster(
+                SEASON
+            )
+        )
 
     local_names = {
         player[
