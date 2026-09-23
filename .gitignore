@@ -50,3 +50,6 @@ data/archive/
 
 data/yahoo_normalized.json
 data/yahoo_html_store.json
+
+# Generated Sleeper matchup cache
+data/sleeper_matchups.json
