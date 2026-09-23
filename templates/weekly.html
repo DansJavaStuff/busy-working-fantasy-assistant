@@ -449,7 +449,7 @@ Manual snapshot
                     <div>
                         <strong>
                             {{ item.start.name }}:
-                            {{ item.matchup.start.label }}
+                            {{ item.matchup.start.display_label }}
                         </strong>
                         vs {{ item.matchup.start.opponent }}
                         · {{
@@ -457,25 +457,23 @@ Manual snapshot
                             | format(
                                 item.matchup.start.delta_pct
                             )
-                        }}
-                        · {{ item.matchup.start.games }}
-                        game{% if item.matchup.start.games != 1 %}s{% endif %}
+                        }} vs league avg
+                        · {{ item.matchup.start.games }}-game sample
                     </div>
                     {% endif %}
 
                     {% if item.matchup.sit %}
                     <div class="weekly-card-detail">
                         {{ item.sit.name }}:
-                        {{ item.matchup.sit.label }}
+                        {{ item.matchup.sit.display_label }}
                         vs {{ item.matchup.sit.opponent }}
                         · {{
                             "%+.0f%%"
                             | format(
                                 item.matchup.sit.delta_pct
                             )
-                        }}
-                        · {{ item.matchup.sit.games }}
-                        game{% if item.matchup.sit.games != 1 %}s{% endif %}
+                        }} vs league avg
+                        · {{ item.matchup.sit.games }}-game sample
                     </div>
                     {% endif %}
 
