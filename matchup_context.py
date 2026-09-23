@@ -386,12 +386,20 @@ def matchup_context(
     else:
         label = "NEUTRAL"
 
+    sample_size = len(
+        opponent_samples
+    )
+
+    display_label = (
+        f"EARLY {label}"
+        if sample_size < 4
+        else label
+    )
+
     return {
         "position": position,
         "opponent": opponent,
-        "games": len(
-            opponent_samples
-        ),
+        "games": sample_size,
         "allowed_average":
             round(
                 opponent_average,
@@ -408,4 +416,6 @@ def matchup_context(
                 1,
             ),
         "label": label,
+        "display_label":
+            display_label,
     }
