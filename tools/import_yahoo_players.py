@@ -42,7 +42,7 @@ PARSE_CACHE_FILE = (
     / "yahoo_html_store.json"
 )
 
-PARSE_CACHE_VERSION = 3
+PARSE_CACHE_VERSION = 4
 
 SEASON = 2026
 MY_TEAM_NAME = "Allen Wrench"
@@ -207,6 +207,7 @@ def _normal_header(value):
         .lower()
         .replace("% rostered", "% ros")
         .replace("% started", "% start")
+        .replace("roster status", "status")
     )
 
     # Yahoo decorates some column labels with icon glyphs from its private
