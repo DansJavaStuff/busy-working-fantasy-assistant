@@ -827,6 +827,106 @@ Manual snapshot
 {% endif %}
 
 
+{% if data.weekly.speculative_waivers %}
+<section class="weekly-section">
+    <h2>
+        Speculative Waiver Opportunities
+    </h2>
+
+    <p class="weekly-card-detail">
+        These moves require dropping a player before the incoming waiver claim
+        can clear. They are kept separate from normal recommendations because
+        the claim may fail.
+    </p>
+
+    <div class="transaction-grid">
+        {% for move in data.weekly.speculative_waivers %}
+        <article class="transaction-card">
+            <div class="transaction-heading">
+                <span class="transaction-label">
+                    {{ move.speculative_verdict }}
+                </span>
+
+                <span class="transaction-type">
+                    {{ move.move_type }}
+                </span>
+            </div>
+
+            <div class="transaction-players">
+                <div class="transaction-add">
+                    <span>CLAIM</span>
+                    <strong>{{ move.add.name }}</strong>
+                    <small>
+                        {{ move.add.position }} · {{ move.add.roster_status }}
+                    </small>
+                </div>
+
+                <div class="transaction-drop">
+                    <span>PRE-DROP</span>
+                    <strong>{{ move.drop.name }}</strong>
+                    <small>{{ move.drop.position }}</small>
+                </div>
+            </div>
+
+            <div class="transaction-metrics">
+                <div>
+                    <span>Upside</span>
+                    <strong>
+                        {{ "%+.2f"|format(move.week_gain) }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Fallback</span>
+                    <strong>
+                        {% if move.fallback %}
+                            {{ move.fallback.name }}
+                        {% else %}
+                            None
+                        {% endif %}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Fallback vs current</span>
+                    <strong>
+                        {{ "%+.2f"|format(move.fallback_delta) }}
+                    </strong>
+                </div>
+            </div>
+
+            <div class="transaction-reasons">
+                <strong>Why?</strong>
+                <ul>
+                    <li>
+                        {{ move.add.name }} cannot clear until
+                        {{ move.waiver_clear_date.strftime("%-d %b") }},
+                        but {{ move.drop.name }} locks first.
+                    </li>
+
+                    {% if move.fallback %}
+                    <li>
+                        Best current free-agent fallback is
+                        {{ move.fallback.name }},
+                        {{
+                            "%+.2f"
+                            | format(move.fallback_delta)
+                        }}
+                        pts versus keeping {{ move.drop.name }}.
+                    </li>
+                    {% else %}
+                    <li>
+                        No current free-agent fallback was found at this position.
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 {% if data.weekly.transactions %}
 <section class="weekly-section">
     <h2>
