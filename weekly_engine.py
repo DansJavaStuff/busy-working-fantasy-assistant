@@ -1003,6 +1003,181 @@ def waiver_available_date(
         return None
 
 
+def is_free_agent(player):
+    return (
+        str(
+            player.get(
+                "roster_status"
+            )
+            or ""
+        ).upper()
+        == "FA"
+    )
+
+
+def best_fallback_player(
+    available,
+    position,
+    excluded_ids=None,
+):
+    excluded_ids = (
+        excluded_ids
+        or set()
+    )
+
+    candidates = [
+        player
+        for player in available
+        if (
+            player.get(
+                "position"
+            ) == position
+            and is_free_agent(
+                player
+            )
+            and player.get(
+                "yahoo_player_id"
+            )
+            not in excluded_ids
+            and is_available_to_play(
+                player
+            )
+        )
+    ]
+
+    if not candidates:
+        return None
+
+    return max(
+        candidates,
+        key=lambda player:
+            projection(player),
+    )
+
+
+def build_speculative_waiver_moves(
+    transactions,
+    available,
+    season,
+    limit=3,
+):
+    speculative = []
+
+    for transaction in transactions:
+        add_player = transaction["add"]
+        drop_player = transaction["drop"]
+
+        waiver_date = (
+            waiver_available_date(
+                add_player,
+                season,
+            )
+        )
+
+        drop_time = (
+            drop_player.get(
+                "local_game"
+            )
+            or {}
+        ).get(
+            "datetime"
+        )
+
+        if (
+            waiver_date is None
+            or drop_time is None
+            or drop_time.date()
+            > waiver_date
+        ):
+            continue
+
+        fallback = best_fallback_player(
+            available,
+            drop_player.get(
+                "position"
+            ),
+            {
+                add_player.get(
+                    "yahoo_player_id"
+                )
+            },
+        )
+
+        drop_projection = projection(
+            drop_player
+        )
+
+        fallback_projection = (
+            projection(
+                fallback
+            )
+            if fallback
+            else 0.0
+        )
+
+        fallback_delta = (
+            fallback_projection
+            - drop_projection
+        )
+
+        upside = float(
+            transaction.get(
+                "week_gain",
+                0.0,
+            )
+            or 0.0
+        )
+
+        if (
+            upside >= 5.0
+            and fallback is not None
+            and fallback_delta >= -1.5
+        ):
+            verdict = "WORTH REVIEWING"
+        else:
+            verdict = "NOT WORTH PRE-DROP"
+
+        move = dict(
+            transaction
+        )
+
+        move[
+            "speculative_verdict"
+        ] = verdict
+
+        move[
+            "waiver_clear_date"
+        ] = waiver_date
+
+        move[
+            "fallback"
+        ] = fallback
+
+        move[
+            "fallback_delta"
+        ] = fallback_delta
+
+        speculative.append(
+            move
+        )
+
+    speculative.sort(
+        key=lambda move: (
+            move[
+                "speculative_verdict"
+            ]
+            == "WORTH REVIEWING",
+            move.get(
+                "week_gain",
+                0.0,
+            ),
+        ),
+        reverse=True,
+    )
+
+    return speculative[:limit]
+
+
 def add_transaction_deadlines(
     transactions,
     season,
@@ -1221,6 +1396,14 @@ def build_weekly_data(
             week,
             waiver_priority=
                 waiver_priority,
+        )
+    )
+
+    speculative_waivers = (
+        build_speculative_waiver_moves(
+            transactions,
+            available,
+            season,
         )
     )
 
@@ -1469,6 +1652,9 @@ def build_weekly_data(
 
         "transactions":
             transactions,
+
+        "speculative_waivers":
+            speculative_waivers,
 
         "future_bye_coverage":
             future_bye_coverage,
