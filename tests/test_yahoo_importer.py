@@ -200,8 +200,8 @@ class YahooImporterTableParsingTests(TestCase):
               <th>Pos</th>
               <th>Offense</th>
               <th>Bye</th>
-              <th>Fan Pts</th>
-              <th>Proj Pts</th>
+              <th>Fan Pts \ue002</th>
+              <th>Proj Pts \ue002</th>
               <th>% Start</th>
               <th>% Ros</th>
             </tr>
@@ -266,8 +266,8 @@ class YahooImporterTableParsingTests(TestCase):
               <th>Pos</th>
               <th>Offense</th>
               <th>Bye</th>
-              <th>Fan Pts</th>
-              <th>Proj Pts</th>
+              <th>Fan Pts \ue002</th>
+              <th>Proj Pts \ue002</th>
               <th>% Start</th>
               <th>% Ros</th>
             </tr>
