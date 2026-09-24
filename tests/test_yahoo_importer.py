@@ -199,6 +199,7 @@ class YahooImporterTableParsingTests(TestCase):
             <tr>
               <th>Pos</th>
               <th>Offense</th>
+              <th>Roster Status</th>
               <th>Bye</th>
               <th>Fan Pts \ue002</th>
               <th>Proj Pts \ue002</th>
@@ -214,6 +215,7 @@ class YahooImporterTableParsingTests(TestCase):
                 <span>BUF - QB</span>
                 <span>Sun 1:00 pm vs LAC</span>
               </td>
+              <td>FA</td>
               <td>7</td>
               <td>-</td>
               <td>24.84</td>
@@ -252,6 +254,10 @@ class YahooImporterTableParsingTests(TestCase):
         self.assertEqual(
             player["rostered_pct"],
             100.0,
+        )
+        self.assertEqual(
+            player["roster_status"],
+            "FA",
         )
         self.assertEqual(
             player["opponent"],
