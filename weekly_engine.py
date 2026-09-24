@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+import re
 from zoneinfo import ZoneInfo
 import json
 
@@ -206,7 +207,9 @@ def cached_transaction_recommendations(
         build_transaction_recommendations(
             roster,
             available,
-            limit=5,
+            # Build deeper than the UI limit because operationally
+            # impossible waiver moves may be filtered below.
+            limit=12,
             current_week=week,
             waiver_priority=waiver_priority,
         )
@@ -972,8 +975,37 @@ def build_lock_groups(
     return groups
 
 
+def waiver_available_date(
+    player,
+    season,
+):
+    status = (
+        player.get("roster_status")
+        or ""
+    )
+
+    match = re.search(
+        r"\bW\s*\(([A-Za-z]{3})\s+(\d{1,2})\)",
+        status,
+    )
+
+    if not match:
+        return None
+
+    try:
+        return datetime.strptime(
+            f"{season} "
+            f"{match.group(1)} "
+            f"{match.group(2)}",
+            "%Y %b %d",
+        ).date()
+    except ValueError:
+        return None
+
+
 def add_transaction_deadlines(
     transactions,
+    season,
 ):
     now_local = datetime.now(
         UK_TIME
@@ -1004,6 +1036,25 @@ def add_transaction_deadlines(
         drop_time = drop_game.get(
             "datetime"
         )
+
+        waiver_date = (
+            waiver_available_date(
+                add_player,
+                season,
+            )
+        )
+
+        # A player on waivers is not immediately actionable. If the player
+        # being dropped locks on or before the waiver-clear date, suppress
+        # the move rather than encouraging the manager to sacrifice this
+        # week's starter before knowing the claim succeeded.
+        if (
+            waiver_date is not None
+            and drop_time is not None
+            and drop_time.date()
+            <= waiver_date
+        ):
+            continue
 
         possible_times = [
             value
@@ -1175,9 +1226,10 @@ def build_weekly_data(
 
     transactions = (
         add_transaction_deadlines(
-            transactions
+            transactions,
+            season,
         )
-    )
+    )[:5]
 
     lineup = build_best_lineup(
         roster
