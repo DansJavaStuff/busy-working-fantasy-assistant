@@ -42,7 +42,7 @@ PARSE_CACHE_FILE = (
     / "yahoo_html_store.json"
 )
 
-PARSE_CACHE_VERSION = 1
+PARSE_CACHE_VERSION = 2
 
 SEASON = 2026
 MY_TEAM_NAME = "Allen Wrench"
@@ -198,6 +198,151 @@ def extract_headshot(
     return (
         "player_headshots/"
         f"{destination.name}"
+    )
+
+
+def _normal_header(value):
+    return (
+        clean_text(value)
+        .lower()
+        .replace("% rostered", "% ros")
+        .replace("% started", "% start")
+    )
+
+
+def _expanded_header_cells(row):
+    labels = []
+
+    for cell in row.find_all(
+        ["th", "td"],
+        recursive=False,
+    ):
+        label = _normal_header(
+            cell.get_text(
+                " ",
+                strip=True,
+            )
+        )
+
+        try:
+            colspan = int(
+                cell.get(
+                    "colspan",
+                    1,
+                )
+            )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            colspan = 1
+
+        labels.extend(
+            [label] * max(
+                1,
+                colspan,
+            )
+        )
+
+    return labels
+
+
+def column_indexes(row):
+    """Map Yahoo's visible leaf headers to row-cell indexes."""
+
+    table = row.find_parent(
+        "table"
+    )
+
+    if table is None:
+        return {}
+
+    candidates = []
+
+    for header_row in table.find_all(
+        "tr"
+    ):
+        if header_row is row:
+            break
+
+        labels = (
+            _expanded_header_cells(
+                header_row
+            )
+        )
+
+        if not labels:
+            continue
+
+        recognised = sum(
+            1
+            for label in labels
+            if label in {
+                "pos",
+                "offense",
+                "player",
+                "status",
+                "gp",
+                "bye",
+                "fan pts",
+                "proj pts",
+                "% start",
+                "% ros",
+            }
+        )
+
+        if recognised:
+            candidates.append(
+                (
+                    recognised,
+                    labels,
+                )
+            )
+
+    if not candidates:
+        return {}
+
+    labels = max(
+        candidates,
+        key=lambda item:
+            item[0],
+    )[1]
+
+    indexes = {}
+
+    for index, label in enumerate(
+        labels
+    ):
+        if (
+            label
+            and label not in indexes
+        ):
+            indexes[label] = index
+
+    return indexes
+
+
+def _cell_text(
+    cells,
+    indexes,
+    label,
+    fallback=None,
+):
+    index = indexes.get(
+        label,
+        fallback,
+    )
+
+    if (
+        index is None
+        or index < 0
+        or index >= len(cells)
+    ):
+        return ""
+
+    return cells[index].get_text(
+        " ",
+        strip=True,
     )
 
 
@@ -422,6 +567,11 @@ def parse_page(path):
 
     seen = set()
 
+    is_actual_snapshot = (
+        "-actual"
+        in path.name.lower()
+    )
+
     for link in links:
         player_id = link.get(
             "data-ys-playerid"
@@ -439,25 +589,31 @@ def parse_page(path):
             continue
 
         cells = row.find_all(
+            ["th", "td"],
+            recursive=False,
+        )
+
+        if not cells:
+            continue
+
+        link_cell = link.find_parent(
             ["th", "td"]
         )
 
-        # Yahoo rows currently contain:
-        # 0 action
-        # 1 watch list
-        # 2 player
-        # 3 roster status
-        # 4 GP
-        # 5 bye
-        # 6 fantasy points
-        # 7 pre-season rank
-        # 8 actual rank
-        # 9 rostered %
-        # 10+ projected/actual stats
-        if len(cells) < 10:
+        if (
+            link_cell is None
+            or link_cell not in cells
+        ):
             continue
 
-        player_cell = cells[2]
+        player_cell = link_cell
+        player_index = cells.index(
+            player_cell
+        )
+
+        indexes = column_indexes(
+            row
+        )
 
         name = clean_text(
             link.get_text(
@@ -488,16 +644,117 @@ def parse_page(path):
             )
         )
 
-        roster_status = clean_text(
-            cells[3].get_text(
-                " ",
-                strip=True,
+        roster_status = (
+            _cell_text(
+                cells,
+                indexes,
+                "status",
             )
         )
+
+        if (
+            not roster_status
+            and not indexes
+            and player_index + 1
+            < len(cells)
+        ):
+            roster_status = clean_text(
+                cells[
+                    player_index + 1
+                ].get_text(
+                    " ",
+                    strip=True,
+                )
+            )
 
         status = extract_status(
             player_cell
         )
+
+        if indexes:
+            bye_text = _cell_text(
+                cells,
+                indexes,
+                "bye",
+            )
+
+            points_label = (
+                "fan pts"
+                if is_actual_snapshot
+                else "proj pts"
+            )
+
+            points_text = _cell_text(
+                cells,
+                indexes,
+                points_label,
+            )
+
+            # Some historical Yahoo captures only expose one fantasy-points
+            # column. Fall back to the other named points column, never to a
+            # positional cell that could actually be Bye.
+            if not points_text:
+                alternate = (
+                    "proj pts"
+                    if points_label
+                    == "fan pts"
+                    else "fan pts"
+                )
+                points_text = _cell_text(
+                    cells,
+                    indexes,
+                    alternate,
+                )
+
+            games_played_text = (
+                _cell_text(
+                    cells,
+                    indexes,
+                    "gp",
+                )
+            )
+
+            rostered_text = (
+                _cell_text(
+                    cells,
+                    indexes,
+                    "% ros",
+                )
+            )
+        else:
+            # Legacy saved layouts from before Yahoo added separate Fan Pts /
+            # Proj Pts columns.
+            games_played_text = (
+                cells[4].get_text(
+                    strip=True,
+                )
+                if len(cells) > 4
+                else ""
+            )
+
+            bye_text = (
+                cells[5].get_text(
+                    strip=True,
+                )
+                if len(cells) > 5
+                else ""
+            )
+
+            points_text = (
+                cells[6].get_text(
+                    strip=True,
+                )
+                if len(cells) > 6
+                else ""
+            )
+
+            rostered_text = (
+                cells[9].get_text(
+                    strip=True,
+                )
+                if len(cells) > 9
+                else ""
+            )
 
         players[player_id] = {
             "yahoo_player_id":
@@ -520,44 +777,28 @@ def parse_page(path):
 
             "games_played":
                 parse_int(
-                    cells[4].get_text(
-                        strip=True,
-                    )
+                    games_played_text
                 ),
 
             "bye_week":
                 parse_int(
-                    cells[5].get_text(
-                        strip=True,
-                    )
+                    bye_text
                 ),
 
             "projection":
                 parse_number(
-                    cells[6].get_text(
-                        strip=True,
-                    )
+                    points_text
                 ),
 
             "preseason_rank":
-                parse_int(
-                    cells[7].get_text(
-                        strip=True,
-                    )
-                ),
+                None,
 
             "actual_rank":
-                parse_int(
-                    cells[8].get_text(
-                        strip=True,
-                    )
-                ),
+                None,
 
             "rostered_pct":
                 parse_percentage(
-                    cells[9].get_text(
-                        strip=True,
-                    )
+                    rostered_text
                 ),
 
             "headshot_source":
@@ -567,9 +808,13 @@ def parse_page(path):
                 ),
 
             "projection_stats":
-                extract_offense_stats(
-                    cells,
-                    position,
+                (
+                    extract_offense_stats(
+                        cells,
+                        position,
+                    )
+                    if not indexes
+                    else None
                 ),
         }
 
