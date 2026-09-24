@@ -42,7 +42,7 @@ PARSE_CACHE_FILE = (
     / "yahoo_html_store.json"
 )
 
-PARSE_CACHE_VERSION = 2
+PARSE_CACHE_VERSION = 3
 
 SEASON = 2026
 MY_TEAM_NAME = "Allen Wrench"
@@ -202,11 +202,24 @@ def extract_headshot(
 
 
 def _normal_header(value):
-    return (
+    value = (
         clean_text(value)
         .lower()
         .replace("% rostered", "% ros")
         .replace("% started", "% start")
+    )
+
+    # Yahoo decorates some column labels with icon glyphs from its private
+    # font (for example "Fan Pts \ue002").  Those glyphs are visual only and
+    # must not be part of the semantic header name used by the importer.
+    value = re.sub(
+        r"[^a-z0-9%]+",
+        " ",
+        value,
+    )
+
+    return " ".join(
+        value.split()
     )
 
 
