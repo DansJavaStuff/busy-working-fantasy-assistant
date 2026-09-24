@@ -191,6 +191,127 @@ class YahooProviderWeekTests(TestCase):
         )
 
 
+class YahooImporterTableParsingTests(TestCase):
+    def test_projection_uses_proj_pts_not_bye_column(self):
+        html = """
+        <table>
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Offense</th>
+              <th>Bye</th>
+              <th>Fan Pts</th>
+              <th>Proj Pts</th>
+              <th>% Start</th>
+              <th>% Ros</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>QB</td>
+              <td>
+                <a data-ys-playerid="30123">Josh Allen</a>
+                <span>BUF - QB</span>
+                <span>Sun 1:00 pm vs LAC</span>
+              </td>
+              <td>7</td>
+              <td>-</td>
+              <td>24.84</td>
+              <td>99%</td>
+              <td>100%</td>
+            </tr>
+          </tbody>
+        </table>
+        """
+
+        with TemporaryDirectory() as directory:
+            path = (
+                Path(directory)
+                / "Yahoo_MyTeam_week3-Proj.html"
+            )
+            path.write_text(
+                html,
+                encoding="utf-8",
+            )
+
+            players = (
+                import_yahoo_players
+                .parse_page(path)
+            )
+
+        player = players["30123"]
+
+        self.assertEqual(
+            player["bye_week"],
+            7,
+        )
+        self.assertEqual(
+            player["projection"],
+            24.84,
+        )
+        self.assertEqual(
+            player["rostered_pct"],
+            100.0,
+        )
+        self.assertEqual(
+            player["opponent"],
+            "LAC",
+        )
+
+    def test_actual_snapshot_uses_fan_pts(self):
+        html = """
+        <table>
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Offense</th>
+              <th>Bye</th>
+              <th>Fan Pts</th>
+              <th>Proj Pts</th>
+              <th>% Start</th>
+              <th>% Ros</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>QB</td>
+              <td>
+                <a data-ys-playerid="30123">Josh Allen</a>
+                <span>BUF - QB</span>
+              </td>
+              <td>7</td>
+              <td>43.82</td>
+              <td>25.55</td>
+              <td>99%</td>
+              <td>100%</td>
+            </tr>
+          </tbody>
+        </table>
+        """
+
+        with TemporaryDirectory() as directory:
+            path = (
+                Path(directory)
+                / "Yahoo_MyTeam_week2-Actual.html"
+            )
+            path.write_text(
+                html,
+                encoding="utf-8",
+            )
+
+            players = (
+                import_yahoo_players
+                .parse_page(path)
+            )
+
+        self.assertEqual(
+            players["30123"][
+                "projection"
+            ],
+            43.82,
+        )
+
+
 class YahooImporterParseCacheTests(TestCase):
     def test_unchanged_file_reuses_cached_parse(self):
         with TemporaryDirectory() as directory:
