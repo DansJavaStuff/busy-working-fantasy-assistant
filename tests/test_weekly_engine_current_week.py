@@ -261,6 +261,77 @@ class WeeklyEngineCurrentWeekTests(TestCase):
             places=2,
         )
 
+    def test_better_immediate_free_agent_beats_waiver_option(self):
+        move = {
+            "week_gain": 0.55,
+            "move_type": "DST STREAM",
+            "add": {
+                "name": "Eagles",
+                "position": "DST",
+                "roster_status": "W (Sep 25)",
+                "yahoo_player_id": "eagles",
+                "current_week_projection": 7.32,
+                "local_game": {
+                    "datetime": datetime(
+                        2099,
+                        9,
+                        27,
+                        18,
+                        0,
+                        tzinfo=weekly_engine.UK_TIME,
+                    )
+                },
+            },
+            "drop": {
+                "name": "Packers",
+                "position": "DST",
+                "yahoo_player_id": "packers",
+                "current_week_projection": 6.77,
+                "local_game": {
+                    "datetime": datetime(
+                        2099,
+                        9,
+                        25,
+                        1,
+                        15,
+                        tzinfo=weekly_engine.UK_TIME,
+                    )
+                },
+            },
+        }
+
+        available = [
+            move["add"],
+            {
+                "name": "Lions",
+                "position": "DST",
+                "roster_status": "FA",
+                "yahoo_player_id": "lions",
+                "current_week_projection": 7.45,
+                "status": None,
+            },
+        ]
+
+        output = build_speculative_waiver_moves(
+            [move],
+            available,
+            2099,
+        )
+
+        self.assertEqual(
+            output[0]["speculative_verdict"],
+            "BETTER FA AVAILABLE",
+        )
+        self.assertEqual(
+            output[0]["fallback"]["name"],
+            "Lions",
+        )
+        self.assertAlmostEqual(
+            output[0]["fallback_delta"],
+            0.68,
+            places=2,
+        )
+
     def test_large_speculative_upside_with_safe_fallback_is_worth_reviewing(self):
         move = {
             "week_gain": 8.0,
