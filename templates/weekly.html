@@ -914,6 +914,14 @@ Manual snapshot
                         }}
                         pts versus keeping {{ move.drop.name }}.
                     </li>
+
+                    {% if move.speculative_verdict == "BETTER FA AVAILABLE" %}
+                    <li>
+                        {{ move.fallback.name }} is immediately available and
+                        offers at least as much current-week upside as waiting
+                        for {{ move.add.name }} to clear waivers.
+                    </li>
+                    {% endif %}
                     {% else %}
                     <li>
                         No current free-agent fallback was found at this position.
