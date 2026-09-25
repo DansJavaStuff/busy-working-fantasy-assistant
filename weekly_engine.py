@@ -1129,6 +1129,11 @@ def build_speculative_waiver_moves(
         )
 
         if (
+            fallback is not None
+            and fallback_delta >= upside
+        ):
+            verdict = "BETTER FA AVAILABLE"
+        elif (
             upside >= 5.0
             and fallback is not None
             and fallback_delta >= -1.5
