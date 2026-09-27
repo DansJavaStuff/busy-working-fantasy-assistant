@@ -261,6 +261,57 @@ class WeeklyEngineCurrentWeekTests(TestCase):
             places=2,
         )
 
+    def test_speculative_waiver_is_hidden_after_drop_player_locks(self):
+        move = {
+            "week_gain": 5.0,
+            "move_type": "DST STREAM",
+            "add": {
+                "name": "Eagles",
+                "position": "DST",
+                "roster_status": "W (Sep 25)",
+                "yahoo_player_id": "eagles",
+                "current_week_projection": 10.0,
+                "local_game": {
+                    "datetime": datetime(
+                        2099,
+                        9,
+                        27,
+                        18,
+                        0,
+                        tzinfo=weekly_engine.UK_TIME,
+                    )
+                },
+            },
+            "drop": {
+                "name": "Packers",
+                "position": "DST",
+                "yahoo_player_id": "packers",
+                "current_week_projection": 5.0,
+                "current_week_actual": 2.0,
+                "local_game": {
+                    "datetime": datetime(
+                        2099,
+                        9,
+                        25,
+                        1,
+                        15,
+                        tzinfo=weekly_engine.UK_TIME,
+                    )
+                },
+            },
+        }
+
+        output = build_speculative_waiver_moves(
+            [move],
+            [move["add"]],
+            2099,
+        )
+
+        self.assertEqual(
+            output,
+            [],
+        )
+
     def test_better_immediate_free_agent_beats_waiver_option(self):
         move = {
             "week_gain": 0.55,
