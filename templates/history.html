@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}
+{{ data.team.team_name }} · History
+{% endblock %}
+
+{% block favicon %}
+{% if data.team.logo_path %}
+<link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for(
+        'static',
+        filename=data.team.logo_path
+    ) }}"
+>
+{% else %}
+{{ super() }}
+{% endif %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+    :root {
+        --team-primary:
+            {{ data.team.primary_colour }};
+        --team-secondary:
+            {{ data.team.secondary_colour }};
+        --team-accent:
+            {{ data.team.accent_colour }};
+    }
+
+    .history-controls {
+        display: flex;
+        gap: 12px;
+        align-items: end;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+    }
+
+    .history-controls label {
+        display: grid;
+        gap: 6px;
+        font-weight: 700;
+    }
+
+    .history-controls select {
+        min-width: 120px;
+        padding: 9px 12px;
+    }
+
+    .history-summary {
+        display: grid;
+        grid-template-columns:
+            repeat(
+                auto-fit,
+                minmax(160px, 1fr)
+            );
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .history-card {
+        border: 1px solid #d7dce2;
+        border-radius: 10px;
+        padding: 14px;
+        background: #fff;
+    }
+
+    .history-card span {
+        display: block;
+        color: #69717c;
+        font-size: .85rem;
+        margin-bottom: 4px;
+    }
+
+    .history-card strong {
+        font-size: 1.45rem;
+    }
+
+    .history-table .bench-row {
+        background: #fafafa;
+    }
+
+    .history-table .ir-row {
+        background: #f7f3fb;
+    }
+
+    .history-positive {
+        font-weight: 700;
+    }
+
+    .history-negative {
+        font-weight: 700;
+    }
+
+    .history-note {
+        margin-top: 10px;
+        color: #69717c;
+        font-size: .9rem;
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<header class="topbar weekly-topbar">
+    <div>
+        <div class="eyebrow">
+            SEASON HISTORY
+        </div>
+
+        <h1>
+            🏈 {{ data.team.team_name }}
+        </h1>
+
+        <div class="subtitle">
+            Week {{ data.history.week }}
+        </div>
+    </div>
+
+    <div class="topbar-actions">
+        {% if data.team.logo_path %}
+        <img
+            src="{{ url_for(
+                'static',
+                filename=data.team.logo_path
+            ) }}"
+            alt="{{ data.team.team_name }}"
+            style="
+                max-height: 64px;
+                max-width: 160px;
+            "
+        >
+        {% endif %}
+
+        {% include "_app_nav.html" %}
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+
+<form
+    method="get"
+    action="{{ url_for('history') }}"
+    class="history-controls"
+>
+    <label>
+        Gameweek
+        <select
+            name="week"
+            onchange="this.form.submit()"
+        >
+            {% for week in data.available_weeks %}
+            <option
+                value="{{ week }}"
+                {% if week == data.history.week %}
+                selected
+                {% endif %}
+            >
+                Week {{ week }}
+            </option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <noscript>
+        <button type="submit">
+            View
+        </button>
+    </noscript>
+</form>
+
+{% if data.history.rows %}
+
+<section class="history-summary">
+    <div class="history-card">
+        <span>
+            Starting projection
+        </span>
+        <strong>
+            {{
+                "%.2f"
+                | format(
+                    data.history
+                    .starter_projection
+                )
+            }}
+        </strong>
+    </div>
+
+    <div class="history-card">
+        <span>
+            Starting actual
+        </span>
+        <strong>
+            {{
+                "%.2f"
+                | format(
+                    data.history
+                    .starter_actual
+                )
+            }}
+        </strong>
+    </div>
+
+    <div class="history-card">
+        <span>
+            Starter variance
+        </span>
+        <strong>
+            {{
+                "%+.2f"
+                | format(
+                    data.history.starter_actual
+                    - data.history.starter_projection
+                )
+            }}
+        </strong>
+    </div>
+
+    <div class="history-card">
+        <span>
+            Bench points
+        </span>
+        <strong>
+            {{
+                "%.2f"
+                | format(
+                    data.history
+                    .bench_actual
+                )
+            }}
+        </strong>
+    </div>
+</section>
+
+<section class="weekly-section">
+    <h2>
+        Week {{ data.history.week }} roster
+    </h2>
+
+    <table class="weekly-table history-table">
+        <thead>
+            <tr>
+                <th>Slot</th>
+                <th>Player</th>
+                <th>Team</th>
+                <th>Proj</th>
+                <th>Actual</th>
+                <th>Variance</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for row in data.history.rows %}
+            <tr
+                {% if row.roster_slot == "BN" %}
+                class="bench-row"
+                {% elif row.roster_slot == "IR" %}
+                class="ir-row"
+                {% endif %}
+            >
+                <td>
+                    <strong>
+                        {{ row.roster_slot }}
+                    </strong>
+                </td>
+
+                <td>
+                    {{ row.player_name }}
+                </td>
+
+                <td>
+                    {{ row.team or "—" }}
+                </td>
+
+                <td>
+                    {% if row.projection is not none %}
+                    {{
+                        "%.2f"
+                        | format(row.projection)
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if row.actual is not none %}
+                    {{
+                        "%.2f"
+                        | format(row.actual)
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if row.variance is not none %}
+                    <span class="
+                        {% if row.variance >= 0 %}
+                        history-positive
+                        {% else %}
+                        history-negative
+                        {% endif %}
+                    ">
+                        {{
+                            "%+.2f"
+                            | format(row.variance)
+                        }}
+                    </span>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if not data.history.complete_actuals %}
+    <div class="history-note">
+        This week is still incomplete. Totals use only the
+        actual scores currently stored; later Yahoo stat
+        corrections can update those results without changing
+        historical roster ownership.
+    </div>
+    {% endif %}
+</section>
+
+{% else %}
+
+<section class="weekly-section">
+    <h2>
+        No roster history stored for Week
+        {{ data.history.week }}
+    </h2>
+
+    <p>
+        Historical roster snapshots will appear here as they
+        are reconstructed or captured during the season.
+    </p>
+</section>
+
+{% endif %}
+
+{% endblock %}
