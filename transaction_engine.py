@@ -25,6 +25,18 @@ def projection(
     return float(value)
 
 
+def has_projection(
+    player,
+    field,
+):
+    return player.get(
+        field
+    ) not in {
+        None,
+        "",
+    }
+
+
 def playable(player):
     status = (
         player.get("status")
@@ -1499,6 +1511,36 @@ def build_transaction_recommendations(
                 before,
                 after,
             )
+
+            four_week_data_complete = (
+                has_projection(
+                    add_player,
+                    "next_4_weeks_projection",
+                )
+                and has_projection(
+                    drop_player,
+                    "next_4_weeks_projection",
+                )
+            )
+
+            result[
+                "four_week_data_complete"
+            ] = four_week_data_complete
+
+            # Missing future projections are unknown, not zero. Do not let a
+            # newly added player with incomplete Yahoo data look artificially
+            # worthless compared with a fully populated free agent.
+            if not four_week_data_complete:
+                result["score"] -= (
+                    result["four_week_gain"]
+                    * 0.75
+                )
+                result["score"] -= (
+                    result["bench_gain"]
+                    * 0.20
+                )
+                result["four_week_gain"] = 0.0
+                result["bench_gain"] = 0.0
 
             result[
                 "bye_coverage_gain"
