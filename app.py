@@ -34,6 +34,7 @@ from database import (
     load_season_league_state,
     load_season_roster,
     load_team_identity,
+    replace_week_lineup,
     record_recommendation_action,
     save_current_draft_order,
     save_waiver_priority,
@@ -453,6 +454,98 @@ def history():
     return render_template(
         "history.html",
         data=data,
+    )
+
+
+@app.post("/weekly/save-submitted-lineup")
+def save_submitted_lineup():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    weekly_data = build_weekly_data(
+        season=season,
+        week=week,
+    )
+
+    rows = []
+    slot_counts = {}
+
+    def add_row(
+        player,
+        lineup_slot,
+    ):
+        slot = (
+            "DEF"
+            if lineup_slot == "DST"
+            else lineup_slot
+        )
+
+        slot_counts[slot] = (
+            slot_counts.get(
+                slot,
+                0,
+            )
+            + 1
+        )
+
+        rows.append(
+            {
+                "player_id": str(
+                    player[
+                        "yahoo_player_id"
+                    ]
+                ),
+                "player_name":
+                    player["name"],
+                "position":
+                    player["position"],
+                "lineup_slot": slot,
+                "slot_index":
+                    slot_counts[slot],
+                "source":
+                    "confirmed_recommended_lineup",
+            }
+        )
+
+    for item in weekly_data[
+        "lineup"
+    ]:
+        add_row(
+            item["player"],
+            item["slot"],
+        )
+
+    for player in weekly_data[
+        "bench"
+    ]:
+        add_row(
+            player,
+            "BN",
+        )
+
+    for player in weekly_data[
+        "ir_review"
+    ]:
+        add_row(
+            player,
+            "IR",
+        )
+
+    replace_week_lineup(
+        week,
+        rows,
+        season=season,
+        source=
+            "confirmed_recommended_lineup",
+    )
+
+    return redirect(
+        url_for(
+            "weekly",
+            lineup_saved="1",
+        )
     )
 
 
