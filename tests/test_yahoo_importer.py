@@ -112,6 +112,67 @@ class YahooImporterFilenameTests(TestCase):
             )
 
 
+class YahooImporterCombinedSourceTests(TestCase):
+    def test_player_and_my_team_pages_share_one_snapshot_bucket(self):
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+
+            player_file = (
+                data_dir
+                / "Yahoo_Player_list_week3-Proj.html"
+            )
+            team_file = (
+                data_dir
+                / "Yahoo_MyTeam_week3-Proj.html"
+            )
+
+            player_file.write_text(
+                "",
+                encoding="utf-8",
+            )
+            team_file.write_text(
+                "",
+                encoding="utf-8",
+            )
+
+            with patch.object(
+                import_yahoo_players,
+                "DATA_DIR",
+                data_dir,
+            ):
+                player_sources = (
+                    import_yahoo_players
+                    .discover_source_files(
+                        import_yahoo_players
+                        .PLAYER_SOURCE_PREFIX
+                    )
+                )
+                team_sources = (
+                    import_yahoo_players
+                    .discover_source_files(
+                        import_yahoo_players
+                        .MY_TEAM_SOURCE_PREFIX
+                    )
+                )
+
+            combined = (
+                import_yahoo_players
+                .merge_source_maps(
+                    player_sources,
+                    team_sources,
+                )
+            )
+
+            self.assertEqual(
+                len(
+                    combined[
+                        "week_3_projection"
+                    ]
+                ),
+                2,
+            )
+
+
 class YahooProviderWeekTests(TestCase):
     def test_fantasy_week_advances_on_tuesday(self):
         self.assertEqual(
