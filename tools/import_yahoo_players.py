@@ -1718,18 +1718,6 @@ def main():
         parse_cache
     )
 
-    my_team = {
-        player_id: dict(player)
-        for (
-            player_id,
-            player,
-        ) in combined.items()
-        if player.get(
-            "roster_status"
-        )
-        == MY_TEAM_NAME
-    }
-
     my_team_sources = (
         discover_source_files(
             MY_TEAM_SOURCE_PREFIX
@@ -1765,9 +1753,21 @@ def main():
             )
         )
 
+        # My Team pages are just another source of player data.
+        # Ownership is determined later from the local roster layer, not from
+        # whichever Yahoo page supplied the projections.
+        supplement_data = {
+            player_id: {
+                key: value
+                for key, value in player.items()
+                if key != "roster_status"
+            }
+            for player_id, player in supplement.items()
+        }
+
         merge_player_data(
-            my_team,
-            supplement,
+            combined,
+            supplement_data,
         )
 
     else:
@@ -1783,26 +1783,9 @@ def main():
         )
     )
 
-    fresh_yahoo_roster = (
-        freshest_current_my_team_players(
-            my_team_sources,
-            parse_cache,
-        )
-        if my_team_sources
-        else {}
-    )
-
-    if fresh_yahoo_roster:
-        reconcile_local_roster_from_yahoo(
-            local_roster,
-            fresh_yahoo_roster,
-        )
-
-        local_roster = (
-            load_season_roster(
-                SEASON
-            )
-        )
+    # Importing projection/stat pages must not mutate roster ownership.
+    # The local roster is the authority until an explicit roster sync is
+    # requested from a demonstrably fresh Yahoo snapshot.
 
     local_names = {
         player[
@@ -1844,11 +1827,14 @@ def main():
         )
 
     my_team = {
-        player_id: player
+        player_id: {
+            **player,
+            "roster_status": MY_TEAM_NAME,
+        }
         for (
             player_id,
             player,
-        ) in my_team.items()
+        ) in combined.items()
         if is_local_roster_player(
             player
         )
