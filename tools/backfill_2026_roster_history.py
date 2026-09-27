@@ -2,6 +2,7 @@ from database import (
     backup_database,
     load_player_week_history,
     load_season_roster,
+    load_week_lineup,
     load_week_roster,
     replace_season_transactions,
     replace_week_lineup,
@@ -133,6 +134,14 @@ def print_week_summary(
         season=SEASON,
     )
 
+    submitted_lineup = {
+        row["player_id"]: row
+        for row in load_week_lineup(
+            week,
+            season=SEASON,
+        )
+    }
+
     history = {
         row["player_id"]: row
         for row in load_player_week_history(
@@ -161,7 +170,52 @@ def print_week_summary(
         f"{len(actuals)} actual score(s) available"
     )
 
+    display_rows = []
+
     for player in roster:
+        lineup = submitted_lineup.get(
+            player["player_id"]
+        )
+
+        display_rows.append(
+            {
+                **player,
+                "roster_slot": (
+                    lineup["lineup_slot"]
+                    if lineup
+                    else player["roster_slot"]
+                ),
+                "slot_index": (
+                    lineup["slot_index"]
+                    if lineup
+                    else player["slot_index"]
+                ),
+            }
+        )
+
+    slot_order = {
+        "QB": 1,
+        "RB": 2,
+        "WR": 3,
+        "TE": 4,
+        "FLEX": 5,
+        "K": 6,
+        "DEF": 7,
+        "BN": 8,
+        "IR": 9,
+    }
+
+    display_rows.sort(
+        key=lambda player: (
+            slot_order.get(
+                player["roster_slot"],
+                99,
+            ),
+            player["slot_index"],
+        )
+    )
+
+    for player in display_rows:
         result = history.get(
             player["player_id"],
             {},
