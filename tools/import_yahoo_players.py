@@ -936,17 +936,52 @@ def parse_my_team_lineup_page(path):
             row
         )
 
-        slot_text = _cell_text(
+        # Yahoo My Team layouts have varied over time. Prefer the
+        # semantic Pos column when available, but fall back to scanning cells
+        # before the player-name cell for a recognised roster slot.
+        slot_candidates = []
+
+        semantic_slot = _cell_text(
             cells,
             indexes,
             "pos",
-            fallback=0,
         )
 
-        lineup_slot = (
-            _normalise_lineup_slot(
-                slot_text
+        if semantic_slot:
+            slot_candidates.append(
+                semantic_slot
             )
+
+        player_index = cells.index(
+            player_cell
+        )
+
+        for cell in cells[:player_index]:
+            text_value = clean_text(
+                cell.get_text(
+                    " ",
+                    strip=True,
+                )
+            )
+
+            if text_value:
+                slot_candidates.append(
+                    text_value
+                )
+
+        lineup_slot = next(
+            (
+                slot
+                for slot in (
+                    _normalise_lineup_slot(
+                        candidate
+                    )
+                    for candidate
+                    in slot_candidates
+                )
+                if slot is not None
+            ),
+            None,
         )
 
         if lineup_slot is None:
