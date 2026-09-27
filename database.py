@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -205,6 +205,39 @@ def initialise_database():
                 UNIQUE (
                     season_id,
                     player_id
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                season_id INTEGER NOT NULL,
+
+                occurred_at TEXT NOT NULL,
+                transaction_type TEXT NOT NULL,
+
+                add_player_id TEXT,
+                add_player_name TEXT,
+                add_position TEXT,
+                add_team TEXT,
+                acquisition_type TEXT,
+
+                drop_player_id TEXT,
+                drop_player_name TEXT,
+                drop_position TEXT,
+                drop_team TEXT,
+
+                source TEXT NOT NULL
+                    DEFAULT 'yahoo_html',
+
+                UNIQUE (
+                    season_id,
+                    occurred_at,
+                    add_player_id,
+                    drop_player_id
                 ),
 
                 FOREIGN KEY (season_id)
@@ -1093,6 +1126,117 @@ def update_recommendation_action_status(
                 season_id,
             ),
         )
+
+
+def replace_season_transactions(
+    transactions,
+    season=None,
+    source="yahoo_html",
+):
+    """Replace imported transaction history for a season."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_transactions
+            WHERE season_id = ?
+              AND source = ?
+            """,
+            (
+                season_id,
+                str(source),
+            ),
+        )
+
+        for transaction in transactions:
+            db.execute(
+                """
+                INSERT INTO season_transactions (
+                    season_id,
+                    occurred_at,
+                    transaction_type,
+                    add_player_id,
+                    add_player_name,
+                    add_position,
+                    add_team,
+                    acquisition_type,
+                    drop_player_id,
+                    drop_player_name,
+                    drop_position,
+                    drop_team,
+                    source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    season_id,
+                    transaction["occurred_at"],
+                    transaction.get(
+                        "transaction_type",
+                        "add_drop",
+                    ),
+                    transaction.get("add_player_id"),
+                    transaction.get("add_player_name"),
+                    transaction.get("add_position"),
+                    transaction.get("add_team"),
+                    transaction.get("acquisition_type"),
+                    transaction.get("drop_player_id"),
+                    transaction.get("drop_player_name"),
+                    transaction.get("drop_position"),
+                    transaction.get("drop_team"),
+                    str(source),
+                ),
+            )
+
+    return len(transactions)
+
+
+def load_season_transactions(
+    season=None,
+):
+    """Return imported transactions oldest first."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                occurred_at,
+                transaction_type,
+                add_player_id,
+                add_player_name,
+                add_position,
+                add_team,
+                acquisition_type,
+                drop_player_id,
+                drop_player_name,
+                drop_position,
+                drop_team,
+                source
+            FROM season_transactions
+            WHERE season_id = ?
+            ORDER BY occurred_at
+            """,
+            (season_id,),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def upsert_player_week_history(
