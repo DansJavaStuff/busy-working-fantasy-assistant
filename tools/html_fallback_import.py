@@ -348,6 +348,10 @@ def persist_submitted_lineups():
             )
 
         if not players:
+            print(
+                f"Lineup Week {week}: "
+                "no submitted slots parsed"
+            )
             continue
 
         rows = list(
