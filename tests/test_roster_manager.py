@@ -5,6 +5,7 @@ from unittest import TestCase, mock
 
 import database
 import roster_manager
+import history_reconstruction
 
 
 class RosterManagerTests(TestCase):
@@ -527,6 +528,111 @@ class RosterManagerTests(TestCase):
         )
         self.assertEqual(
             snapshot["k2"]["roster_slot"],
+            "K",
+        )
+
+    def test_lock_aware_snapshot_preserves_locked_player(self):
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+            },
+            season=2026,
+        )
+
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+            preserve_player_ids={"k1"},
+        )
+
+        snapshot = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                3,
+                season=2026,
+            )
+        }
+
+        self.assertIn(
+            "k1",
+            snapshot,
+        )
+        self.assertNotIn(
+            "k2",
+            snapshot,
+        )
+
+    def test_history_reconstruction_rewinds_later_transactions(self):
+        current = database.load_season_roster(
+            2026
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+            },
+            season=2026,
+        )
+
+        current = database.load_season_roster(
+            2026
+        )
+
+        transactions = [
+            {
+                "occurred_at":
+                    "2026-09-27T11:26:00",
+                "add_player_id": "k2",
+                "add_player_name":
+                    "Kicker Two",
+                "add_position": "K",
+                "add_team": "SF",
+                "drop_player_id": "k1",
+                "drop_player_name":
+                    "Kicker One",
+                "drop_position": "K",
+                "drop_team": "LAC",
+            }
+        ]
+
+        week_two = (
+            history_reconstruction
+            .roster_at_week_end(
+                current,
+                transactions,
+                target_week=2,
+                season=2026,
+            )
+        )
+
+        by_id = {
+            player["player_id"]: player
+            for player in week_two
+        }
+
+        self.assertIn(
+            "k1",
+            by_id,
+        )
+        self.assertNotIn(
+            "k2",
+            by_id,
+        )
+        self.assertEqual(
+            by_id["k1"]["roster_slot"],
             "K",
         )
 
