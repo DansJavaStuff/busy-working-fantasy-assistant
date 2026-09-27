@@ -32,29 +32,38 @@ def classify_snapshot(path, prefix):
     metadata = inspect_path(path)
     html_snapshot = metadata.get("snapshot_name")
 
+    filename_snapshot = importer.snapshot_name_from_filename(
+        path,
+        prefix,
+    )
+
     if html_snapshot:
         return {
             "snapshot_name": html_snapshot,
             "source": "html",
             "metadata": metadata,
+            "filename_snapshot": filename_snapshot,
+            "metadata_mismatch": (
+                filename_snapshot is not None
+                and filename_snapshot != html_snapshot
+            ),
         }
-
-    filename_snapshot = importer.snapshot_name_from_filename(
-        path,
-        prefix,
-    )
 
     if filename_snapshot:
         return {
             "snapshot_name": filename_snapshot,
             "source": "filename_fallback",
             "metadata": metadata,
+            "filename_snapshot": filename_snapshot,
+            "metadata_mismatch": False,
         }
 
     return {
         "snapshot_name": None,
         "source": "unknown",
         "metadata": metadata,
+        "filename_snapshot": filename_snapshot,
+        "metadata_mismatch": False,
     }
 
 
@@ -67,6 +76,7 @@ def discover_source_files(prefix):
         "unknown_files": [],
         "classification_reused": 0,
         "classification_read": 0,
+        "metadata_mismatches": [],
     }
     store = importer.load_parse_cache()
     files = store.setdefault("files", {})
@@ -103,6 +113,17 @@ def discover_source_files(prefix):
         snapshot_name = result["snapshot_name"]
 
         diagnostics[source] += 1
+
+        if result.get("metadata_mismatch"):
+            diagnostics["metadata_mismatches"].append(
+                {
+                    "filename": path.name,
+                    "filename_snapshot": result.get(
+                        "filename_snapshot"
+                    ),
+                    "html_snapshot": snapshot_name,
+                }
+            )
 
         if snapshot_name is None:
             diagnostics["unknown_files"].append(path.name)
@@ -155,6 +176,14 @@ def print_diagnostics(label, diagnostics):
 
     for filename in diagnostics["unknown_files"]:
         print(f"  WARNING: could not classify {filename}")
+
+    for item in diagnostics["metadata_mismatches"]:
+        print(
+            "  WARNING: filename/HTML mismatch: "
+            f"{item['filename']} looks like "
+            f"{item['filename_snapshot']} by filename, "
+            f"but Yahoo metadata says {item['html_snapshot']}."
+        )
 
 
 def html_first_discovery(prefix):
