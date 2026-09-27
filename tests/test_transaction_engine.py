@@ -354,6 +354,48 @@ class TransactionEngineTests(TestCase):
             1,
         )
 
+    def test_missing_four_week_projection_does_not_create_fake_upgrade(self):
+        roster = base_roster()
+
+        backup = next(
+            item
+            for item in roster
+            if item["yahoo_player_id"] == "qb2"
+        )
+        backup["next_4_weeks_projection"] = None
+
+        available = [
+            player(
+                "fa-qb",
+                "Available QB",
+                "QB",
+                bye_week=7,
+                week_projection=18.0,
+                four_week_projection=73.0,
+            ),
+        ]
+
+        recommendations = build_transaction_recommendations(
+            roster,
+            available,
+            limit=10,
+            current_week=1,
+        )
+
+        fake_upgrade = [
+            move
+            for move in recommendations
+            if (
+                move["add"]["yahoo_player_id"] == "fa-qb"
+                and move["drop"]["yahoo_player_id"] == "qb2"
+            )
+        ]
+
+        self.assertEqual(
+            fake_upgrade,
+            [],
+        )
+
     def test_roster_metrics_ignore_stale_week_one_alias(self):
         roster = base_roster()
 
