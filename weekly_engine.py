@@ -7,6 +7,7 @@ import json
 from database import (
     load_season_league_state,
     load_season_roster,
+    snapshot_season_roster,
 )
 from fantasy_calendar import (
     UK_TIME,
@@ -265,6 +266,18 @@ def add_roster_slots(
     local_roster = load_season_roster(
         season
     )
+
+    # Keep a durable snapshot of the current fantasy week's roster. Repeated
+    # refreshes within the week may update this snapshot as real transactions
+    # happen, but historical weeks are never rewritten from the current roster.
+    if week == current_fantasy_week(
+        season
+    ):
+        snapshot_season_roster(
+            week,
+            season=season,
+            roster=local_roster,
+        )
 
     by_name = {
         player["player_name"].lower():
