@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -204,6 +204,35 @@ def initialise_database():
 
                 UNIQUE (
                     season_id,
+                    player_id
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_player_week (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+                player_id TEXT NOT NULL,
+
+                player_name TEXT NOT NULL,
+                position TEXT,
+                team TEXT,
+
+                projection REAL,
+                actual REAL,
+
+                source TEXT NOT NULL
+                    DEFAULT 'manual_html',
+
+                updated_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
                     player_id
                 ),
 
@@ -1064,6 +1093,158 @@ def update_recommendation_action_status(
                 season_id,
             ),
         )
+
+
+def upsert_player_week_history(
+    players,
+    season=None,
+    source="manual_html",
+):
+    """Persist normalized player/week projections and actuals."""
+
+    initialise_database()
+
+    rows_written = 0
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        for player_id, player in players.items():
+            for week, week_data in (
+                player.get(
+                    "weeks",
+                    {},
+                ).items()
+            ):
+                try:
+                    week_number = int(week)
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+                    continue
+
+                projection = week_data.get(
+                    "projection"
+                )
+                actual = week_data.get(
+                    "actual"
+                )
+
+                if (
+                    projection is None
+                    and actual is None
+                ):
+                    continue
+
+                db.execute(
+                    """
+                    INSERT INTO season_player_week (
+                        season_id,
+                        week,
+                        player_id,
+                        player_name,
+                        position,
+                        team,
+                        projection,
+                        actual,
+                        source,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(
+                        season_id,
+                        week,
+                        player_id
+                    )
+                    DO UPDATE SET
+                        player_name = excluded.player_name,
+                        position = COALESCE(
+                            excluded.position,
+                            season_player_week.position
+                        ),
+                        team = COALESCE(
+                            excluded.team,
+                            season_player_week.team
+                        ),
+                        projection = COALESCE(
+                            excluded.projection,
+                            season_player_week.projection
+                        ),
+                        actual = COALESCE(
+                            excluded.actual,
+                            season_player_week.actual
+                        ),
+                        source = excluded.source,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        season_id,
+                        week_number,
+                        str(player_id),
+                        player.get(
+                            "name",
+                            str(player_id),
+                        ),
+                        player.get("position"),
+                        player.get("team"),
+                        projection,
+                        actual,
+                        str(source),
+                    ),
+                )
+
+                rows_written += 1
+
+    return rows_written
+
+
+def load_player_week_history(
+    week,
+    season=None,
+):
+    """Return stored player results/projections for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                position,
+                team,
+                projection,
+                actual,
+                source,
+                updated_at
+            FROM season_player_week
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY
+                position,
+                player_name
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def snapshot_season_roster(
