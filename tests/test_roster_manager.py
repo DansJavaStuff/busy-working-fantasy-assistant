@@ -345,6 +345,106 @@ class RosterManagerTests(TestCase):
             roster,
         )
 
+    def test_weekly_roster_snapshots_keep_weeks_independent(self):
+        database.snapshot_season_roster(
+            2,
+            season=2026,
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+                "bye_week": 8,
+            },
+            season=2026,
+        )
+
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        week_two = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                2,
+                season=2026,
+            )
+        }
+
+        week_three = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                3,
+                season=2026,
+            )
+        }
+
+        self.assertIn(
+            "k1",
+            week_two,
+        )
+        self.assertNotIn(
+            "k2",
+            week_two,
+        )
+        self.assertNotIn(
+            "k1",
+            week_three,
+        )
+        self.assertIn(
+            "k2",
+            week_three,
+        )
+
+    def test_resnapshot_updates_only_current_week_copy(self):
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+                "bye_week": 8,
+            },
+            season=2026,
+        )
+
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        snapshot = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                3,
+                season=2026,
+            )
+        }
+
+        self.assertNotIn(
+            "k1",
+            snapshot,
+        )
+        self.assertIn(
+            "k2",
+            snapshot,
+        )
+        self.assertEqual(
+            snapshot["k2"]["roster_slot"],
+            "K",
+        )
+
     def test_ir_move_is_rejected_for_now(self):
         with self.assertRaises(ValueError):
             roster_manager.move_roster_player(
