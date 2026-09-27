@@ -103,6 +103,76 @@ TRANSACTIONS = [
 ]
 
 
+
+
+KNOWN_LINEUP_SWAPS = {
+    # Confirmed from Yahoo My Team / Daniel's Week 3 lineup:
+    # Puka was benched and Courtland Sutton started at WR.
+    3: [
+        ("Puka Nacua", "Courtland Sutton"),
+    ],
+}
+
+
+def apply_known_lineup_swaps(
+    roster,
+    week,
+):
+    output = [
+        dict(player)
+        for player in roster
+    ]
+
+    by_name = {
+        player["player_name"]: player
+        for player in output
+    }
+
+    for starter_name, bench_name in (
+        KNOWN_LINEUP_SWAPS.get(
+            int(week),
+            [],
+        )
+    ):
+        starter = by_name.get(
+            starter_name
+        )
+        bench = by_name.get(
+            bench_name
+        )
+
+        if (
+            starter is None
+            or bench is None
+        ):
+            continue
+
+        (
+            starter["roster_slot"],
+            bench["roster_slot"],
+        ) = (
+            bench["roster_slot"],
+            starter["roster_slot"],
+        )
+
+        (
+            starter["slot_index"],
+            bench["slot_index"],
+        ) = (
+            bench["slot_index"],
+            starter["slot_index"],
+        )
+
+        starter["source"] = (
+            "historical_lineup_correction"
+        )
+        bench["source"] = (
+            "historical_lineup_correction"
+        )
+
+    return output
+
+
 def print_week_summary(
     week,
 ):
@@ -238,6 +308,13 @@ def main():
                 TRANSACTIONS,
                 target_week=week,
                 season=SEASON,
+            )
+        )
+
+        reconstructed = (
+            apply_known_lineup_swaps(
+                reconstructed,
+                week,
             )
         )
 
