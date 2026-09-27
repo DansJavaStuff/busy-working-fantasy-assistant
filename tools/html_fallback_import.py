@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import re
 import sys
 
 
@@ -320,9 +321,7 @@ def persist_submitted_lineups():
     for snapshot_name, paths in sorted(
         sources.items()
     ):
-        match = __import__(
-            "re"
-        ).fullmatch(
+        match = re.fullmatch(
             r"week_(\d+)_actual",
             snapshot_name,
         )
