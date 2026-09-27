@@ -14,6 +14,9 @@ from yahoo_normalizer import (
     build_dataset,
     preserve_locked_projections,
 )
+from database import (
+    upsert_player_week_history,
+)
 
 
 NORMALIZED_OUTPUT_FILE = (
@@ -244,6 +247,15 @@ def write_normalized_dataset():
         encoding="utf-8",
     )
 
+    history_rows = upsert_player_week_history(
+        dataset.get(
+            "players",
+            {},
+        ),
+        season=2026,
+        source="manual_html",
+    )
+
     week_numbers = sorted(
         {
             int(week)
@@ -286,6 +298,10 @@ def write_normalized_dataset():
     print(
         f"Output:     "
         f"{NORMALIZED_OUTPUT_FILE}"
+    )
+    print(
+        f"History:    "
+        f"{history_rows} player/week row(s) persisted"
     )
 
     return dataset
