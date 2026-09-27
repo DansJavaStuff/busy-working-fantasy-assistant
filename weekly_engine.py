@@ -24,6 +24,9 @@ from transaction_engine import (
     build_bye_coverage,
     build_transaction_recommendations,
 )
+from history_reconstruction import (
+    canonical_history_roster,
+)
 from weekly_evidence import (
     build_start_sit_evidence,
 )
@@ -1435,10 +1438,16 @@ def build_weekly_data(
             )
         }
 
+        history_roster = (
+            canonical_history_roster(
+                roster
+            )
+        )
+
         snapshot_season_roster(
             week,
             season=season,
-            roster=local_roster,
+            roster=history_roster,
             preserve_player_ids=
                 locked_player_ids,
         )
