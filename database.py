@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -303,6 +303,41 @@ def initialise_database():
                     season_id,
                     week,
                     roster_slot,
+                    slot_index
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_week_lineup (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                player_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                position TEXT NOT NULL,
+
+                lineup_slot TEXT NOT NULL,
+                slot_index INTEGER NOT NULL DEFAULT 1,
+
+                source TEXT NOT NULL
+                    DEFAULT 'yahoo_my_team',
+
+                captured_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
+                    player_id
+                ),
+
+                UNIQUE (
+                    season_id,
+                    week,
+                    lineup_slot,
                     slot_index
                 ),
 
@@ -1567,6 +1602,128 @@ def snapshot_season_roster(
             )
 
     return len(roster)
+
+
+def replace_week_lineup(
+    week,
+    players,
+    season=None,
+    source="yahoo_my_team",
+):
+    """Replace the submitted Yahoo lineup for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_week_lineup
+            WHERE season_id = ?
+              AND week = ?
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        )
+
+        for player in players:
+            db.execute(
+                """
+                INSERT INTO season_week_lineup (
+                    season_id,
+                    week,
+                    player_id,
+                    player_name,
+                    position,
+                    lineup_slot,
+                    slot_index,
+                    source,
+                    captured_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    season_id,
+                    int(week),
+                    str(player["player_id"]),
+                    player["player_name"],
+                    player["position"],
+                    player["lineup_slot"],
+                    int(
+                        player.get(
+                            "slot_index",
+                            1,
+                        )
+                    ),
+                    player.get(
+                        "source",
+                        source,
+                    ),
+                ),
+            )
+
+    return len(players)
+
+
+def load_week_lineup(
+    week,
+    season=None,
+):
+    """Return Yahoo's stored submitted lineup for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                position,
+                lineup_slot,
+                slot_index,
+                source,
+                captured_at
+            FROM season_week_lineup
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY
+                CASE lineup_slot
+                    WHEN 'QB' THEN 1
+                    WHEN 'RB' THEN 2
+                    WHEN 'WR' THEN 3
+                    WHEN 'TE' THEN 4
+                    WHEN 'FLEX' THEN 5
+                    WHEN 'K' THEN 6
+                    WHEN 'DEF' THEN 7
+                    WHEN 'BN' THEN 8
+                    WHEN 'IR' THEN 9
+                    ELSE 99
+                END,
+                slot_index
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def load_week_roster(
