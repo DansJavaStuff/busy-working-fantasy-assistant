@@ -539,6 +539,41 @@ def enrich_local_roster(
     return enriched
 
 
+def is_directly_acquirable(
+    player,
+):
+    """Return True only for players Yahoo marks as FA/waiver.
+
+    Older narrow snapshots sometimes lack roster_status entirely, so missing
+    status remains allowed for backwards compatibility. When Yahoo supplies an
+    explicit status, players owned by another fantasy team are excluded.
+    """
+
+    raw_status = player.get(
+        "roster_status"
+    )
+
+    if raw_status is None:
+        return True
+
+    status = str(
+        raw_status
+    ).strip()
+
+    if not status:
+        return True
+
+    upper = status.upper()
+
+    return (
+        upper == "FA"
+        or upper == "FREE AGENT"
+        or upper == "WAIVER"
+        or upper.startswith("W (")
+        or upper.startswith("W ")
+    )
+
+
 def get_effective_available_players(
     local_roster,
 ):
@@ -553,12 +588,17 @@ def get_effective_available_players(
     return [
         player
         for player in _snapshot_player_pool()
-        if not any(
-            _matches_local_player(
-                player,
-                local_player,
+        if (
+            is_directly_acquirable(
+                player
             )
-            for local_player in local_roster
+            and not any(
+                _matches_local_player(
+                    player,
+                    local_player,
+                )
+                for local_player in local_roster
+            )
         )
     ]
 
