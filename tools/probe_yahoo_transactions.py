@@ -22,11 +22,34 @@ PLAYER_RE = re.compile(
     re.IGNORECASE,
 )
 
+PLAYER_HREF_RE = re.compile(
+    r"/nfl/players/(\d+)"
+)
+
 
 def clean_text(value):
     return " ".join(
         value.split()
     )
+
+
+def yahoo_player_id(link):
+    player_id = link.get(
+        "data-ys-playerid"
+    )
+
+    if player_id:
+        return str(player_id)
+
+    href = link.get("href") or ""
+    match = PLAYER_HREF_RE.search(
+        href
+    )
+
+    if match:
+        return match.group(1)
+
+    return None
 
 
 def player_details(link):
@@ -52,10 +75,8 @@ def player_details(link):
             position = "DST"
 
     return {
-        "player_id": str(
-            link.get(
-                "data-ys-playerid"
-            )
+        "player_id": yahoo_player_id(
+            link
         ),
         "name": clean_text(
             link.get_text(
@@ -91,21 +112,16 @@ def transaction_container(link):
         ):
             continue
 
-        links = node.find_all(
-            "a",
-            attrs={
-                "data-ys-playerid": True,
-            },
-        )
+        links = [
+            item
+            for item in node.find_all("a")
+            if yahoo_player_id(item)
+        ]
 
         ids = {
-            item.get(
-                "data-ys-playerid"
-            )
+            yahoo_player_id(item)
             for item in links
-            if item.get(
-                "data-ys-playerid"
-            )
+            if yahoo_player_id(item)
         }
 
         if 1 <= len(ids) <= 2:
@@ -127,12 +143,13 @@ def parse_candidates(path):
 
     groups = {}
 
-    for link in soup.find_all(
-        "a",
-        attrs={
-            "data-ys-playerid": True,
-        },
-    ):
+    candidate_links = [
+        link
+        for link in soup.find_all("a")
+        if yahoo_player_id(link)
+    ]
+
+    for link in candidate_links:
         container = transaction_container(
             link
         )
@@ -157,14 +174,9 @@ def parse_candidates(path):
         player_links = []
         seen = set()
 
-        for player_link in container.find_all(
-            "a",
-            attrs={
-                "data-ys-playerid": True,
-            },
-        ):
-            player_id = player_link.get(
-                "data-ys-playerid"
+        for player_link in container.find_all("a"):
+            player_id = yahoo_player_id(
+                player_link
             )
 
             if (
@@ -181,9 +193,7 @@ def parse_candidates(path):
         key = (
             date_match.group(0).lower(),
             tuple(
-                link.get(
-                    "data-ys-playerid"
-                )
+                yahoo_player_id(link)
                 for link in player_links
             ),
         )
