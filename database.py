@@ -1395,8 +1395,14 @@ def snapshot_season_roster(
     week,
     season=None,
     roster=None,
+    preserve_player_ids=None,
 ):
-    """Replace one fantasy week's roster snapshot with the current roster."""
+    """Persist one fantasy week's roster snapshot.
+
+    With no preserved ids this replaces the whole snapshot. When preserved
+    player ids are supplied, those existing rows are retained and only the
+    still-unlocked part of the roster is refreshed.
+    """
 
     initialise_database()
 
@@ -1412,25 +1418,67 @@ def snapshot_season_roster(
             season
         )
 
+    preserve_player_ids = {
+        str(player_id)
+        for player_id in (
+            preserve_player_ids
+            or set()
+        )
+    }
+
     with connect() as db:
         season_id = get_or_create_season(
             db,
             season,
         )
 
-        db.execute(
-            """
-            DELETE FROM season_week_roster
-            WHERE season_id = ?
-              AND week = ?
-            """,
-            (
-                season_id,
-                week,
-            ),
-        )
+        if preserve_player_ids:
+            placeholders = ",".join(
+                "?"
+                for _ in preserve_player_ids
+            )
+
+            db.execute(
+                f"""
+                DELETE FROM season_week_roster
+                WHERE season_id = ?
+                  AND week = ?
+                  AND player_id NOT IN (
+                      {placeholders}
+                  )
+                """,
+                (
+                    season_id,
+                    week,
+                    *sorted(
+                        preserve_player_ids
+                    ),
+                ),
+            )
+        else:
+            db.execute(
+                """
+                DELETE FROM season_week_roster
+                WHERE season_id = ?
+                  AND week = ?
+                """,
+                (
+                    season_id,
+                    week,
+                ),
+            )
 
         for player in roster:
+            player_id = str(
+                player["player_id"]
+            )
+
+            if (
+                player_id
+                in preserve_player_ids
+            ):
+                continue
+
             db.execute(
                 """
                 INSERT INTO season_week_roster (
@@ -1452,9 +1500,7 @@ def snapshot_season_roster(
                 (
                     season_id,
                     week,
-                    str(
-                        player["player_id"]
-                    ),
+                    player_id,
                     player["player_name"],
                     player["position"],
                     player["roster_slot"],
