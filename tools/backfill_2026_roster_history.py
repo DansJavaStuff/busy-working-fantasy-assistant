@@ -7,7 +7,11 @@ from database import (
     snapshot_season_roster,
 )
 from history_reconstruction import (
+    canonical_history_roster,
     roster_at_week_end,
+)
+from yahoo_provider import (
+    enrich_local_roster,
 )
 
 
@@ -161,9 +165,17 @@ def print_week_summary(
 
 
 def main():
-    current_roster = (
+    current_local_roster = (
         load_season_roster(
             SEASON
+        )
+    )
+
+    current_roster = (
+        canonical_history_roster(
+            enrich_local_roster(
+                current_local_roster
+            )
         )
     )
 
