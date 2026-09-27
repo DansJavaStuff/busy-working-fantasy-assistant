@@ -47,6 +47,7 @@ from refresh_data import (
     refresh_ffc,
 )
 from roster_display import build_roster_slots
+from history_engine import build_history_week
 from roster_manager import (
     move_roster_player,
     replace_roster_player,
@@ -398,6 +399,59 @@ def weekly():
 
     return render_template(
         "weekly.html",
+        data=data,
+    )
+
+
+@app.get("/history")
+def history():
+    season = 2026
+    current_week = current_fantasy_week(
+        season
+    )
+
+    requested_week = request.args.get(
+        "week",
+        type=int,
+    )
+
+    available_weeks = list(
+        range(
+            1,
+            current_week + 1,
+        )
+    )
+
+    week = (
+        requested_week
+        if requested_week in available_weeks
+        else current_week
+    )
+
+    history_data = build_history_week(
+        week,
+        season=season,
+    )
+
+    data = {
+        "league": {
+            "name":
+                CURRENT_LEAGUE_NAME,
+            "season":
+                season,
+        },
+        "team":
+            load_team_identity(
+                season
+            ),
+        "history":
+            history_data,
+        "available_weeks":
+            available_weeks,
+    }
+
+    return render_template(
+        "history.html",
         data=data,
     )
 
