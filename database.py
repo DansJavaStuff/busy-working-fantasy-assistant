@@ -1468,14 +1468,63 @@ def snapshot_season_roster(
                 ),
             )
 
+        preserved_slots = set()
+
+        if preserve_player_ids:
+            placeholders = ",".join(
+                "?"
+                for _ in preserve_player_ids
+            )
+
+            preserved_rows = db.execute(
+                f"""
+                SELECT
+                    roster_slot,
+                    slot_index
+                FROM season_week_roster
+                WHERE season_id = ?
+                  AND week = ?
+                  AND player_id IN (
+                      {placeholders}
+                  )
+                """,
+                (
+                    season_id,
+                    week,
+                    *sorted(
+                        preserve_player_ids
+                    ),
+                ),
+            ).fetchall()
+
+            preserved_slots = {
+                (
+                    row["roster_slot"],
+                    row["slot_index"],
+                )
+                for row in preserved_rows
+            }
+
         for player in roster:
             player_id = str(
                 player["player_id"]
             )
 
+            slot_key = (
+                player["roster_slot"],
+                int(
+                    player.get(
+                        "slot_index",
+                        1,
+                    )
+                ),
+            )
+
             if (
                 player_id
                 in preserve_player_ids
+                or slot_key
+                in preserved_slots
             ):
                 continue
 
