@@ -112,6 +112,113 @@ class HistoryEngineTests(TestCase):
             10.0,
         )
 
+    def test_submitted_lineup_overrides_reconstructed_slots(self):
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+            roster=[
+                {
+                    "roster_slot": "WR",
+                    "slot_index": 1,
+                    "player_id": "puka",
+                    "player_name": "Puka Nacua",
+                    "position": "WR",
+                    "team": "LAR",
+                },
+                {
+                    "roster_slot": "BN",
+                    "slot_index": 1,
+                    "player_id": "pollard",
+                    "player_name": "Tony Pollard",
+                    "position": "RB",
+                    "team": "TEN",
+                },
+            ],
+        )
+
+        database.replace_week_lineup(
+            3,
+            [
+                {
+                    "player_id": "puka",
+                    "player_name": "Puka Nacua",
+                    "position": "WR",
+                    "lineup_slot": "BN",
+                    "slot_index": 1,
+                },
+                {
+                    "player_id": "pollard",
+                    "player_name": "Tony Pollard",
+                    "position": "RB",
+                    "lineup_slot": "FLEX",
+                    "slot_index": 1,
+                },
+            ],
+            season=2026,
+        )
+
+        database.upsert_player_week_history(
+            {
+                "puka": {
+                    "name": "Puka Nacua",
+                    "position": "WR",
+                    "team": "LAR",
+                    "weeks": {
+                        "3": {
+                            "projection": 0.0,
+                            "actual": None,
+                        }
+                    },
+                },
+                "pollard": {
+                    "name": "Tony Pollard",
+                    "position": "RB",
+                    "team": "TEN",
+                    "weeks": {
+                        "3": {
+                            "projection": 10.0,
+                            "actual": 11.6,
+                        }
+                    },
+                },
+            },
+            season=2026,
+        )
+
+        history = build_history_week(
+            3,
+            season=2026,
+        )
+
+        by_id = {
+            row["player_id"]: row
+            for row in history["rows"]
+        }
+
+        self.assertEqual(
+            by_id["puka"]["roster_slot"],
+            "BN",
+        )
+        self.assertFalse(
+            by_id["puka"]["is_starter"]
+        )
+        self.assertEqual(
+            by_id["pollard"]["roster_slot"],
+            "FLEX",
+        )
+        self.assertTrue(
+            by_id["pollard"]["is_starter"]
+        )
+        self.assertEqual(
+            history["starter_actual"],
+            11.6,
+        )
+        self.assertTrue(
+            history[
+                "submitted_lineup_available"
+            ]
+        )
+
     def test_incomplete_week_does_not_fake_missing_actual(self):
         database.snapshot_season_roster(
             3,
