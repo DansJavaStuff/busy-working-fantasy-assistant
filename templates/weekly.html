@@ -98,6 +98,26 @@ Manual snapshot
     </button>
 </form>
 
+{% if request.args.get("lineup_saved") == "1" %}
+<div class="yahoo-data-status">
+    Submitted lineup saved for Week {{ data.weekly.week }}.
+</div>
+{% endif %}
+
+<form
+    method="post"
+    action="{{ url_for('save_submitted_lineup') }}"
+    class="yahoo-refresh-form"
+    onsubmit="return confirm('Save the current recommended lineup as the lineup you submitted to Yahoo for Week {{ data.weekly.week }}?');"
+>
+    <button
+        type="submit"
+        class="yahoo-refresh-button"
+    >
+        Save Recommended Lineup as Submitted
+    </button>
+</form>
+
 <section class="weekly-summary">
     <div class="weekly-card">
         <span>
