@@ -5,6 +5,7 @@ from unittest.mock import patch
 import weekly_engine
 from weekly_engine import (
     add_transaction_deadlines,
+    apply_submitted_lineup_slots,
     build_speculative_waiver_moves,
     build_status_watch,
     cached_start_sit_evidence,
@@ -40,6 +41,75 @@ class WeeklyEngineCurrentWeekTests(TestCase):
 
         self.assertTrue(
             has_played(player)
+        )
+
+    def test_submitted_lineup_slots_override_local_slots_for_locks(self):
+        roster = [
+            {
+                "yahoo_player_id": "evans",
+                "name": "Mike Evans",
+                "position": "WR",
+                "roster_slot": "FLEX",
+                "slot_index": 1,
+                "current_week_actual": 10.9,
+            },
+            {
+                "yahoo_player_id": "pollard",
+                "name": "Tony Pollard",
+                "position": "RB",
+                "roster_slot": "BN",
+                "slot_index": 1,
+                "current_week_actual": 11.6,
+            },
+            {
+                "yahoo_player_id": "sutton",
+                "name": "Courtland Sutton",
+                "position": "WR",
+                "roster_slot": "WR",
+                "slot_index": 1,
+                "current_week_actual": None,
+            },
+        ]
+
+        submitted = [
+            {
+                "player_id": "evans",
+                "lineup_slot": "WR",
+                "slot_index": 2,
+            },
+            {
+                "player_id": "pollard",
+                "lineup_slot": "FLEX",
+                "slot_index": 1,
+            },
+            {
+                "player_id": "sutton",
+                "lineup_slot": "BN",
+                "slot_index": 2,
+            },
+        ]
+
+        output = apply_submitted_lineup_slots(
+            roster,
+            submitted,
+        )
+
+        by_id = {
+            player["yahoo_player_id"]: player
+            for player in output
+        }
+
+        self.assertEqual(
+            by_id["evans"]["roster_slot"],
+            "WR",
+        )
+        self.assertEqual(
+            by_id["pollard"]["roster_slot"],
+            "FLEX",
+        )
+        self.assertEqual(
+            by_id["sutton"]["roster_slot"],
+            "BN",
         )
 
     def test_status_watch_includes_starter_and_bench_concerns(self):
