@@ -34,6 +34,7 @@ from database import (
     load_season_league_state,
     load_season_roster,
     load_team_identity,
+    load_week_lineup,
     replace_week_lineup,
     record_recommendation_action,
     save_current_draft_order,
@@ -396,6 +397,11 @@ def weekly():
             ),
         "weekly":
             weekly_data,
+        "submitted_lineup":
+            load_week_lineup(
+                week,
+                season=season,
+            ),
     }
 
     return render_template(
@@ -464,10 +470,38 @@ def save_submitted_lineup():
         season
     )
 
+    existing = load_week_lineup(
+        week,
+        season=season,
+    )
+
+    if existing:
+        return redirect(
+            url_for(
+                "weekly",
+                lineup_already_saved="1",
+            )
+        )
+
     weekly_data = build_weekly_data(
         season=season,
         week=week,
     )
+
+    if any(
+        player.get(
+            "current_week_actual"
+        ) is not None
+        for player in weekly_data[
+            "roster"
+        ]
+    ):
+        return redirect(
+            url_for(
+                "weekly",
+                lineup_locked="1",
+            )
+        )
 
     rows = []
     slot_counts = {}
