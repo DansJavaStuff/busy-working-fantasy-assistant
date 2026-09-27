@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -205,6 +205,43 @@ def initialise_database():
                 UNIQUE (
                     season_id,
                     player_id
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_week_roster (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                player_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                position TEXT NOT NULL,
+
+                roster_slot TEXT NOT NULL,
+                slot_index INTEGER NOT NULL DEFAULT 1,
+
+                team TEXT,
+                bye_week INTEGER,
+                status TEXT,
+                source TEXT,
+
+                captured_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
+                    player_id
+                ),
+
+                UNIQUE (
+                    season_id,
+                    week,
+                    roster_slot,
+                    slot_index
                 ),
 
                 FOREIGN KEY (season_id)
@@ -1027,6 +1064,147 @@ def update_recommendation_action_status(
                 season_id,
             ),
         )
+
+
+def snapshot_season_roster(
+    week,
+    season=None,
+    roster=None,
+):
+    """Replace one fantasy week's roster snapshot with the current roster."""
+
+    initialise_database()
+
+    week = int(week)
+
+    if week < 1:
+        raise ValueError(
+            "Fantasy week must be 1 or higher"
+        )
+
+    if roster is None:
+        roster = load_season_roster(
+            season
+        )
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_week_roster
+            WHERE season_id = ?
+              AND week = ?
+            """,
+            (
+                season_id,
+                week,
+            ),
+        )
+
+        for player in roster:
+            db.execute(
+                """
+                INSERT INTO season_week_roster (
+                    season_id,
+                    week,
+                    player_id,
+                    player_name,
+                    position,
+                    roster_slot,
+                    slot_index,
+                    team,
+                    bye_week,
+                    status,
+                    source,
+                    captured_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    season_id,
+                    week,
+                    str(
+                        player["player_id"]
+                    ),
+                    player["player_name"],
+                    player["position"],
+                    player["roster_slot"],
+                    int(
+                        player.get(
+                            "slot_index",
+                            1,
+                        )
+                    ),
+                    player.get("team"),
+                    player.get("bye_week"),
+                    player.get("status"),
+                    player.get("source"),
+                ),
+            )
+
+    return len(roster)
+
+
+def load_week_roster(
+    week,
+    season=None,
+):
+    """Return the stored roster snapshot for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                position,
+                roster_slot,
+                slot_index,
+                team,
+                bye_week,
+                status,
+                source,
+                captured_at
+            FROM season_week_roster
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY
+                CASE roster_slot
+                    WHEN 'QB' THEN 1
+                    WHEN 'RB' THEN 2
+                    WHEN 'WR' THEN 3
+                    WHEN 'TE' THEN 4
+                    WHEN 'FLEX' THEN 5
+                    WHEN 'K' THEN 6
+                    WHEN 'DEF' THEN 7
+                    WHEN 'BN' THEN 8
+                    WHEN 'IR' THEN 9
+                    ELSE 99
+                END,
+                slot_index
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def load_season_roster(season=None):
