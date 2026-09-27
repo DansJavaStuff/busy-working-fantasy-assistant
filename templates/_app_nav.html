@@ -27,6 +27,15 @@
     </a>
 
     <a
+        {% if request.endpoint == 'history' %}
+        class="active"
+        {% endif %}
+        href="{{ url_for('history') }}"
+    >
+        History
+    </a>
+
+    <a
         {% if request.endpoint == 'my_team' %}
         class="active"
         {% endif %}
