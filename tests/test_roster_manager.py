@@ -345,6 +345,91 @@ class RosterManagerTests(TestCase):
             roster,
         )
 
+    def test_player_week_history_preserves_actuals_and_projections(self):
+        players = {
+            "k1": {
+                "name": "Kicker One",
+                "position": "K",
+                "team": "LAC",
+                "weeks": {
+                    "1": {
+                        "projection": 7.0,
+                        "actual": 9.0,
+                    },
+                    "2": {
+                        "projection": 6.5,
+                        "actual": 4.0,
+                    },
+                },
+            }
+        }
+
+        database.upsert_player_week_history(
+            players,
+            season=2026,
+        )
+
+        week_one = (
+            database.load_player_week_history(
+                1,
+                season=2026,
+            )
+        )
+        week_two = (
+            database.load_player_week_history(
+                2,
+                season=2026,
+            )
+        )
+
+        self.assertEqual(
+            week_one[0]["actual"],
+            9.0,
+        )
+        self.assertEqual(
+            week_one[0]["projection"],
+            7.0,
+        )
+        self.assertEqual(
+            week_two[0]["actual"],
+            4.0,
+        )
+
+        # A later import that lacks an actual must not erase the historical
+        # actual already stored for that player/week.
+        database.upsert_player_week_history(
+            {
+                "k1": {
+                    "name": "Kicker One",
+                    "position": "K",
+                    "team": "LAC",
+                    "weeks": {
+                        "1": {
+                            "projection": 7.2,
+                            "actual": None,
+                        }
+                    },
+                }
+            },
+            season=2026,
+        )
+
+        refreshed = (
+            database.load_player_week_history(
+                1,
+                season=2026,
+            )
+        )
+
+        self.assertEqual(
+            refreshed[0]["actual"],
+            9.0,
+        )
+        self.assertEqual(
+            refreshed[0]["projection"],
+            7.2,
+        )
+
     def test_weekly_roster_snapshots_keep_weeks_independent(self):
         database.snapshot_season_roster(
             2,
