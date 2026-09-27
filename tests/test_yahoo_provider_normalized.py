@@ -212,6 +212,68 @@ class YahooProviderNormalizedTests(TestCase):
         self.assertEqual(player["current_week_projection"], 8.3)
         self.assertEqual(player["next_4_weeks_projection"], 30.0)
 
+    def test_effective_availability_excludes_other_team_players(self):
+        class SnapshotProvider:
+            @staticmethod
+            def get_roster():
+                return []
+
+            @staticmethod
+            def get_available_players():
+                return [
+                    {
+                        "yahoo_player_id": "fa-1",
+                        "name": "Free Agent",
+                        "team": "KC",
+                        "position": "WR",
+                        "roster_status": "FA",
+                    },
+                    {
+                        "yahoo_player_id": "w-1",
+                        "name": "Waiver Player",
+                        "team": "BUF",
+                        "position": "RB",
+                        "roster_status": "W (Sep 29)",
+                    },
+                    {
+                        "yahoo_player_id": "owned-1",
+                        "name": "Owned Star",
+                        "team": "BAL",
+                        "position": "QB",
+                        "roster_status": "The Hurts Locker",
+                    },
+                ]
+
+        with patch.object(
+            yahoo_provider,
+            "yahoo_provider",
+            SnapshotProvider(),
+        ):
+            available = (
+                yahoo_provider
+                .get_effective_available_players(
+                    []
+                )
+            )
+
+        ids = {
+            player["yahoo_player_id"]
+            for player in available
+        }
+
+        self.assertIn(
+            "fa-1",
+            ids,
+        )
+        self.assertIn(
+            "w-1",
+            ids,
+        )
+        self.assertNotIn(
+            "owned-1",
+            ids,
+        )
+
     def test_effective_availability_follows_local_roster_membership(self):
         class SnapshotProvider:
             @staticmethod
