@@ -4,6 +4,88 @@ from datetime import datetime
 from fantasy_calendar import current_fantasy_week
 
 
+
+
+
+def canonical_history_roster(
+    enriched_roster,
+):
+    """Convert an enriched local roster to Yahoo-keyed history rows.
+
+    Current roster membership/slots remain locally authoritative, but Yahoo's
+    player id is the canonical identity used by season_player_week. Using the
+    same id here makes historical roster rows join directly to projections and
+    actuals.
+    """
+
+    output = []
+
+    for player in enriched_roster:
+        yahoo_id = player.get(
+            "yahoo_player_id"
+        )
+
+        if yahoo_id is None:
+            raise ValueError(
+                "Cannot persist historical roster row without Yahoo id: "
+                + str(
+                    player.get(
+                        "name",
+                        player.get(
+                            "player_name",
+                            "unknown player",
+                        ),
+                    )
+                )
+            )
+
+        output.append(
+            {
+                "player_id": str(
+                    yahoo_id
+                ),
+                "player_name":
+                    player.get(
+                        "name"
+                    )
+                    or player.get(
+                        "player_name"
+                    ),
+                "position":
+                    player.get(
+                        "position"
+                    ),
+                "team":
+                    player.get(
+                        "team"
+                    ),
+                "roster_slot":
+                    player.get(
+                        "roster_slot"
+                    ),
+                "slot_index":
+                    int(
+                        player.get(
+                            "slot_index",
+                            1,
+                        )
+                    ),
+                "bye_week":
+                    player.get(
+                        "bye_week"
+                    ),
+                "status":
+                    player.get(
+                        "status"
+                    ),
+                "source":
+                    "yahoo_canonical_history",
+            }
+        )
+
+    return output
+
+
 def transaction_week(
     transaction,
     season,
