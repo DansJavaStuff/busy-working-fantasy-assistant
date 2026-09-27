@@ -4,6 +4,7 @@ from database import (
     load_season_roster,
     load_week_roster,
     replace_season_transactions,
+    replace_week_lineup,
     snapshot_season_roster,
 )
 from history_reconstruction import (
@@ -21,6 +22,25 @@ SEASON = 2026
 # pages independently corroborate these rows; this list is deliberately kept
 # explicit because the backfill is a one-off reconstruction, not a recurring
 # transaction-scraping dependency.
+WEEK_3_SUBMITTED_LINEUP = [
+    ("30977", "Josh Allen", "QB", "QB", 1),
+    ("41791", "Ashton Jeanty", "RB", "RB", 1),
+    ("31905", "David Montgomery", "RB", "RB", 2),
+    ("32703", "Tee Higgins", "WR", "WR", 1),
+    ("27535", "Mike Evans", "WR", "WR", 2),
+    ("40102", "Tucker Kraft", "TE", "TE", 1),
+    ("31960", "Tony Pollard", "RB", "FLEX", 1),
+    ("31482", "Eddy Pineiro", "K", "K", 1),
+    ("100009", "Packers", "DST", "DEF", 1),
+    ("40168", "Puka Nacua", "WR", "BN", 1),
+    ("31010", "Courtland Sutton", "WR", "BN", 2),
+    ("33415", "Rashod Bateman", "WR", "BN", 3),
+    ("40641", "Keaton Mitchell", "RB", "BN", 4),
+    ("40030", "C.J. Stroud", "QB", "BN", 5),
+    ("42630", "Jordyn Tyson", "WR", "IR", 1),
+]
+
+
 TRANSACTIONS = [
     {
         "occurred_at": "2026-09-08T18:43:00",
@@ -254,6 +274,36 @@ def main():
         "Tyson's pre-Week-1 IR placement is represented by the "
         "current roster state used as the reconstruction anchor; "
         "the Sep 8 Mitchell add therefore remains part of Week 1."
+    )
+
+    replace_week_lineup(
+        3,
+        [
+            {
+                "player_id": player_id,
+                "player_name": player_name,
+                "position": position,
+                "lineup_slot": lineup_slot,
+                "slot_index": slot_index,
+                "source": "confirmed_yahoo_screenshot",
+            }
+            for (
+                player_id,
+                player_name,
+                position,
+                lineup_slot,
+                slot_index,
+            )
+            in WEEK_3_SUBMITTED_LINEUP
+        ],
+        season=SEASON,
+        source="confirmed_yahoo_screenshot",
+    )
+
+    print()
+    print(
+        "Stored confirmed Week 3 submitted Yahoo lineup: "
+        "15 player(s)"
     )
 
     for week in (1, 2, 3):
