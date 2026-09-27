@@ -102,8 +102,23 @@ Manual snapshot
 <div class="yahoo-data-status">
     Submitted lineup saved for Week {{ data.weekly.week }}.
 </div>
+{% elif request.args.get("lineup_already_saved") == "1" %}
+<div class="yahoo-data-status">
+    Week {{ data.weekly.week }} already has a submitted lineup saved.
+</div>
+{% elif request.args.get("lineup_locked") == "1" %}
+<div class="yahoo-data-status">
+    Submitted lineup can no longer be saved because Week {{ data.weekly.week }} has already started.
+</div>
 {% endif %}
 
+{% if data.submitted_lineup %}
+<div class="yahoo-data-status">
+    Submitted lineup:
+    <strong>saved</strong>
+    · {{ data.submitted_lineup | length }} player(s)
+</div>
+{% else %}
 <form
     method="post"
     action="{{ url_for('save_submitted_lineup') }}"
@@ -117,6 +132,7 @@ Manual snapshot
         Save Recommended Lineup as Submitted
     </button>
 </form>
+{% endif %}
 
 <section class="weekly-summary">
     <div class="weekly-card">
