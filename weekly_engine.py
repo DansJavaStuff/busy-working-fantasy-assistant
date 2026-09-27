@@ -1682,10 +1682,16 @@ def build_weekly_data(
         )
     ]
 
-    first_lock = (
-        upcoming_lock_groups[0]
-        if upcoming_lock_groups
-        else None
+    first_lock = next(
+        (
+            group
+            for group in upcoming_lock_groups
+            if any(
+                item["role"] != "BENCH"
+                for item in group["players"]
+            )
+        ),
+        None,
     )
 
     next_decision = None
