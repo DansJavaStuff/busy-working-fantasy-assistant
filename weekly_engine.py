@@ -1083,9 +1083,20 @@ def build_speculative_waiver_moves(
             "datetime"
         )
 
+        now_local = datetime.now(
+            UK_TIME
+        )
+
+        # A speculative pre-drop only exists while the rostered player's
+        # game is still unlocked. Once that player has started/played, the
+        # manager can no longer execute the proposed pre-drop.
         if (
             waiver_date is None
             or drop_time is None
+            or drop_time <= now_local
+            or has_played(
+                drop_player
+            )
             or drop_time.date()
             > waiver_date
         ):
