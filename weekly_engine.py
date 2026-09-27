@@ -267,18 +267,6 @@ def add_roster_slots(
         season
     )
 
-    # Keep a durable snapshot of the current fantasy week's roster. Repeated
-    # refreshes within the week may update this snapshot as real transactions
-    # happen, but historical weeks are never rewritten from the current roster.
-    if week == current_fantasy_week(
-        season
-    ):
-        snapshot_season_roster(
-            week,
-            season=season,
-            roster=local_roster,
-        )
-
     by_name = {
         player["player_name"].lower():
             player
@@ -1397,6 +1385,63 @@ def build_weekly_data(
         )
         for player in roster
     ]
+
+    # Persist current-week ownership while respecting Yahoo game locks.
+    # A rostered player whose game has started (or whose actual is already
+    # present) is frozen in this week's history. Unlocked roster membership can
+    # still change after a real Yahoo transaction is recorded locally.
+    if week == current_fantasy_week(
+        season
+    ):
+        now_local = datetime.now(
+            UK_TIME
+        )
+
+        locked_player_ids = {
+            str(
+                player.get(
+                    "yahoo_player_id",
+                    player.get(
+                        "player_id",
+                        "",
+                    ),
+                )
+            )
+            for player in roster
+            if (
+                player.get(
+                    "current_week_actual"
+                )
+                is not None
+                or (
+                    (
+                        player.get(
+                            "local_game"
+                        )
+                        or {}
+                    ).get(
+                        "datetime"
+                    )
+                    is not None
+                    and (
+                        player[
+                            "local_game"
+                        ][
+                            "datetime"
+                        ]
+                        <= now_local
+                    )
+                )
+            )
+        }
+
+        snapshot_season_roster(
+            week,
+            season=season,
+            roster=local_roster,
+            preserve_player_ids=
+                locked_player_ids,
+        )
 
     available = [
         enrich_player_game_time(
