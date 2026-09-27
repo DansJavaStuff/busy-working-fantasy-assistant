@@ -261,6 +261,47 @@ class WeeklyEngineCurrentWeekTests(TestCase):
             places=2,
         )
 
+    def test_recommended_move_is_hidden_after_drop_player_has_actual(self):
+        move = {
+            "week_gain": 0.39,
+            "move_type": "DST UPGRADE",
+            "add": {
+                "name": "Eagles",
+                "position": "DST",
+                "roster_status": "FA",
+                "yahoo_player_id": "eagles",
+                "current_week_projection": 7.16,
+                "local_game": {
+                    "datetime": datetime(
+                        2099,
+                        9,
+                        29,
+                        1,
+                        15,
+                        tzinfo=weekly_engine.UK_TIME,
+                    )
+                },
+            },
+            "drop": {
+                "name": "Packers",
+                "position": "DST",
+                "yahoo_player_id": "packers",
+                "current_week_projection": 6.77,
+                "current_week_actual": -2.0,
+                "local_game": None,
+            },
+        }
+
+        output = add_transaction_deadlines(
+            [move],
+            2099,
+        )
+
+        self.assertEqual(
+            output,
+            [],
+        )
+
     def test_speculative_waiver_is_hidden_after_drop_player_locks(self):
         move = {
             "week_gain": 5.0,
