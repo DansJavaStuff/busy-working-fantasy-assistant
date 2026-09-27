@@ -7,6 +7,7 @@ import json
 from database import (
     load_season_league_state,
     load_season_roster,
+    load_week_lineup,
     snapshot_season_roster,
 )
 from fantasy_calendar import (
@@ -310,6 +311,56 @@ def add_roster_slots(
         player["slot_index"] = (
             local["slot_index"]
         )
+
+
+def apply_submitted_lineup_slots(
+    roster,
+    submitted_lineup,
+):
+    """Overlay confirmed Yahoo lineup slots for weekly decision locking.
+
+    Ownership/history snapshots continue to use the local roster separately;
+    this copy is only for start/sit and game-lock decisions.
+    """
+
+    by_id = {
+        str(row["player_id"]): row
+        for row in (
+            submitted_lineup
+            or []
+        )
+    }
+
+    output = []
+
+    for player in roster:
+        item = dict(player)
+
+        yahoo_id = str(
+            item.get(
+                "yahoo_player_id",
+                "",
+            )
+        )
+
+        submitted = by_id.get(
+            yahoo_id
+        )
+
+        if submitted:
+            item["roster_slot"] = (
+                submitted["lineup_slot"]
+            )
+            item["slot_index"] = (
+                submitted["slot_index"]
+            )
+            item["submitted_lineup"] = True
+
+        output.append(
+            item
+        )
+
+    return output
 
 
 def best_players(
@@ -1461,6 +1512,18 @@ def build_weekly_data(
         for player in available
     ]
 
+    submitted_lineup = load_week_lineup(
+        week,
+        season=season,
+    )
+
+    decision_roster = (
+        apply_submitted_lineup_slots(
+            roster,
+            submitted_lineup,
+        )
+    )
+
     provider_status = (
         yahoo_provider
         .get_status()
@@ -1506,7 +1569,7 @@ def build_weekly_data(
     )[:5]
 
     lineup = build_best_lineup(
-        roster
+        decision_roster
     )
 
     starter_ids = {
@@ -1518,7 +1581,7 @@ def build_weekly_data(
 
     bench = [
         player
-        for player in roster
+        for player in decision_roster
         if (
             player[
                 "yahoo_player_id"
@@ -1546,14 +1609,14 @@ def build_weekly_data(
 
     status_watch = (
         build_status_watch(
-            roster,
+            decision_roster,
             lineup,
         )
     )
 
     ir_review = [
         player
-        for player in roster
+        for player in decision_roster
         if player.get(
             "roster_slot"
         ) == "IR"
@@ -1595,7 +1658,7 @@ def build_weekly_data(
     )
 
     lock_groups = build_lock_groups(
-        roster,
+        decision_roster,
         lineup,
         season,
         week,
@@ -1731,7 +1794,7 @@ def build_weekly_data(
     return {
         "season": season,
         "week": week,
-        "roster": roster,
+        "roster": decision_roster,
         "lineup": lineup,
         "bench": bench,
 
