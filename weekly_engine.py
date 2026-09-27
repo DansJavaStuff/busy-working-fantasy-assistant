@@ -1210,6 +1210,14 @@ def add_transaction_deadlines(
         add_player = move["add"]
         drop_player = move["drop"]
 
+        # A player with a current-week actual has already played and is
+        # roster-locked for this scoring week. Do not recommend dropping that
+        # player as though the move could still affect the current matchup.
+        if has_played(
+            drop_player
+        ):
+            continue
+
         add_game = (
             add_player.get("local_game")
             or {}
