@@ -1,5 +1,6 @@
 from database import (
     load_player_week_history,
+    load_week_lineup,
     load_week_roster,
 )
 
@@ -22,6 +23,14 @@ def build_history_week(
         week,
         season=season,
     )
+
+    submitted_lineup = {
+        row["player_id"]: row
+        for row in load_week_lineup(
+            week,
+            season=season,
+        )
+    }
 
     player_history = {
         row["player_id"]: row
@@ -47,6 +56,26 @@ def build_history_week(
             {},
         )
 
+        lineup = submitted_lineup.get(
+            roster_player["player_id"]
+        )
+
+        effective_slot = (
+            lineup["lineup_slot"]
+            if lineup
+            else roster_player[
+                "roster_slot"
+            ]
+        )
+
+        effective_index = (
+            lineup["slot_index"]
+            if lineup
+            else roster_player[
+                "slot_index"
+            ]
+        )
+
         projection = result.get(
             "projection"
         )
@@ -66,7 +95,7 @@ def build_history_week(
             )
 
         is_starter = (
-            roster_player["roster_slot"]
+            effective_slot
             not in NON_SCORING_SLOTS
         )
 
@@ -95,14 +124,48 @@ def build_history_week(
         rows.append(
             {
                 **roster_player,
+                "roster_slot":
+                    effective_slot,
+                "slot_index":
+                    effective_index,
                 "projection": projection,
                 "actual": actual,
                 "variance": variance,
                 "is_starter": is_starter,
                 "has_history":
                     bool(result),
+                "lineup_source":
+                    (
+                        lineup.get(
+                            "source"
+                        )
+                        if lineup
+                        else None
+                    ),
             }
         )
+
+    slot_order = {
+        "QB": 1,
+        "RB": 2,
+        "WR": 3,
+        "TE": 4,
+        "FLEX": 5,
+        "K": 6,
+        "DEF": 7,
+        "BN": 8,
+        "IR": 9,
+    }
+
+    rows.sort(
+        key=lambda row: (
+            slot_order.get(
+                row["roster_slot"],
+                99,
+            ),
+            row["slot_index"],
+        )
+    )
 
     return {
         "season": int(season),
@@ -133,4 +196,6 @@ def build_history_week(
                 for row in rows
                 if row["is_starter"]
             ),
+        "submitted_lineup_available":
+            bool(submitted_lineup),
     }
