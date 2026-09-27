@@ -1,6 +1,5 @@
 from pathlib import Path
 import json
-import re
 import sys
 
 
@@ -16,7 +15,6 @@ from yahoo_normalizer import (
     preserve_locked_projections,
 )
 from database import (
-    replace_week_lineup,
     upsert_player_week_history,
 )
 
@@ -309,80 +307,6 @@ def write_normalized_dataset():
     return dataset
 
 
-def persist_submitted_lineups():
-    """Persist Yahoo's actual submitted lineup from saved My Team pages."""
-
-    sources, _ = discover_source_files(
-        importer.MY_TEAM_SOURCE_PREFIX
-    )
-
-    total_rows = 0
-
-    for snapshot_name, paths in sorted(
-        sources.items()
-    ):
-        match = re.fullmatch(
-            r"week_(\d+)_actual",
-            snapshot_name,
-        )
-
-        if not match:
-            continue
-
-        week = int(
-            match.group(1)
-        )
-
-        players = {}
-
-        for path in paths:
-            page_players = (
-                importer
-                .parse_my_team_lineup_page(
-                    path
-                )
-            )
-
-            players.update(
-                page_players
-            )
-
-        if not players:
-            print(
-                f"Lineup Week {week}: "
-                "no submitted slots parsed"
-            )
-            continue
-
-        rows = list(
-            players.values()
-        )
-
-        replace_week_lineup(
-            week,
-            rows,
-            season=2026,
-            source="yahoo_my_team_actual",
-        )
-
-        total_rows += len(
-            rows
-        )
-
-        print(
-            f"Lineup Week {week}: "
-            f"{len(rows)} submitted slot(s) persisted"
-        )
-
-    if total_rows:
-        print(
-            f"Submitted lineup history: "
-            f"{total_rows} row(s) persisted"
-        )
-
-    return total_rows
-
-
 def main():
     # Reuse the already-tested row parser/merger/output path, replacing only
     # source discovery.  Legacy JSON outputs are retained temporarily while
@@ -390,7 +314,6 @@ def main():
     importer.discover_source_files = html_first_discovery
     importer.main()
     write_normalized_dataset()
-    persist_submitted_lineups()
 
 
 if __name__ == "__main__":
