@@ -571,6 +571,36 @@ class RosterManagerTests(TestCase):
             snapshot,
         )
 
+    def test_history_roster_uses_yahoo_player_id_for_join(self):
+        roster = [
+            {
+                "player_id": "local-123",
+                "yahoo_player_id": "31482",
+                "player_name": "Eddy Pineiro",
+                "name": "Eddy Pineiro",
+                "position": "K",
+                "team": "SF",
+                "roster_slot": "K",
+                "slot_index": 1,
+            }
+        ]
+
+        history = (
+            history_reconstruction
+            .canonical_history_roster(
+                roster
+            )
+        )
+
+        self.assertEqual(
+            history[0]["player_id"],
+            "31482",
+        )
+        self.assertEqual(
+            history[0]["roster_slot"],
+            "K",
+        )
+
     def test_history_reconstruction_rewinds_later_transactions(self):
         current = database.load_season_roster(
             2026
