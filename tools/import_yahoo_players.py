@@ -41,7 +41,7 @@ PARSE_CACHE_FILE = (
     / "yahoo_html_store.json"
 )
 
-PARSE_CACHE_VERSION = 4
+PARSE_CACHE_VERSION = 5
 
 SEASON = 2026
 MY_TEAM_NAME = "Allen Wrench"
@@ -839,6 +839,186 @@ def parse_page(path):
             )
 
         seen.add(player_id)
+
+    return players
+
+
+def _normalise_lineup_slot(value):
+    value = clean_text(
+        value or ""
+    ).upper()
+
+    aliases = {
+        "W/R/T": "FLEX",
+        "W/R": "FLEX",
+        "R/W/T": "FLEX",
+        "DST": "DEF",
+    }
+
+    value = aliases.get(
+        value,
+        value,
+    )
+
+    if value in {
+        "QB",
+        "RB",
+        "WR",
+        "TE",
+        "FLEX",
+        "K",
+        "DEF",
+        "BN",
+        "IR",
+    }:
+        return value
+
+    return None
+
+
+def parse_my_team_lineup_page(path):
+    """Extract Yahoo submitted roster slots from one saved My Team page."""
+
+    html = path.read_text(
+        encoding="utf-8",
+        errors="ignore",
+    )
+
+    soup = BeautifulSoup(
+        html,
+        "html.parser",
+    )
+
+    players = {}
+    slot_counts = {}
+    seen = set()
+
+    for link in soup.find_all(
+        "a",
+        attrs={
+            "data-ys-playerid": True,
+        },
+    ):
+        player_id = link.get(
+            "data-ys-playerid"
+        )
+
+        if (
+            not player_id
+            or player_id in seen
+        ):
+            continue
+
+        row = link.find_parent("tr")
+
+        if row is None:
+            continue
+
+        cells = row.find_all(
+            ["th", "td"],
+            recursive=False,
+        )
+
+        if not cells:
+            continue
+
+        player_cell = link.find_parent(
+            ["th", "td"]
+        )
+
+        if (
+            player_cell is None
+            or player_cell not in cells
+        ):
+            continue
+
+        indexes = column_indexes(
+            row
+        )
+
+        slot_text = _cell_text(
+            cells,
+            indexes,
+            "pos",
+            fallback=0,
+        )
+
+        lineup_slot = (
+            _normalise_lineup_slot(
+                slot_text
+            )
+        )
+
+        if lineup_slot is None:
+            continue
+
+        name = clean_text(
+            link.get_text(
+                " ",
+                strip=True,
+            )
+        )
+
+        if not name:
+            # Yahoo's note icon can carry the player id but no visible name.
+            # Fall back to the first player link in the same cell.
+            candidate = (
+                player_cell.find(
+                    "a",
+                    href=re.compile(
+                        r"/nfl/(?:players|teams)/"
+                    ),
+                )
+            )
+
+            if candidate:
+                name = clean_text(
+                    candidate.get_text(
+                        " ",
+                        strip=True,
+                    )
+                )
+
+        team, position = (
+            extract_team_position(
+                player_cell
+            )
+        )
+
+        if (
+            not name
+            or not position
+        ):
+            continue
+
+        slot_counts[lineup_slot] = (
+            slot_counts.get(
+                lineup_slot,
+                0,
+            )
+            + 1
+        )
+
+        players[str(player_id)] = {
+            "player_id": str(
+                player_id
+            ),
+            "player_name": name,
+            "position": position,
+            "team": team,
+            "lineup_slot":
+                lineup_slot,
+            "slot_index":
+                slot_counts[
+                    lineup_slot
+                ],
+            "source":
+                "yahoo_my_team",
+        }
+
+        seen.add(
+            player_id
+        )
 
     return players
 
