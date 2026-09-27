@@ -16,7 +16,6 @@ if str(PROJECT_ROOT) not in sys.path:
     )
 
 from database import load_season_roster
-from fantasy_calendar import current_fantasy_week
 from roster_manager import replace_roster_player
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -1063,6 +1062,29 @@ def discover_source_files(
     return discovered
 
 
+def merge_source_maps(*source_maps):
+    """Combine Yahoo snapshot files regardless of which page supplied them."""
+
+    merged = {}
+
+    for source_map in source_maps:
+        for snapshot_name, paths in source_map.items():
+            merged.setdefault(
+                snapshot_name,
+                [],
+            ).extend(paths)
+
+    for paths in merged.values():
+        paths.sort(
+            key=lambda path: (
+                path.stat().st_mtime_ns,
+                path.name,
+            )
+        )
+
+    return merged
+
+
 def _my_team_page_kind(path):
     name = path.name
 
@@ -1570,21 +1592,12 @@ def merge_projection_sources(
             )
 
             if roster_status:
-                # Some Yahoo stat views can briefly disagree
-                # after a transaction. If any snapshot says
-                # the player is ours, do not let a stale
-                # FA/waiver view overwrite that.
-                if (
-                    roster_status
-                    == MY_TEAM_NAME
-                    or existing.get(
-                        "roster_status"
-                    )
-                    != MY_TEAM_NAME
-                ):
-                    existing[
-                        "roster_status"
-                    ] = roster_status
+                # Ownership is maintained by the local roster layer. Yahoo's
+                # roster-status field is informational only, so the newest
+                # parsed snapshot is allowed to replace an older value.
+                existing[
+                    "roster_status"
+                ] = roster_status
 
     return merged
 
@@ -1676,23 +1689,33 @@ def main():
         )
     )
 
-    if not player_sources:
+    my_team_sources = (
+        discover_source_files(
+            MY_TEAM_SOURCE_PREFIX
+        )
+    )
+
+    sources = merge_source_maps(
+        player_sources,
+        my_team_sources,
+    )
+
+    if not sources:
         raise SystemExit(
-            "No Yahoo player-list HTML "
-            "files found in data/"
+            "No Yahoo player HTML files found in data/"
         )
 
     print()
-    print("DISCOVERED PLAYER SNAPSHOTS")
-    print("===========================")
+    print("DISCOVERED YAHOO SNAPSHOTS")
+    print("==========================")
 
     for snapshot_name in sorted(
-        player_sources,
+        sources,
         key=snapshot_sort_key,
     ):
         print(
             f"{snapshot_name}: "
-            f"{len(player_sources[snapshot_name])} "
+            f"{len(sources[snapshot_name])} "
             "file(s)"
         )
 
@@ -1706,76 +1729,11 @@ def main():
 
     combined = (
         merge_projection_sources(
-            player_sources,
+            sources,
             parse_cache=parse_cache,
             cache_stats=cache_stats,
         )
     )
-
-    # Persist the first pass before metadata discovery for the My Team pages.
-    # The fallback discoverer shares this same local JSON store.
-    save_parse_cache(
-        parse_cache
-    )
-
-    my_team_sources = (
-        discover_source_files(
-            MY_TEAM_SOURCE_PREFIX
-        )
-    )
-
-    print()
-    print("MY TEAM SUPPLEMENT")
-    print("==================")
-
-    if my_team_sources:
-        # My Team discovery may have added classification metadata to the
-        # store, so reload it before parsing those pages.
-        parse_cache = (
-            load_parse_cache()
-        )
-
-        for snapshot_name in sorted(
-            my_team_sources,
-            key=snapshot_sort_key,
-        ):
-            print(
-                f"{snapshot_name}: "
-                f"{len(my_team_sources[snapshot_name])} "
-                "file(s)"
-            )
-
-        supplement = (
-            merge_projection_sources(
-                my_team_sources,
-                parse_cache=parse_cache,
-                cache_stats=cache_stats,
-            )
-        )
-
-        # My Team pages are just another source of player data.
-        # Ownership is determined later from the local roster layer, not from
-        # whichever Yahoo page supplied the projections.
-        supplement_data = {
-            player_id: {
-                key: value
-                for key, value in player.items()
-                if key != "roster_status"
-            }
-            for player_id, player in supplement.items()
-        }
-
-        merge_player_data(
-            combined,
-            supplement_data,
-        )
-
-    else:
-        print(
-            "No My Team HTML pages found; "
-            "using player-list ownership "
-            "data only."
-        )
 
     local_roster = (
         load_season_roster(
@@ -1783,10 +1741,8 @@ def main():
         )
     )
 
-    # Importing projection/stat pages must not mutate roster ownership.
-    # The local roster is the authority until an explicit roster sync is
-    # requested from a demonstrably fresh Yahoo snapshot.
-
+    # Projection/stat imports never mutate roster ownership. The local roster
+    # is the authority; Yahoo pages only contribute player observations.
     local_names = {
         player[
             "player_name"
@@ -1841,7 +1797,19 @@ def main():
     }
 
     available = {
-        player_id: player
+        player_id: {
+            **player,
+            "roster_status": (
+                None
+                if player.get(
+                    "roster_status"
+                )
+                == MY_TEAM_NAME
+                else player.get(
+                    "roster_status"
+                )
+            ),
+        }
         for (
             player_id,
             player,
@@ -1892,14 +1860,17 @@ def main():
     print()
     print("HTML PARSE CACHE")
     print("================")
+
     print(
         f"Reused:      "
         f"{cache_stats['hits']} file(s)"
     )
+
     print(
         f"Reparsed:    "
         f"{cache_stats['misses']} file(s)"
     )
+
     print(
         f"Cache file:  "
         f"{PARSE_CACHE_FILE}"
