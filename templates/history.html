@@ -245,6 +245,136 @@
     </div>
 </section>
 
+{% if data.history.optimal_analysis.complete %}
+<section class="weekly-section">
+    <h2>Lineup analysis</h2>
+
+    <div class="history-summary">
+        <div class="history-card">
+            <span>
+                Submitted actual
+            </span>
+            <strong>
+                {{
+                    "%.2f"
+                    | format(
+                        data.history
+                        .starter_actual
+                    )
+                }}
+            </strong>
+        </div>
+
+        <div class="history-card">
+            <span>
+                Best possible actual
+            </span>
+            <strong>
+                {{
+                    "%.2f"
+                    | format(
+                        data.history
+                        .optimal_analysis
+                        .optimal_actual
+                    )
+                }}
+            </strong>
+        </div>
+
+        <div class="history-card">
+            <span>
+                Lineup opportunity
+            </span>
+            <strong>
+                {{
+                    "+%.2f"
+                    | format(
+                        data.history
+                        .optimal_analysis
+                        .lineup_delta
+                    )
+                }}
+            </strong>
+        </div>
+    </div>
+
+    {% if data.history.optimal_analysis.lineup_delta > 0.001 %}
+    <div style="
+        display: grid;
+        grid-template-columns:
+            repeat(
+                auto-fit,
+                minmax(260px, 1fr)
+            );
+        gap: 14px;
+    ">
+        <div class="history-card">
+            <span>
+                Hindsight: would start
+            </span>
+
+            {% for item in data.history.optimal_analysis.would_start %}
+            <div style="margin-top: 9px;">
+                <strong style="font-size: 1rem;">
+                    {{ item.player.player_name }}
+                </strong>
+                · {{ item.slot }}
+                · {{
+                    "%.2f"
+                    | format(
+                        item.player.actual
+                    )
+                }}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="history-card">
+            <span>
+                Hindsight: would sit
+            </span>
+
+            {% for player in data.history.optimal_analysis.would_sit %}
+            <div style="margin-top: 9px;">
+                <strong style="font-size: 1rem;">
+                    {{ player.player_name }}
+                </strong>
+                · {{ player.roster_slot }}
+                · {{
+                    "%.2f"
+                    | format(
+                        player.actual
+                    )
+                }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="history-note">
+        You submitted the highest-scoring legal lineup available
+        from the players on your roster this week.
+    </div>
+    {% endif %}
+
+    <div class="history-note">
+        This is hindsight analysis using final actual scores. It
+        measures the scoring opportunity that existed on the roster;
+        it does not imply that the alternative was the better
+        pre-game decision.
+    </div>
+</section>
+{% elif data.history.submitted_lineup_available %}
+<section class="weekly-section">
+    <h2>Lineup analysis</h2>
+
+    <div class="history-note">
+        Best-lineup analysis will appear once actual scores are
+        available for every non-IR player from this week's roster.
+    </div>
+</section>
+{% endif %}
+
 <section class="weekly-section">
     <h2>
         Week {{ data.history.week }}
