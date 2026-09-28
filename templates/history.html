@@ -247,7 +247,12 @@
 
 <section class="weekly-section">
     <h2>
-        Week {{ data.history.week }} roster
+        Week {{ data.history.week }}
+        {% if data.history.submitted_lineup_available %}
+        submitted lineup
+        {% else %}
+        roster
+        {% endif %}
     </h2>
 
     <table class="weekly-table history-table">
@@ -335,7 +340,11 @@
         This week is still incomplete. Totals use only the
         actual scores currently stored; later Yahoo stat
         corrections can update those results without changing
+        {% if data.history.submitted_lineup_available %}
+        the saved submitted lineup.
+        {% else %}
         historical roster ownership.
+        {% endif %}
     </div>
     {% endif %}
 </section>
