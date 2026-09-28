@@ -23,23 +23,60 @@ SEASON = 2026
 # pages independently corroborate these rows; this list is deliberately kept
 # explicit because the backfill is a one-off reconstruction, not a recurring
 # transaction-scraping dependency.
-WEEK_3_SUBMITTED_LINEUP = [
-    ("30977", "Josh Allen", "QB", "QB", 1),
-    ("41791", "Ashton Jeanty", "RB", "RB", 1),
-    ("31905", "David Montgomery", "RB", "RB", 2),
-    ("32703", "Tee Higgins", "WR", "WR", 1),
-    ("27535", "Mike Evans", "WR", "WR", 2),
-    ("40102", "Tucker Kraft", "TE", "TE", 1),
-    ("31960", "Tony Pollard", "RB", "FLEX", 1),
-    ("31482", "Eddy Pineiro", "K", "K", 1),
-    ("100009", "Packers", "DST", "DEF", 1),
-    ("40168", "Puka Nacua", "WR", "BN", 1),
-    ("31010", "Courtland Sutton", "WR", "BN", 2),
-    ("33415", "Rashod Bateman", "WR", "BN", 3),
-    ("40641", "Keaton Mitchell", "RB", "BN", 4),
-    ("40030", "C.J. Stroud", "QB", "BN", 5),
-    ("42630", "Jordyn Tyson", "WR", "IR", 1),
-]
+CONFIRMED_SUBMITTED_LINEUPS = {
+    # Confirmed directly from Yahoo historical My Team screenshots.
+    1: [
+        ("30977", "Josh Allen", "QB", "QB", 1),
+        ("31905", "David Montgomery", "RB", "RB", 1),
+        ("41791", "Ashton Jeanty", "RB", "RB", 2),
+        ("40168", "Puka Nacua", "WR", "WR", 1),
+        ("32703", "Tee Higgins", "WR", "WR", 2),
+        ("40102", "Tucker Kraft", "TE", "TE", 1),
+        ("27535", "Mike Evans", "WR", "FLEX", 1),
+        ("34344", "Cameron Dicker", "K", "K", 1),
+        ("100008", "Lions", "DST", "DEF", 1),
+        ("31960", "Tony Pollard", "RB", "BN", 1),
+        ("31010", "Courtland Sutton", "WR", "BN", 2),
+        ("33389", "Trevor Lawrence", "QB", "BN", 3),
+        ("33415", "Rashod Bateman", "WR", "BN", 4),
+        ("40641", "Keaton Mitchell", "RB", "BN", 5),
+        ("42630", "Jordyn Tyson", "WR", "IR", 1),
+    ],
+    2: [
+        ("30977", "Josh Allen", "QB", "QB", 1),
+        ("31905", "David Montgomery", "RB", "RB", 1),
+        ("41791", "Ashton Jeanty", "RB", "RB", 2),
+        ("40168", "Puka Nacua", "WR", "WR", 1),
+        ("32703", "Tee Higgins", "WR", "WR", 2),
+        ("40102", "Tucker Kraft", "TE", "TE", 1),
+        ("27535", "Mike Evans", "WR", "FLEX", 1),
+        ("34344", "Cameron Dicker", "K", "K", 1),
+        ("100027", "Buccaneers", "DST", "DEF", 1),
+        ("31960", "Tony Pollard", "RB", "BN", 1),
+        ("31010", "Courtland Sutton", "WR", "BN", 2),
+        ("33389", "Trevor Lawrence", "QB", "BN", 3),
+        ("33415", "Rashod Bateman", "WR", "BN", 4),
+        ("40641", "Keaton Mitchell", "RB", "BN", 5),
+        ("42630", "Jordyn Tyson", "WR", "IR", 1),
+    ],
+    3: [
+        ("30977", "Josh Allen", "QB", "QB", 1),
+        ("41791", "Ashton Jeanty", "RB", "RB", 1),
+        ("31905", "David Montgomery", "RB", "RB", 2),
+        ("32703", "Tee Higgins", "WR", "WR", 1),
+        ("27535", "Mike Evans", "WR", "WR", 2),
+        ("40102", "Tucker Kraft", "TE", "TE", 1),
+        ("31960", "Tony Pollard", "RB", "FLEX", 1),
+        ("31482", "Eddy Pineiro", "K", "K", 1),
+        ("100009", "Packers", "DST", "DEF", 1),
+        ("40168", "Puka Nacua", "WR", "BN", 1),
+        ("31010", "Courtland Sutton", "WR", "BN", 2),
+        ("33415", "Rashod Bateman", "WR", "BN", 3),
+        ("40641", "Keaton Mitchell", "RB", "BN", 4),
+        ("40030", "C.J. Stroud", "QB", "BN", 5),
+        ("42630", "Jordyn Tyson", "WR", "IR", 1),
+    ],
+}
 
 
 TRANSACTIONS = [
@@ -330,35 +367,38 @@ def main():
         "the Sep 8 Mitchell add therefore remains part of Week 1."
     )
 
-    replace_week_lineup(
-        3,
-        [
-            {
-                "player_id": player_id,
-                "player_name": player_name,
-                "position": position,
-                "lineup_slot": lineup_slot,
-                "slot_index": slot_index,
-                "source": "confirmed_yahoo_screenshot",
-            }
-            for (
-                player_id,
-                player_name,
-                position,
-                lineup_slot,
-                slot_index,
-            )
-            in WEEK_3_SUBMITTED_LINEUP
-        ],
-        season=SEASON,
-        source="confirmed_yahoo_screenshot",
-    )
+    for week, confirmed_lineup in sorted(
+        CONFIRMED_SUBMITTED_LINEUPS.items()
+    ):
+        replace_week_lineup(
+            week,
+            [
+                {
+                    "player_id": player_id,
+                    "player_name": player_name,
+                    "position": position,
+                    "lineup_slot": lineup_slot,
+                    "slot_index": slot_index,
+                    "source": "confirmed_yahoo_screenshot",
+                }
+                for (
+                    player_id,
+                    player_name,
+                    position,
+                    lineup_slot,
+                    slot_index,
+                )
+                in confirmed_lineup
+            ],
+            season=SEASON,
+            source="confirmed_yahoo_screenshot",
+        )
 
-    print()
-    print(
-        "Stored confirmed Week 3 submitted Yahoo lineup: "
-        "15 player(s)"
-    )
+        print()
+        print(
+            f"Stored confirmed Week {week} submitted Yahoo lineup: "
+            f"{len(confirmed_lineup)} player(s)"
+        )
 
     for week in (1, 2, 3):
         print_week_summary(
