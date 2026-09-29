@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -339,6 +339,30 @@ def initialise_database():
                     week,
                     lineup_slot,
                     slot_index
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_week_cant_cut (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                player_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+
+                source TEXT NOT NULL
+                    DEFAULT 'manual_yahoo',
+
+                captured_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
+                    player_id
                 ),
 
                 FOREIGN KEY (season_id)
@@ -1602,6 +1626,101 @@ def snapshot_season_roster(
             )
 
     return len(roster)
+
+
+def replace_week_cant_cut(
+    week,
+    players,
+    season=None,
+    source="manual_yahoo",
+):
+    """Replace Yahoo's Can't Cut list for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_week_cant_cut
+            WHERE season_id = ?
+              AND week = ?
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        )
+
+        for player in players:
+            db.execute(
+                """
+                INSERT INTO season_week_cant_cut (
+                    season_id,
+                    week,
+                    player_id,
+                    player_name,
+                    source,
+                    captured_at
+                )
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    season_id,
+                    int(week),
+                    str(player["player_id"]),
+                    player["player_name"],
+                    player.get(
+                        "source",
+                        source,
+                    ),
+                ),
+            )
+
+    return len(players)
+
+
+def load_week_cant_cut(
+    week,
+    season=None,
+):
+    """Return Yahoo's recorded Can't Cut list for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                source,
+                captured_at
+            FROM season_week_cant_cut
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY player_name
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def replace_week_lineup(
