@@ -34,7 +34,10 @@ from database import (
     load_season_league_state,
     load_season_roster,
     load_team_identity,
+    load_week_cant_cut,
+    load_week_cant_cut_state,
     load_week_lineup,
+    replace_week_cant_cut,
     replace_week_lineup,
     record_recommendation_action,
     save_current_draft_order,
@@ -207,6 +210,49 @@ def dashboard():
 @app.get("/settings")
 def settings_page():
     state = load_state()
+    season = state["season"]
+    week = current_fantasy_week(
+        season
+    )
+    settings_roster = enrich_local_roster(
+        load_season_roster(
+            season
+        )
+    )
+    cant_cut_players = load_week_cant_cut(
+        week,
+        season=season,
+    )
+    cant_cut_state = load_week_cant_cut_state(
+        week,
+        season=season,
+    )
+    cant_cut_ids = {
+        str(player["player_id"])
+        for player in cant_cut_players
+    }
+
+    cant_cut_roster = []
+
+    for player in settings_roster:
+        selection_id = str(
+            player.get(
+                "yahoo_player_id"
+            )
+            or player["player_id"]
+        )
+        cant_cut_roster.append(
+            {
+                "player_id": selection_id,
+                "player_name": player["name"],
+                "position": player["position"],
+                "team": player.get("team"),
+                "selected": (
+                    selection_id
+                    in cant_cut_ids
+                ),
+            }
+        )
 
     data = {
         "league": {
@@ -231,6 +277,11 @@ def settings_page():
             get_data_status(),
         "fantasypros_usage":
             get_api_usage(),
+        "cant_cut": {
+            "week": week,
+            "players": cant_cut_roster,
+            "state": cant_cut_state,
+        },
         "refresh_complete":
             request.args.get("refreshed") == "1",
         "quota_blocked":
@@ -240,6 +291,75 @@ def settings_page():
     return render_template(
         "settings.html",
         data=data,
+    )
+
+
+@app.post("/settings/cant-cut")
+def update_cant_cut():
+    state = load_state()
+    season = state["season"]
+    week = current_fantasy_week(
+        season
+    )
+    roster = enrich_local_roster(
+        load_season_roster(
+            season
+        )
+    )
+    roster_by_id = {}
+
+    for player in roster:
+        selection_id = str(
+            player.get(
+                "yahoo_player_id"
+            )
+            or player["player_id"]
+        )
+        roster_by_id[selection_id] = player
+
+    selected_ids = set(
+        request.form.getlist(
+            "player_ids"
+        )
+    )
+
+    if not selected_ids.issubset(
+        roster_by_id
+    ):
+        return redirect(
+            url_for(
+                "settings_page",
+                cant_cut_error="1",
+            )
+        )
+
+    selected_players = [
+        {
+            "player_id": player_id,
+            "player_name":
+                roster_by_id[
+                    player_id
+                ]["name"],
+            "source":
+                "manual_settings",
+        }
+        for player_id in sorted(
+            selected_ids
+        )
+    ]
+
+    replace_week_cant_cut(
+        week,
+        selected_players,
+        season=season,
+        source="manual_settings",
+    )
+
+    return redirect(
+        url_for(
+            "settings_page",
+            cant_cut_saved="1",
+        )
     )
       
 @app.post("/settings/waiver-priority")
