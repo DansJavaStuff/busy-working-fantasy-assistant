@@ -80,6 +80,8 @@ CANT_CUT_ELIGIBLE_POSITIONS = {
     "TE",
 }
 
+MIN_CANT_CUT_ACTION_COVERAGE = 0.8
+
 
 def clean_text(value):
     return " ".join(
@@ -1582,13 +1584,64 @@ def sync_cant_cut_from_my_team(
         }
     ]
 
-    if unclassified:
+    recognised_count = (
+        len(matched)
+        - len(unclassified)
+    )
+    action_coverage = (
+        recognised_count
+        / len(matched)
+        if matched
+        else 0.0
+    )
+
+    if (
+        action_coverage
+        < MIN_CANT_CUT_ACTION_COVERAGE
+    ):
         print(
             "Can't Cut auto-sync skipped: "
-            f"Yahoo's drop action was not recognised for "
-            f"{len(unclassified)} roster player(s)."
+            "Yahoo's drop action was recognised for "
+            f"{recognised_count} of {len(matched)} "
+            "eligible offensive roster players "
+            f"({action_coverage:.0%})."
         )
+
+        if unclassified:
+            print(
+                "  Unrecognised: "
+                + ", ".join(
+                    sorted(
+                        player[
+                            "player_name"
+                        ]
+                        for player
+                        in unclassified
+                    )
+                )
+            )
+
         return False
+
+    if unclassified:
+        print(
+            "Can't Cut auto-sync: "
+            f"{len(unclassified)} player action(s) "
+            "were unrecognised but semantic action coverage "
+            f"was sufficient ({action_coverage:.0%})."
+        )
+        print(
+            "  Unrecognised: "
+            + ", ".join(
+                sorted(
+                    player[
+                        "player_name"
+                    ]
+                    for player
+                    in unclassified
+                )
+            )
+        )
 
     if week is None:
         week = current_fantasy_week(

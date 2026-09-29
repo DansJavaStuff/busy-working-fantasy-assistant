@@ -416,6 +416,57 @@ class YahooImporterTableParsingTests(TestCase):
         self.assertFalse(synced)
         replace.assert_not_called()
 
+    def test_one_unknown_action_is_tolerated_with_strong_coverage(self):
+        rows = []
+        local_roster = []
+
+        for index in range(5):
+            action = (
+                '<a class="T-action-icon-drop" title="Drop Player">x</a>'
+                if index < 4
+                else ""
+            )
+            rows.append(
+                f"""
+                <tr>
+                  <td>{action}</td>
+                  <td><a data-ys-playerid="{index}">Player {index}</a>
+                      <span>BUF - WR</span></td>
+                </tr>
+                """
+            )
+            local_roster.append(
+                {
+                    "player_name": f"Player {index}",
+                    "position": "WR",
+                    "team": "BUF",
+                }
+            )
+
+        html = "<table><tbody>" + "".join(rows) + "</tbody></table>"
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "Yahoo_MyTeam_4week-Proj.html"
+            path.write_text(html, encoding="utf-8")
+
+            with patch.object(
+                import_yahoo_players,
+                "replace_week_cant_cut",
+            ) as replace:
+                synced = (
+                    import_yahoo_players
+                    .sync_cant_cut_from_my_team(
+                        {
+                            "next_4_weeks_projection": [path],
+                        },
+                        local_roster,
+                        week=4,
+                    )
+                )
+
+        self.assertTrue(synced)
+        replace.assert_called_once()
+
     def test_projection_uses_proj_pts_not_bye_column(self):
         html = """
         <table>
