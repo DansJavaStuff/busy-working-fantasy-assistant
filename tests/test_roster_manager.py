@@ -675,6 +675,30 @@ class RosterManagerTests(TestCase):
                 season=2026,
             )
 
+    def test_empty_manual_cant_cut_list_keeps_authoritative_state(self):
+        count = database.replace_week_cant_cut(
+            4,
+            [],
+            season=2026,
+            source="manual_settings",
+        )
+
+        self.assertEqual(count, 0)
+        self.assertEqual(
+            database.load_week_cant_cut(
+                4,
+                season=2026,
+            ),
+            [],
+        )
+        self.assertEqual(
+            database.load_week_cant_cut_state(
+                4,
+                season=2026,
+            )["source"],
+            "manual_settings",
+        )
+
 
 if __name__ == "__main__":
     import unittest

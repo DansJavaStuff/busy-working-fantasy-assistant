@@ -108,6 +108,90 @@ container settings-page
     </section>
 
     <section class="settings-panel">
+        <h2>
+            Yahoo Can't Cut · Week {{ data.cant_cut.week }}
+        </h2>
+
+        <p class="settings-help">
+            Select every player Yahoo currently prevents you from dropping.
+            This only controls transaction recommendations; it does not alter
+            your roster or the imported player database.
+        </p>
+
+        <form
+            method="post"
+            action="{{ url_for('update_cant_cut') }}"
+            class="cant-cut-form"
+        >
+            <div class="cant-cut-roster">
+                {% for player in data.cant_cut.players %}
+                <label class="cant-cut-option">
+                    <input
+                        type="checkbox"
+                        name="player_ids"
+                        value="{{ player.player_id }}"
+                        {% if player.selected %}
+                        checked
+                        {% endif %}
+                    >
+
+                    <span>
+                        <strong>{{ player.player_name }}</strong>
+                        <small>
+                            {{ player.team or '—' }} · {{ player.position }}
+                        </small>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+
+            <button
+                type="submit"
+                class="primary-button"
+            >
+                Save Week {{ data.cant_cut.week }} Can't Cut List
+            </button>
+        </form>
+
+        {% if data.cant_cut.state %}
+        <div class="season-current cant-cut-source">
+            Source:
+            <strong>
+                {% if data.cant_cut.state.source == 'manual_settings' %}
+                    manual Settings selection
+                {% elif data.cant_cut.state.source == 'yahoo_html' %}
+                    fresh Yahoo My Team HTML
+                {% else %}
+                    {{ data.cant_cut.state.source }}
+                {% endif %}
+            </strong>
+            · updated
+            {{ data.cant_cut.state.captured_at|local_datetime }}
+        </div>
+        {% endif %}
+
+        {% if request.args.get('cant_cut_saved') == '1' %}
+        <div class="data-refresh-success">
+            ✓ Week {{ data.cant_cut.week }} Can't Cut list saved.
+            This manual selection is authoritative for the rest of the week.
+        </div>
+        {% endif %}
+
+        {% if request.args.get('cant_cut_error') == '1' %}
+        <div class="season-data-warning">
+            The Can't Cut list contained a player who is not on the current
+            roster, so no changes were saved.
+        </div>
+        {% endif %}
+
+        <div class="season-data-warning">
+            Saving with every box clear confirms that Yahoo currently has no
+            protected players. A manual selection cannot be overwritten by a
+            later HTML import for the same week.
+        </div>
+    </section>
+
+    <section class="settings-panel">
 
         <h2>
             Player Data

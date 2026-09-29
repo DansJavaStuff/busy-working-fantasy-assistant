@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime, timedelta
 import json
 import re
 import shutil
@@ -17,9 +18,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from database import (
     load_season_roster,
+    load_week_cant_cut_state,
     replace_week_cant_cut,
 )
-from fantasy_calendar import current_fantasy_week
+from fantasy_calendar import (
+    UK_TIME,
+    current_fantasy_week,
+    week_1_start,
+)
 from roster_manager import replace_roster_player
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -1514,6 +1520,29 @@ def sync_cant_cut_from_my_team(
 ):
     """Persist Can't Cut players only from a complete, actionable roster."""
 
+    if week is None:
+        week = current_fantasy_week(
+            SEASON
+        )
+
+    existing_state = load_week_cant_cut_state(
+        week,
+        season=SEASON,
+    )
+
+    if (
+        existing_state
+        and existing_state.get(
+            "source"
+        ) == "manual_settings"
+    ):
+        print(
+            "Can't Cut auto-sync skipped: "
+            f"Week {week} has an authoritative "
+            "manual Settings selection."
+        )
+        return False
+
     newest_pages = freshest_my_team_pages(
         my_team_sources
     )
@@ -1522,6 +1551,33 @@ def sync_cant_cut_from_my_team(
         print(
             "Can't Cut auto-sync skipped: "
             "no saved My Team pages."
+        )
+        return False
+
+    offense_page = newest_pages.get(
+        "OFFENSE"
+    )
+    week_start = (
+        week_1_start(
+            SEASON
+        )
+        + timedelta(
+            weeks=week - 1
+        )
+    )
+
+    if (
+        offense_page is None
+        or datetime.fromtimestamp(
+            offense_page.stat().st_mtime,
+            UK_TIME,
+        ).date()
+        < week_start
+    ):
+        print(
+            "Can't Cut auto-sync skipped: "
+            f"the newest offensive My Team page is not "
+            f"from Week {week}."
         )
         return False
 
@@ -1641,11 +1697,6 @@ def sync_cant_cut_from_my_team(
                     in unclassified
                 )
             )
-        )
-
-    if week is None:
-        week = current_fantasy_week(
-            SEASON
         )
 
     cant_cut = [

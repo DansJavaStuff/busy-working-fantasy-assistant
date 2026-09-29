@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -363,6 +363,24 @@ def initialise_database():
                     season_id,
                     week,
                     player_id
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_week_cant_cut_state (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                source TEXT NOT NULL,
+                captured_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week
                 ),
 
                 FOREIGN KEY (season_id)
@@ -1683,6 +1701,27 @@ def replace_week_cant_cut(
                 ),
             )
 
+        db.execute(
+            """
+            INSERT INTO season_week_cant_cut_state (
+                season_id,
+                week,
+                source,
+                captured_at
+            )
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (season_id, week)
+            DO UPDATE SET
+                source = excluded.source,
+                captured_at = CURRENT_TIMESTAMP
+            """,
+            (
+                season_id,
+                int(week),
+                source,
+            ),
+        )
+
     return len(players)
 
 
@@ -1723,6 +1762,43 @@ def load_week_cant_cut(
         dict(row)
         for row in rows
     ]
+
+
+def load_week_cant_cut_state(
+    week,
+    season=None,
+):
+    """Return the source/status of a weekly Can't Cut selection."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        row = db.execute(
+            """
+            SELECT
+                week,
+                source,
+                captured_at
+            FROM season_week_cant_cut_state
+            WHERE season_id = ?
+              AND week = ?
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchone()
+
+    return (
+        dict(row)
+        if row is not None
+        else None
+    )
 
 
 def replace_week_lineup(

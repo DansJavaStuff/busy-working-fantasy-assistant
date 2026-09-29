@@ -1,4 +1,5 @@
 from datetime import date
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -345,6 +346,10 @@ class YahooImporterTableParsingTests(TestCase):
 
             with patch.object(
                 import_yahoo_players,
+                "load_week_cant_cut_state",
+                return_value=None,
+            ), patch.object(
+                import_yahoo_players,
                 "replace_week_cant_cut",
             ) as replace:
                 synced = (
@@ -400,6 +405,10 @@ class YahooImporterTableParsingTests(TestCase):
 
             with patch.object(
                 import_yahoo_players,
+                "load_week_cant_cut_state",
+                return_value=None,
+            ), patch.object(
+                import_yahoo_players,
                 "replace_week_cant_cut",
             ) as replace:
                 synced = (
@@ -451,6 +460,10 @@ class YahooImporterTableParsingTests(TestCase):
 
             with patch.object(
                 import_yahoo_players,
+                "load_week_cant_cut_state",
+                return_value=None,
+            ), patch.object(
+                import_yahoo_players,
                 "replace_week_cant_cut",
             ) as replace:
                 synced = (
@@ -466,6 +479,63 @@ class YahooImporterTableParsingTests(TestCase):
 
         self.assertTrue(synced)
         replace.assert_called_once()
+
+    def test_manual_settings_selection_blocks_html_replacement(self):
+        with patch.object(
+            import_yahoo_players,
+            "load_week_cant_cut_state",
+            return_value={
+                "source": "manual_settings",
+            },
+        ), patch.object(
+            import_yahoo_players,
+            "replace_week_cant_cut",
+        ) as replace:
+            synced = (
+                import_yahoo_players
+                .sync_cant_cut_from_my_team(
+                    {},
+                    [],
+                    week=4,
+                )
+            )
+
+        self.assertFalse(synced)
+        replace.assert_not_called()
+
+    def test_stale_my_team_page_does_not_replace_week_list(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "Yahoo_MyTeam_4week-Proj.html"
+            path.write_text(
+                "<html></html>",
+                encoding="utf-8",
+            )
+            os.utime(
+                path,
+                (1000, 1000),
+            )
+
+            with patch.object(
+                import_yahoo_players,
+                "load_week_cant_cut_state",
+                return_value=None,
+            ), patch.object(
+                import_yahoo_players,
+                "replace_week_cant_cut",
+            ) as replace:
+                synced = (
+                    import_yahoo_players
+                    .sync_cant_cut_from_my_team(
+                        {
+                            "next_4_weeks_projection": [path],
+                        },
+                        [],
+                        week=4,
+                    )
+                )
+
+        self.assertFalse(synced)
+        replace.assert_not_called()
 
     def test_projection_uses_proj_pts_not_bye_column(self):
         html = """
