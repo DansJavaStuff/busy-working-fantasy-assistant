@@ -1424,7 +1424,16 @@ def build_transaction_recommendations(
     limit=5,
     current_week=1,
     waiver_priority=None,
+    cant_cut_ids=None,
 ):
+    cant_cut_ids = {
+        str(player_id)
+        for player_id in (
+            cant_cut_ids
+            or set()
+        )
+    }
+
     before = roster_metrics(
         roster,
         available,
@@ -1460,6 +1469,14 @@ def build_transaction_recommendations(
 
     for add_player in candidates:
         for drop_player in roster:
+            if str(
+                drop_player.get(
+                    "yahoo_player_id",
+                    "",
+                )
+            ) in cant_cut_ids:
+                continue
+
             if not transaction_allowed(
                 roster,
                 add_player,
