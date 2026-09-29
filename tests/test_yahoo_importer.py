@@ -324,6 +324,16 @@ class YahooImporterTableParsingTests(TestCase):
                 "position": "RB",
                 "team": "DET",
             },
+            {
+                "player_name": "Example Kicker",
+                "position": "K",
+                "team": "BUF",
+            },
+            {
+                "player_name": "Example Defence",
+                "position": "DEF",
+                "team": "BUF",
+            },
         ]
 
         with TemporaryDirectory() as directory:
