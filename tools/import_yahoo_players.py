@@ -15,7 +15,11 @@ if str(PROJECT_ROOT) not in sys.path:
         str(PROJECT_ROOT),
     )
 
-from database import load_season_roster
+from database import (
+    load_season_roster,
+    replace_week_cant_cut,
+)
+from fantasy_calendar import current_fantasy_week
 from roster_manager import replace_roster_player
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -62,11 +66,125 @@ GAME_FIELDS = (
     "home_away",
 )
 
+CANT_CUT_CLASSES = {
+    "noactioncc-cantcut",
+    "T-action-icon-cantcut",
+}
+
+DROP_ACTION_CLASS = "T-action-icon-drop"
+
 
 def clean_text(value):
     return " ".join(
         value.split()
     )
+
+
+def _normalise_player_name(value):
+    return clean_text(
+        value or ""
+    ).casefold()
+
+
+def parse_cant_cut_actions(path):
+    """Return Yahoo drop-action observations from one saved My Team page."""
+
+    soup = BeautifulSoup(
+        path.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        ),
+        "html.parser",
+    )
+
+    observations = {}
+
+    for link in soup.find_all(
+        "a",
+        attrs={
+            "data-ys-playerid": True,
+        },
+    ):
+        player_id = str(
+            link.get(
+                "data-ys-playerid"
+            )
+        )
+
+        if player_id in observations:
+            continue
+
+        row = link.find_parent("tr")
+
+        if row is None:
+            continue
+
+        name = clean_text(
+            link.get_text(
+                " ",
+                strip=True,
+            )
+        )
+
+        if not name:
+            continue
+
+        player_cell = link.find_parent(
+            ["th", "td"]
+        )
+        team = None
+        position = None
+
+        if player_cell is not None:
+            team, position = (
+                extract_team_position(
+                    player_cell
+                )
+            )
+
+        action = None
+
+        for control in row.find_all(
+            ["a", "button"],
+        ):
+            classes = set(
+                control.get(
+                    "class",
+                    [],
+                )
+            )
+            title = clean_text(
+                control.get(
+                    "title",
+                    "",
+                )
+            ).casefold()
+
+            if (
+                classes
+                & CANT_CUT_CLASSES
+                or title
+                == "player is on can't cut list"
+            ):
+                action = "cant_cut"
+                break
+
+            if (
+                DROP_ACTION_CLASS
+                in classes
+                or title == "drop player"
+            ):
+                action = "drop"
+
+        observations[player_id] = {
+            "player_id": player_id,
+            "player_name": name,
+            "team": team,
+            "position": position,
+            "action": action,
+        }
+
+    return observations
 
 
 def parse_number(value):
@@ -1316,6 +1434,193 @@ def _my_team_page_kind(path):
     return "OFFENSE"
 
 
+def freshest_my_team_pages(my_team_sources):
+    """Return the newest saved My Team page for offense, kicker and DST."""
+
+    newest_by_kind = {}
+
+    for paths in my_team_sources.values():
+        for path in paths:
+            kind = _my_team_page_kind(
+                path
+            )
+            current = newest_by_kind.get(
+                kind
+            )
+
+            if (
+                current is None
+                or path.stat().st_mtime_ns
+                > current.stat().st_mtime_ns
+            ):
+                newest_by_kind[kind] = path
+
+    return newest_by_kind
+
+
+def _observation_matches_local(
+    observation,
+    local_player,
+):
+    if (
+        _normalise_player_name(
+            observation.get(
+                "player_name"
+            )
+        )
+        == _normalise_player_name(
+            local_player.get(
+                "player_name"
+            )
+        )
+    ):
+        return True
+
+    return (
+        local_player.get(
+            "position"
+        )
+        in {"DEF", "DST"}
+        and observation.get(
+            "position"
+        )
+        in {"DEF", "DST"}
+        and _normalise_player_name(
+            observation.get(
+                "team"
+            )
+        )
+        == _normalise_player_name(
+            local_player.get(
+                "team"
+            )
+        )
+    )
+
+
+def sync_cant_cut_from_my_team(
+    my_team_sources,
+    local_roster,
+    week=None,
+):
+    """Persist Can't Cut players only from a complete, actionable roster."""
+
+    newest_pages = freshest_my_team_pages(
+        my_team_sources
+    )
+
+    if not newest_pages:
+        print(
+            "Can't Cut auto-sync skipped: "
+            "no saved My Team pages."
+        )
+        return False
+
+    observations = {}
+
+    for path in newest_pages.values():
+        observations.update(
+            parse_cant_cut_actions(
+                path
+            )
+        )
+
+    matched = []
+
+    for local_player in local_roster:
+        match = next(
+            (
+                observation
+                for observation
+                in observations.values()
+                if _observation_matches_local(
+                    observation,
+                    local_player,
+                )
+            ),
+            None,
+        )
+
+        if match is not None:
+            matched.append(match)
+
+    if len(matched) != len(local_roster):
+        print(
+            "Can't Cut auto-sync skipped: "
+            "newest My Team pages cover "
+            f"{len(matched)} of "
+            f"{len(local_roster)} roster players."
+        )
+        return False
+
+    unclassified = [
+        player
+        for player in matched
+        if player.get(
+            "action"
+        )
+        not in {
+            "cant_cut",
+            "drop",
+        }
+    ]
+
+    if unclassified:
+        print(
+            "Can't Cut auto-sync skipped: "
+            f"Yahoo's drop action was not recognised for "
+            f"{len(unclassified)} roster player(s)."
+        )
+        return False
+
+    if week is None:
+        week = current_fantasy_week(
+            SEASON
+        )
+
+    cant_cut = [
+        {
+            "player_id":
+                player["player_id"],
+            "player_name":
+                player["player_name"],
+            "source":
+                "yahoo_html",
+        }
+        for player in matched
+        if player[
+            "action"
+        ] == "cant_cut"
+    ]
+
+    replace_week_cant_cut(
+        week,
+        cant_cut,
+        season=SEASON,
+        source="yahoo_html",
+    )
+
+    print()
+    print("YAHOO CAN'T CUT")
+    print("===============")
+    print(
+        f"Stored Week {week} Can't Cut list: "
+        f"{len(cant_cut)} player(s)"
+    )
+
+    for player in sorted(
+        cant_cut,
+        key=lambda item:
+            item["player_name"],
+    ):
+        print(
+            f"  {player['player_name']} "
+            f"({player['player_id']})"
+        )
+
+    return True
+
+
 def freshest_current_my_team_players(
     my_team_sources,
     parse_cache,
@@ -1954,6 +2259,11 @@ def main():
         load_season_roster(
             SEASON
         )
+    )
+
+    sync_cant_cut_from_my_team(
+        my_team_sources,
+        local_roster,
     )
 
     # Projection/stat imports never mutate roster ownership. The local roster

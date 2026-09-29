@@ -253,6 +253,159 @@ class YahooProviderWeekTests(TestCase):
 
 
 class YahooImporterTableParsingTests(TestCase):
+    def test_cant_cut_actions_use_yahoo_semantic_markers(self):
+        html = """
+        <table><tbody>
+          <tr>
+            <td>
+              <a class="noactioncc-cantcut T-action-icon-cantcut"
+                 title="Player is on can't cut list">x</a>
+            </td>
+            <td>
+              <a data-ys-playerid="30977">Josh Allen</a>
+              <span>BUF - QB</span>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <a class="T-action-icon-drop" title="Drop Player">x</a>
+            </td>
+            <td>
+              <a data-ys-playerid="31905">David Montgomery</a>
+              <span>DET - RB</span>
+            </td>
+          </tr>
+        </tbody></table>
+        """
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "Yahoo_MyTeam_4week-Proj.html"
+            path.write_text(html, encoding="utf-8")
+
+            actions = (
+                import_yahoo_players
+                .parse_cant_cut_actions(path)
+            )
+
+        self.assertEqual(
+            actions["30977"]["action"],
+            "cant_cut",
+        )
+        self.assertEqual(
+            actions["31905"]["action"],
+            "drop",
+        )
+
+    def test_complete_my_team_pages_replace_week_cant_cut_list(self):
+        html = """
+        <table><tbody>
+          <tr>
+            <td><a class="T-action-icon-cantcut"
+                   title="Player is on can't cut list">x</a></td>
+            <td><a data-ys-playerid="30977">Josh Allen</a>
+                <span>BUF - QB</span></td>
+          </tr>
+          <tr>
+            <td><a class="T-action-icon-drop"
+                   title="Drop Player">x</a></td>
+            <td><a data-ys-playerid="31905">David Montgomery</a>
+                <span>DET - RB</span></td>
+          </tr>
+        </tbody></table>
+        """
+        local_roster = [
+            {
+                "player_name": "Josh Allen",
+                "position": "QB",
+                "team": "BUF",
+            },
+            {
+                "player_name": "David Montgomery",
+                "position": "RB",
+                "team": "DET",
+            },
+        ]
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "Yahoo_MyTeam_4week-Proj.html"
+            path.write_text(html, encoding="utf-8")
+            sources = {
+                "next_4_weeks_projection": [path],
+            }
+
+            with patch.object(
+                import_yahoo_players,
+                "replace_week_cant_cut",
+            ) as replace:
+                synced = (
+                    import_yahoo_players
+                    .sync_cant_cut_from_my_team(
+                        sources,
+                        local_roster,
+                        week=4,
+                    )
+                )
+
+        self.assertTrue(synced)
+        replace.assert_called_once()
+        args, kwargs = replace.call_args
+        self.assertEqual(args[0], 4)
+        self.assertEqual(
+            args[1],
+            [
+                {
+                    "player_id": "30977",
+                    "player_name": "Josh Allen",
+                    "source": "yahoo_html",
+                }
+            ],
+        )
+        self.assertEqual(kwargs["season"], 2026)
+
+    def test_partial_my_team_page_preserves_existing_cant_cut_list(self):
+        html = """
+        <table><tbody><tr>
+          <td><a class="T-action-icon-cantcut"
+                 title="Player is on can't cut list">x</a></td>
+          <td><a data-ys-playerid="30977">Josh Allen</a>
+              <span>BUF - QB</span></td>
+        </tr></tbody></table>
+        """
+        local_roster = [
+            {
+                "player_name": "Josh Allen",
+                "position": "QB",
+                "team": "BUF",
+            },
+            {
+                "player_name": "David Montgomery",
+                "position": "RB",
+                "team": "DET",
+            },
+        ]
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "Yahoo_MyTeam_4week-Proj.html"
+            path.write_text(html, encoding="utf-8")
+
+            with patch.object(
+                import_yahoo_players,
+                "replace_week_cant_cut",
+            ) as replace:
+                synced = (
+                    import_yahoo_players
+                    .sync_cant_cut_from_my_team(
+                        {
+                            "next_4_weeks_projection": [path],
+                        },
+                        local_roster,
+                        week=4,
+                    )
+                )
+
+        self.assertFalse(synced)
+        replace.assert_not_called()
+
     def test_projection_uses_proj_pts_not_bye_column(self):
         html = """
         <table>
