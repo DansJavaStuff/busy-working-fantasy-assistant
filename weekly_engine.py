@@ -7,6 +7,7 @@ import json
 from database import (
     load_season_league_state,
     load_season_roster,
+    load_week_cant_cut,
     load_week_lineup,
     snapshot_season_roster,
 )
@@ -162,6 +163,7 @@ def cached_transaction_recommendations(
     provider_status,
     week,
     waiver_priority=None,
+    cant_cut_ids=None,
 ):
     captured_at = provider_status.get(
         "captured_at"
@@ -194,6 +196,15 @@ def cached_transaction_recommendations(
         roster_key,
         week,
         waiver_priority,
+        tuple(
+            sorted(
+                str(player_id)
+                for player_id in (
+                    cant_cut_ids
+                    or set()
+                )
+            )
+        ),
     )
 
     if (
@@ -217,6 +228,7 @@ def cached_transaction_recommendations(
             limit=12,
             current_week=week,
             waiver_priority=waiver_priority,
+            cant_cut_ids=cant_cut_ids,
         )
     )
 
@@ -1420,6 +1432,16 @@ def build_weekly_data(
         )
     )
 
+    cant_cut_players = load_week_cant_cut(
+        week,
+        season=season,
+    )
+
+    cant_cut_ids = {
+        str(player["player_id"])
+        for player in cant_cut_players
+    }
+
     roster = enrich_local_roster(
         local_roster
     )
@@ -1550,6 +1572,8 @@ def build_weekly_data(
             week,
             waiver_priority=
                 waiver_priority,
+            cant_cut_ids=
+                cant_cut_ids,
         )
     )
 
@@ -1850,4 +1874,7 @@ def build_weekly_data(
 
         "waiver_priority":
             waiver_priority,
+
+        "cant_cut_players":
+            cant_cut_players,
     }
