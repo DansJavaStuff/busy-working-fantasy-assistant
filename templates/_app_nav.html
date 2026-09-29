@@ -1,11 +1,11 @@
 <nav class="app-nav">
     <a
-        {% if request.endpoint == 'dashboard' %}
+        {% if request.endpoint == 'today_page' %}
         class="active"
         {% endif %}
-        href="{{ url_for('dashboard') }}"
+        href="{{ url_for('today_page') }}"
     >
-        Draft
+        Today
     </a>
 
     <a
@@ -27,6 +27,15 @@
     </a>
 
     <a
+        {% if request.endpoint == 'my_team' %}
+        class="active"
+        {% endif %}
+        href="{{ url_for('my_team') }}"
+    >
+        My Team
+    </a>
+
+    <a
         {% if request.endpoint == 'history' %}
         class="active"
         {% endif %}
@@ -36,12 +45,12 @@
     </a>
 
     <a
-        {% if request.endpoint == 'my_team' %}
+        {% if request.endpoint == 'dashboard' %}
         class="active"
         {% endif %}
-        href="{{ url_for('my_team') }}"
+        href="{{ url_for('dashboard') }}"
     >
-        My Team
+        Draft
     </a>
 
     <a
