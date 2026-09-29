@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 11
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -154,6 +154,26 @@ def initialise_database():
                     ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS season_league_state (
+                season_id INTEGER PRIMARY KEY,
+
+                waiver_priority INTEGER
+                    CHECK (
+                        waiver_priority IS NULL
+                        OR waiver_priority >= 1
+                    ),
+
+                waiver_priority_source TEXT NOT NULL
+                    DEFAULT 'manual',
+
+                updated_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS season_roster (
                 season_id INTEGER NOT NULL,
 
@@ -186,6 +206,210 @@ def initialise_database():
                     season_id,
                     player_id
                 ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                season_id INTEGER NOT NULL,
+
+                occurred_at TEXT NOT NULL,
+                transaction_type TEXT NOT NULL,
+
+                add_player_id TEXT,
+                add_player_name TEXT,
+                add_position TEXT,
+                add_team TEXT,
+                acquisition_type TEXT,
+
+                drop_player_id TEXT,
+                drop_player_name TEXT,
+                drop_position TEXT,
+                drop_team TEXT,
+
+                source TEXT NOT NULL
+                    DEFAULT 'yahoo_html',
+
+                UNIQUE (
+                    season_id,
+                    occurred_at,
+                    add_player_id,
+                    drop_player_id
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_player_week (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+                player_id TEXT NOT NULL,
+
+                player_name TEXT NOT NULL,
+                position TEXT,
+                team TEXT,
+
+                projection REAL,
+                actual REAL,
+
+                source TEXT NOT NULL
+                    DEFAULT 'manual_html',
+
+                updated_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
+                    player_id
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_week_roster (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                player_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                position TEXT NOT NULL,
+
+                roster_slot TEXT NOT NULL,
+                slot_index INTEGER NOT NULL DEFAULT 1,
+
+                team TEXT,
+                bye_week INTEGER,
+                status TEXT,
+                source TEXT,
+
+                captured_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
+                    player_id
+                ),
+
+                UNIQUE (
+                    season_id,
+                    week,
+                    roster_slot,
+                    slot_index
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_week_lineup (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                player_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                position TEXT NOT NULL,
+
+                lineup_slot TEXT NOT NULL,
+                slot_index INTEGER NOT NULL DEFAULT 1,
+
+                source TEXT NOT NULL
+                    DEFAULT 'yahoo_my_team',
+
+                captured_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
+                    player_id
+                ),
+
+                UNIQUE (
+                    season_id,
+                    week,
+                    lineup_slot,
+                    slot_index
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_week_cant_cut (
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                player_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+
+                source TEXT NOT NULL
+                    DEFAULT 'manual_yahoo',
+
+                captured_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    week,
+                    player_id
+                ),
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS recommendation_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                season_id INTEGER NOT NULL,
+                week INTEGER NOT NULL,
+
+                action_type TEXT NOT NULL
+                    DEFAULT 'waiver_claim',
+
+                priority INTEGER,
+
+                add_player_id TEXT,
+                add_player_name TEXT NOT NULL,
+                add_position TEXT,
+
+                drop_player_id TEXT,
+                drop_player_name TEXT,
+                drop_position TEXT,
+
+                recommendation_label TEXT,
+                move_type TEXT,
+                recommendation_rank INTEGER,
+
+                status TEXT NOT NULL
+                    DEFAULT 'pending'
+                    CHECK (
+                        status IN (
+                            'pending',
+                            'succeeded',
+                            'failed',
+                            'superseded',
+                            'cancelled'
+                        )
+                    ),
+
+                notes TEXT,
+
+                submitted_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                resolved_at TEXT,
 
                 FOREIGN KEY (season_id)
                     REFERENCES seasons(id)
@@ -261,6 +485,31 @@ def initialise_database():
                 )
             );
             """
+        )
+
+        # Seed the known current 2026 waiver position once. Future
+        # seasons start unset and can be maintained manually until the
+        # Yahoo API can supply this league state directly.
+        db.execute(
+            """
+            INSERT INTO season_league_state (
+                season_id,
+                waiver_priority,
+                waiver_priority_source
+            )
+            SELECT
+                s.id,
+                11,
+                'manual'
+            FROM seasons s
+            JOIN leagues l
+              ON l.id = s.league_id
+            WHERE l.league_key = ?
+              AND s.season = 2026
+            ON CONFLICT(season_id)
+            DO NOTHING
+            """,
+            (CURRENT_LEAGUE_KEY,),
         )
 
         db.execute(
@@ -575,6 +824,1085 @@ def save_team_identity(
                 accent_colour,
             ),
         )
+
+
+
+
+def load_season_league_state(season=None):
+    """Return mutable in-season league state for a Busy Working season."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        row = db.execute(
+            """
+            SELECT
+                waiver_priority,
+                waiver_priority_source,
+                updated_at
+            FROM season_league_state
+            WHERE season_id = ?
+            """,
+            (season_id,),
+        ).fetchone()
+
+        requested_season = (
+            int(season)
+            if season is not None
+            else date.today().year
+        )
+
+        if (
+            row is None
+            and requested_season == 2026
+        ):
+            db.execute(
+                """
+                INSERT INTO season_league_state (
+                    season_id,
+                    waiver_priority,
+                    waiver_priority_source,
+                    updated_at
+                )
+                VALUES (?, 11, 'manual', CURRENT_TIMESTAMP)
+                """,
+                (season_id,),
+            )
+
+            row = db.execute(
+                """
+                SELECT
+                    waiver_priority,
+                    waiver_priority_source,
+                    updated_at
+                FROM season_league_state
+                WHERE season_id = ?
+                """,
+                (season_id,),
+            ).fetchone()
+
+    if row is None:
+        return {
+            "waiver_priority": None,
+            "waiver_priority_source": "manual",
+            "updated_at": None,
+        }
+
+    return dict(row)
+
+
+def save_waiver_priority(
+    waiver_priority,
+    season=None,
+    source="manual",
+):
+    """Persist the current waiver priority for a season."""
+
+    initialise_database()
+
+    if waiver_priority in {
+        None,
+        "",
+    }:
+        value = None
+    else:
+        value = int(
+            waiver_priority
+        )
+
+        if value < 1:
+            raise ValueError(
+                "Waiver priority must be 1 or higher"
+            )
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            INSERT INTO season_league_state (
+                season_id,
+                waiver_priority,
+                waiver_priority_source,
+                updated_at
+            )
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(season_id)
+            DO UPDATE SET
+                waiver_priority =
+                    excluded.waiver_priority,
+                waiver_priority_source =
+                    excluded.waiver_priority_source,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                season_id,
+                value,
+                str(source or "manual"),
+            ),
+        )
+
+    return value
+
+
+def record_recommendation_action(
+    week,
+    add_player_name,
+    drop_player_name=None,
+    season=None,
+    action_type="waiver_claim",
+    priority=None,
+    add_player_id=None,
+    add_position=None,
+    drop_player_id=None,
+    drop_position=None,
+    recommendation_label=None,
+    move_type=None,
+    recommendation_rank=None,
+    notes=None,
+):
+    """Record a recommendation the user chose to act on."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        existing = db.execute(
+            """
+            SELECT id
+            FROM recommendation_actions
+            WHERE season_id = ?
+              AND week = ?
+              AND action_type = ?
+              AND COALESCE(add_player_id, '') = COALESCE(?, '')
+              AND COALESCE(drop_player_id, '') = COALESCE(?, '')
+              AND status = 'pending'
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (
+                season_id,
+                int(week),
+                str(action_type),
+                (
+                    str(add_player_id)
+                    if add_player_id
+                    else None
+                ),
+                (
+                    str(drop_player_id)
+                    if drop_player_id
+                    else None
+                ),
+            ),
+        ).fetchone()
+
+        if existing is not None:
+            return existing["id"]
+
+        cursor = db.execute(
+            """
+            INSERT INTO recommendation_actions (
+                season_id,
+                week,
+                action_type,
+                priority,
+                add_player_id,
+                add_player_name,
+                add_position,
+                drop_player_id,
+                drop_player_name,
+                drop_position,
+                recommendation_label,
+                move_type,
+                recommendation_rank,
+                notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                season_id,
+                int(week),
+                str(action_type),
+                (
+                    int(priority)
+                    if priority is not None
+                    else None
+                ),
+                (
+                    str(add_player_id)
+                    if add_player_id
+                    else None
+                ),
+                str(add_player_name),
+                add_position,
+                (
+                    str(drop_player_id)
+                    if drop_player_id
+                    else None
+                ),
+                drop_player_name,
+                drop_position,
+                recommendation_label,
+                move_type,
+                (
+                    int(recommendation_rank)
+                    if recommendation_rank
+                    is not None
+                    else None
+                ),
+                notes,
+            ),
+        )
+
+        return cursor.lastrowid
+
+
+def list_recommendation_actions(
+    season=None,
+    limit=25,
+):
+    """Return newest recorded recommendation actions."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                id,
+                week,
+                action_type,
+                priority,
+                add_player_id,
+                add_player_name,
+                add_position,
+                drop_player_id,
+                drop_player_name,
+                drop_position,
+                recommendation_label,
+                move_type,
+                recommendation_rank,
+                status,
+                notes,
+                submitted_at,
+                resolved_at
+            FROM recommendation_actions
+            WHERE season_id = ?
+            ORDER BY
+                CASE status
+                    WHEN 'pending' THEN 0
+                    ELSE 1
+                END,
+                CASE
+                    WHEN status = 'pending'
+                    THEN submitted_at
+                END ASC,
+                CASE
+                    WHEN status != 'pending'
+                    THEN COALESCE(
+                        resolved_at,
+                        submitted_at
+                    )
+                END DESC,
+                id ASC
+            LIMIT ?
+            """,
+            (
+                season_id,
+                int(limit),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def update_recommendation_action_status(
+    action_id,
+    status,
+    season=None,
+):
+    """Resolve or update a recorded recommendation action."""
+
+    valid = {
+        "pending",
+        "succeeded",
+        "failed",
+        "superseded",
+        "cancelled",
+    }
+
+    if status not in valid:
+        raise ValueError(
+            "Invalid recommendation action status"
+        )
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            UPDATE recommendation_actions
+            SET
+                status = ?,
+                resolved_at = CASE
+                    WHEN ? = 'pending'
+                    THEN NULL
+                    ELSE CURRENT_TIMESTAMP
+                END
+            WHERE id = ?
+              AND season_id = ?
+            """,
+            (
+                status,
+                status,
+                int(action_id),
+                season_id,
+            ),
+        )
+
+
+def replace_season_transactions(
+    transactions,
+    season=None,
+    source="yahoo_html",
+):
+    """Replace imported transaction history for a season."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_transactions
+            WHERE season_id = ?
+              AND source = ?
+            """,
+            (
+                season_id,
+                str(source),
+            ),
+        )
+
+        for transaction in transactions:
+            db.execute(
+                """
+                INSERT INTO season_transactions (
+                    season_id,
+                    occurred_at,
+                    transaction_type,
+                    add_player_id,
+                    add_player_name,
+                    add_position,
+                    add_team,
+                    acquisition_type,
+                    drop_player_id,
+                    drop_player_name,
+                    drop_position,
+                    drop_team,
+                    source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    season_id,
+                    transaction["occurred_at"],
+                    transaction.get(
+                        "transaction_type",
+                        "add_drop",
+                    ),
+                    transaction.get("add_player_id"),
+                    transaction.get("add_player_name"),
+                    transaction.get("add_position"),
+                    transaction.get("add_team"),
+                    transaction.get("acquisition_type"),
+                    transaction.get("drop_player_id"),
+                    transaction.get("drop_player_name"),
+                    transaction.get("drop_position"),
+                    transaction.get("drop_team"),
+                    str(source),
+                ),
+            )
+
+    return len(transactions)
+
+
+def load_season_transactions(
+    season=None,
+):
+    """Return imported transactions oldest first."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                occurred_at,
+                transaction_type,
+                add_player_id,
+                add_player_name,
+                add_position,
+                add_team,
+                acquisition_type,
+                drop_player_id,
+                drop_player_name,
+                drop_position,
+                drop_team,
+                source
+            FROM season_transactions
+            WHERE season_id = ?
+            ORDER BY occurred_at
+            """,
+            (season_id,),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def upsert_player_week_history(
+    players,
+    season=None,
+    source="manual_html",
+):
+    """Persist normalized player/week projections and actuals."""
+
+    initialise_database()
+
+    rows_written = 0
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        for player_id, player in players.items():
+            for week, week_data in (
+                player.get(
+                    "weeks",
+                    {},
+                ).items()
+            ):
+                try:
+                    week_number = int(week)
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+                    continue
+
+                projection = week_data.get(
+                    "projection"
+                )
+                actual = week_data.get(
+                    "actual"
+                )
+
+                if (
+                    projection is None
+                    and actual is None
+                ):
+                    continue
+
+                db.execute(
+                    """
+                    INSERT INTO season_player_week (
+                        season_id,
+                        week,
+                        player_id,
+                        player_name,
+                        position,
+                        team,
+                        projection,
+                        actual,
+                        source,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(
+                        season_id,
+                        week,
+                        player_id
+                    )
+                    DO UPDATE SET
+                        player_name = excluded.player_name,
+                        position = COALESCE(
+                            excluded.position,
+                            season_player_week.position
+                        ),
+                        team = COALESCE(
+                            excluded.team,
+                            season_player_week.team
+                        ),
+                        projection = COALESCE(
+                            excluded.projection,
+                            season_player_week.projection
+                        ),
+                        actual = COALESCE(
+                            excluded.actual,
+                            season_player_week.actual
+                        ),
+                        source = excluded.source,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        season_id,
+                        week_number,
+                        str(player_id),
+                        player.get(
+                            "name",
+                            str(player_id),
+                        ),
+                        player.get("position"),
+                        player.get("team"),
+                        projection,
+                        actual,
+                        str(source),
+                    ),
+                )
+
+                rows_written += 1
+
+    return rows_written
+
+
+def load_player_week_history(
+    week,
+    season=None,
+):
+    """Return stored player results/projections for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                position,
+                team,
+                projection,
+                actual,
+                source,
+                updated_at
+            FROM season_player_week
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY
+                position,
+                player_name
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def snapshot_season_roster(
+    week,
+    season=None,
+    roster=None,
+    preserve_player_ids=None,
+):
+    """Persist one fantasy week's roster snapshot.
+
+    With no preserved ids this replaces the whole snapshot. When preserved
+    player ids are supplied, those existing rows are retained and only the
+    still-unlocked part of the roster is refreshed.
+    """
+
+    initialise_database()
+
+    week = int(week)
+
+    if week < 1:
+        raise ValueError(
+            "Fantasy week must be 1 or higher"
+        )
+
+    if roster is None:
+        roster = load_season_roster(
+            season
+        )
+
+    preserve_player_ids = {
+        str(player_id)
+        for player_id in (
+            preserve_player_ids
+            or set()
+        )
+    }
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        if preserve_player_ids:
+            placeholders = ",".join(
+                "?"
+                for _ in preserve_player_ids
+            )
+
+            # Only generated SQLite parameter markers are interpolated;
+            # every player id remains a bound query parameter.
+            delete_query = (
+                "DELETE FROM season_week_roster "
+                "WHERE season_id = ? "
+                "AND week = ? "
+                f"AND player_id NOT IN ({placeholders})"  # nosec B608
+            )
+
+            db.execute(
+                delete_query,
+                (
+                    season_id,
+                    week,
+                    *sorted(
+                        preserve_player_ids
+                    ),
+                ),
+            )
+        else:
+            db.execute(
+                """
+                DELETE FROM season_week_roster
+                WHERE season_id = ?
+                  AND week = ?
+                """,
+                (
+                    season_id,
+                    week,
+                ),
+            )
+
+        preserved_slots = set()
+
+        if preserve_player_ids:
+            placeholders = ",".join(
+                "?"
+                for _ in preserve_player_ids
+            )
+
+            # As above, the dynamic fragment contains only generated
+            # parameter markers and no caller-controlled values.
+            preserved_query = (
+                "SELECT roster_slot, slot_index "
+                "FROM season_week_roster "
+                "WHERE season_id = ? "
+                "AND week = ? "
+                f"AND player_id IN ({placeholders})"  # nosec B608
+            )
+
+            preserved_rows = db.execute(
+                preserved_query,
+                (
+                    season_id,
+                    week,
+                    *sorted(
+                        preserve_player_ids
+                    ),
+                ),
+            ).fetchall()
+
+            preserved_slots = {
+                (
+                    row["roster_slot"],
+                    row["slot_index"],
+                )
+                for row in preserved_rows
+            }
+
+        for player in roster:
+            player_id = str(
+                player["player_id"]
+            )
+
+            slot_key = (
+                player["roster_slot"],
+                int(
+                    player.get(
+                        "slot_index",
+                        1,
+                    )
+                ),
+            )
+
+            if (
+                player_id
+                in preserve_player_ids
+                or slot_key
+                in preserved_slots
+            ):
+                continue
+
+            db.execute(
+                """
+                INSERT INTO season_week_roster (
+                    season_id,
+                    week,
+                    player_id,
+                    player_name,
+                    position,
+                    roster_slot,
+                    slot_index,
+                    team,
+                    bye_week,
+                    status,
+                    source,
+                    captured_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    season_id,
+                    week,
+                    player_id,
+                    player["player_name"],
+                    player["position"],
+                    player["roster_slot"],
+                    int(
+                        player.get(
+                            "slot_index",
+                            1,
+                        )
+                    ),
+                    player.get("team"),
+                    player.get("bye_week"),
+                    player.get("status"),
+                    player.get("source"),
+                ),
+            )
+
+    return len(roster)
+
+
+def replace_week_cant_cut(
+    week,
+    players,
+    season=None,
+    source="manual_yahoo",
+):
+    """Replace Yahoo's Can't Cut list for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_week_cant_cut
+            WHERE season_id = ?
+              AND week = ?
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        )
+
+        for player in players:
+            db.execute(
+                """
+                INSERT INTO season_week_cant_cut (
+                    season_id,
+                    week,
+                    player_id,
+                    player_name,
+                    source,
+                    captured_at
+                )
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    season_id,
+                    int(week),
+                    str(player["player_id"]),
+                    player["player_name"],
+                    player.get(
+                        "source",
+                        source,
+                    ),
+                ),
+            )
+
+    return len(players)
+
+
+def load_week_cant_cut(
+    week,
+    season=None,
+):
+    """Return Yahoo's recorded Can't Cut list for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                source,
+                captured_at
+            FROM season_week_cant_cut
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY player_name
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def replace_week_lineup(
+    week,
+    players,
+    season=None,
+    source="yahoo_my_team",
+):
+    """Replace the submitted Yahoo lineup for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        db.execute(
+            """
+            DELETE FROM season_week_lineup
+            WHERE season_id = ?
+              AND week = ?
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        )
+
+        for player in players:
+            db.execute(
+                """
+                INSERT INTO season_week_lineup (
+                    season_id,
+                    week,
+                    player_id,
+                    player_name,
+                    position,
+                    lineup_slot,
+                    slot_index,
+                    source,
+                    captured_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    season_id,
+                    int(week),
+                    str(player["player_id"]),
+                    player["player_name"],
+                    player["position"],
+                    player["lineup_slot"],
+                    int(
+                        player.get(
+                            "slot_index",
+                            1,
+                        )
+                    ),
+                    player.get(
+                        "source",
+                        source,
+                    ),
+                ),
+            )
+
+    return len(players)
+
+
+def load_week_lineup(
+    week,
+    season=None,
+):
+    """Return Yahoo's stored submitted lineup for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                position,
+                lineup_slot,
+                slot_index,
+                source,
+                captured_at
+            FROM season_week_lineup
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY
+                CASE lineup_slot
+                    WHEN 'QB' THEN 1
+                    WHEN 'RB' THEN 2
+                    WHEN 'WR' THEN 3
+                    WHEN 'TE' THEN 4
+                    WHEN 'FLEX' THEN 5
+                    WHEN 'K' THEN 6
+                    WHEN 'DEF' THEN 7
+                    WHEN 'BN' THEN 8
+                    WHEN 'IR' THEN 9
+                    ELSE 99
+                END,
+                slot_index
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
+
+
+def load_week_roster(
+    week,
+    season=None,
+):
+    """Return the stored roster snapshot for one fantasy week."""
+
+    initialise_database()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT
+                week,
+                player_id,
+                player_name,
+                position,
+                roster_slot,
+                slot_index,
+                team,
+                bye_week,
+                status,
+                source,
+                captured_at
+            FROM season_week_roster
+            WHERE season_id = ?
+              AND week = ?
+            ORDER BY
+                CASE roster_slot
+                    WHEN 'QB' THEN 1
+                    WHEN 'RB' THEN 2
+                    WHEN 'WR' THEN 3
+                    WHEN 'TE' THEN 4
+                    WHEN 'FLEX' THEN 5
+                    WHEN 'K' THEN 6
+                    WHEN 'DEF' THEN 7
+                    WHEN 'BN' THEN 8
+                    WHEN 'IR' THEN 9
+                    ELSE 99
+                END,
+                slot_index
+            """,
+            (
+                season_id,
+                int(week),
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 
 def load_season_roster(season=None):

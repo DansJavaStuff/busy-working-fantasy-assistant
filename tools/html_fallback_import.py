@@ -14,6 +14,9 @@ from yahoo_normalizer import (
     build_dataset,
     preserve_locked_projections,
 )
+from database import (
+    upsert_player_week_history,
+)
 
 
 NORMALIZED_OUTPUT_FILE = (
@@ -32,29 +35,38 @@ def classify_snapshot(path, prefix):
     metadata = inspect_path(path)
     html_snapshot = metadata.get("snapshot_name")
 
+    filename_snapshot = importer.snapshot_name_from_filename(
+        path,
+        prefix,
+    )
+
     if html_snapshot:
         return {
             "snapshot_name": html_snapshot,
             "source": "html",
             "metadata": metadata,
+            "filename_snapshot": filename_snapshot,
+            "metadata_mismatch": (
+                filename_snapshot is not None
+                and filename_snapshot != html_snapshot
+            ),
         }
-
-    filename_snapshot = importer.snapshot_name_from_filename(
-        path,
-        prefix,
-    )
 
     if filename_snapshot:
         return {
             "snapshot_name": filename_snapshot,
             "source": "filename_fallback",
             "metadata": metadata,
+            "filename_snapshot": filename_snapshot,
+            "metadata_mismatch": False,
         }
 
     return {
         "snapshot_name": None,
         "source": "unknown",
         "metadata": metadata,
+        "filename_snapshot": filename_snapshot,
+        "metadata_mismatch": False,
     }
 
 
@@ -65,22 +77,77 @@ def discover_source_files(prefix):
         "filename_fallback": 0,
         "unknown": 0,
         "unknown_files": [],
+        "classification_reused": 0,
+        "classification_read": 0,
+        "metadata_mismatches": [],
     }
+    store = importer.load_parse_cache()
+    files = store.setdefault("files", {})
 
     for path in sorted(
         importer.DATA_DIR.glob(f"{prefix}*.html")
     ):
-        result = classify_snapshot(path, prefix)
+        signature = importer.file_signature(path)
+        entry = files.get(path.name) or {}
+
+        if (
+            entry.get("size") == signature["size"]
+            and entry.get("mtime_ns") == signature["mtime_ns"]
+            and isinstance(
+                entry.get("classification"),
+                dict,
+            )
+        ):
+            result = entry["classification"]
+            diagnostics["classification_reused"] += 1
+        else:
+            result = classify_snapshot(path, prefix)
+            diagnostics["classification_read"] += 1
+
+            # A changed file invalidates the old parsed rows.  Keep only the
+            # fresh signature/classification; the player parser will rebuild
+            # the rows later in this same import.
+            files[path.name] = {
+                **signature,
+                "classification": result,
+            }
+
         source = result["source"]
         snapshot_name = result["snapshot_name"]
 
         diagnostics[source] += 1
+
+        if result.get("metadata_mismatch"):
+            diagnostics["metadata_mismatches"].append(
+                {
+                    "filename": path.name,
+                    "filename_snapshot": result.get(
+                        "filename_snapshot"
+                    ),
+                    "html_snapshot": snapshot_name,
+                }
+            )
 
         if snapshot_name is None:
             diagnostics["unknown_files"].append(path.name)
             continue
 
         discovered.setdefault(snapshot_name, []).append(path)
+
+    importer.save_parse_cache(store)
+
+    # The legacy merger applies files in list order and later rows win.
+    # Browsers often save a newly-downloaded Yahoo page as "... (1).html";
+    # filename sorting can therefore put the older base file last and make a
+    # refresh appear stale.  Sort each snapshot oldest -> newest by mtime so
+    # the most recently downloaded page is authoritative.
+    for paths in discovered.values():
+        paths.sort(
+            key=lambda path: (
+                path.stat().st_mtime_ns,
+                path.name,
+            )
+        )
 
     return discovered, diagnostics
 
@@ -101,9 +168,25 @@ def print_diagnostics(label, diagnostics):
         "Unclassified:        "
         f"{diagnostics['unknown']} file(s)"
     )
+    print(
+        "Metadata reused:     "
+        f"{diagnostics['classification_reused']} file(s)"
+    )
+    print(
+        "Metadata read:       "
+        f"{diagnostics['classification_read']} file(s)"
+    )
 
     for filename in diagnostics["unknown_files"]:
         print(f"  WARNING: could not classify {filename}")
+
+    for item in diagnostics["metadata_mismatches"]:
+        print(
+            "  WARNING: filename/HTML mismatch: "
+            f"{item['filename']} looks like "
+            f"{item['filename_snapshot']} by filename, "
+            f"but Yahoo metadata says {item['html_snapshot']}."
+        )
 
 
 def html_first_discovery(prefix):
@@ -164,6 +247,15 @@ def write_normalized_dataset():
         encoding="utf-8",
     )
 
+    history_rows = upsert_player_week_history(
+        dataset.get(
+            "players",
+            {},
+        ),
+        season=2026,
+        source="manual_html",
+    )
+
     week_numbers = sorted(
         {
             int(week)
@@ -206,6 +298,10 @@ def write_normalized_dataset():
     print(
         f"Output:     "
         f"{NORMALIZED_OUTPUT_FILE}"
+    )
+    print(
+        f"History:    "
+        f"{history_rows} player/week row(s) persisted"
     )
 
     return dataset

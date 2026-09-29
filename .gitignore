@@ -28,6 +28,11 @@ backups/
 # Local FantasyPros API usage counter
 data/fantasypros_usage.json
 
+# Local FantasyPros in-season caches
+data/fantasypros_weekly.json
+data/fantasypros_comparisons.json
+data/fantasypros_players.json
+
 # Local test output
 tests/fantasypros_test.json
 
@@ -44,3 +49,7 @@ private/
 data/archive/
 
 data/yahoo_normalized.json
+data/yahoo_html_store.json
+
+# Generated Sleeper matchup cache
+data/sleeper_matchups.json

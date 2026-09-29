@@ -48,6 +48,66 @@ container settings-page
     </div>
 
     <section class="settings-panel">
+        <h2>
+            In-season League State
+        </h2>
+
+        <form
+            method="post"
+            action="{{ url_for('update_waiver_priority') }}"
+            class="settings-form"
+        >
+            <label>
+                Waiver Priority
+
+                <input
+                    type="number"
+                    name="waiver_priority"
+                    min="1"
+                    max="{{ data.league.teams }}"
+                    value="{{ data.league_state.waiver_priority or '' }}"
+                    required
+                >
+            </label>
+
+            <button
+                type="submit"
+                class="primary-button"
+            >
+                Save Waiver Priority
+            </button>
+        </form>
+
+        <div class="season-current">
+            Source:
+            <strong>
+                {{ data.league_state.waiver_priority_source or 'manual' }}
+            </strong>
+            {% if data.league_state.updated_at %}
+                · last updated {{ data.league_state.updated_at }}
+            {% endif %}
+        </div>
+
+        {% if request.args.get('waiver_saved') == '1' %}
+        <div class="data-refresh-success">
+            ✓ Waiver priority saved.
+        </div>
+        {% endif %}
+
+        {% if request.args.get('waiver_error') == '1' %}
+        <div class="season-data-warning">
+            Enter a waiver priority between 1 and
+            {{ data.league.teams }}.
+        </div>
+        {% endif %}
+
+        <div class="season-data-warning">
+            Maintained manually until Yahoo Fantasy API access is available.
+            The same stored field can later be updated automatically from Yahoo.
+        </div>
+    </section>
+
+    <section class="settings-panel">
 
         <h2>
             Player Data

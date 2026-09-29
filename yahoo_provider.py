@@ -131,6 +131,7 @@ class YahooDataProvider:
         self._loaded_at = None
         self._source = None
         self._captured_at = None
+        self._generated_at = None
 
     @staticmethod
     def _load_json(path):
@@ -138,6 +139,27 @@ class YahooDataProvider:
             path.read_text(
                 encoding="utf-8",
             )
+        )
+
+    @staticmethod
+    def _parse_timestamp(value):
+        if not value:
+            return None
+
+        try:
+            parsed = datetime.fromisoformat(
+                str(value).replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            return None
+
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(
+                tzinfo=timezone.utc
+            )
+
+        return parsed.astimezone(
+            timezone.utc
         )
 
     def _load_normalized(self):
@@ -174,6 +196,11 @@ class YahooDataProvider:
         self._source = dataset.get(
             "source"
         ) or "normalized_snapshot"
+        self._generated_at = (
+            self._parse_timestamp(
+                dataset.get("generated_at")
+            )
+        )
 
     def _load_legacy(self):
         self._roster = self._load_json(
@@ -186,6 +213,7 @@ class YahooDataProvider:
 
         self._dataset = None
         self._source = "manual_import_legacy"
+        self._generated_at = None
 
     def refresh(self):
         """Reload the latest normalized Yahoo snapshot from disk.
@@ -278,6 +306,46 @@ class YahooDataProvider:
                 )
             )
 
+        snapshot_current = None
+
+        if (
+            self._generated_at is not None
+            and self._captured_at is not None
+        ):
+            snapshot_current = (
+                self._generated_at
+                >= self._captured_at
+            )
+
+        captured_display = (
+            self._format_timestamp(
+                self._captured_at
+            )
+        )
+        generated_display = (
+            self._format_timestamp(
+                self._generated_at
+            )
+        )
+
+        freshness_display = captured_display
+
+        if (
+            captured_display
+            and generated_display
+        ):
+            freshness = (
+                "CURRENT"
+                if snapshot_current
+                else "STALE"
+            )
+
+            freshness_display = (
+                f"{captured_display} · "
+                f"normalized {generated_display} · "
+                f"{freshness}"
+            )
+
         return {
             "source":
                 self._source,
@@ -310,14 +378,24 @@ class YahooDataProvider:
                 self._captured_at,
 
             "captured_at_display":
-                self._format_timestamp(
-                    self._captured_at
-                ),
+                freshness_display,
+
+            "captured_at_only_display":
+                captured_display,
+
+            "generated_at":
+                self._generated_at,
+
+            "generated_at_display":
+                generated_display,
 
             "loaded_at_display":
                 self._format_timestamp(
                     self._loaded_at
                 ),
+
+            "snapshot_current":
+                snapshot_current,
         }
 
     def _manual_snapshot_time(self):
@@ -344,6 +422,62 @@ class YahooDataProvider:
 yahoo_provider = YahooDataProvider()
 
 
+def _player_key(player):
+    """Return a stable key for de-duplicating Yahoo snapshot players."""
+
+    yahoo_id = player.get(
+        "yahoo_player_id"
+    )
+
+    if yahoo_id is not None:
+        return ("id", str(yahoo_id))
+
+    return (
+        "fallback",
+        (player.get("position") or "").upper(),
+        (player.get("team") or "").upper(),
+        (player.get("name") or "").lower(),
+    )
+
+
+def _snapshot_player_pool():
+    """Return every known Yahoo player once, regardless of stale membership."""
+
+    players = (
+        yahoo_provider.get_roster()
+        + yahoo_provider.get_available_players()
+    )
+
+    unique = {}
+
+    for player in players:
+        unique[_player_key(player)] = player
+
+    return list(unique.values())
+
+
+def _matches_local_player(
+    yahoo_player,
+    local_player,
+):
+    """Match a Yahoo player to one locally authoritative roster row."""
+
+    if (
+        (yahoo_player.get("name") or "").lower()
+        ==
+        (local_player.get("player_name") or "").lower()
+    ):
+        return True
+
+    return (
+        local_player.get("position")
+        in {"DEF", "DST"}
+        and yahoo_player.get("position") == "DST"
+        and yahoo_player.get("team")
+        == local_player.get("team")
+    )
+
+
 def enrich_local_roster(
     local_roster,
 ):
@@ -354,16 +488,7 @@ def enrich_local_roster(
     Yahoo refresh, so enrichment searches both snapshot membership lists.
     """
 
-    yahoo_players = (
-        yahoo_provider.get_roster()
-        + yahoo_provider.get_available_players()
-    )
-
-    by_name = {
-        player["name"].lower():
-            player
-        for player in yahoo_players
-    }
+    yahoo_players = _snapshot_player_pool()
 
     enriched = []
 
@@ -386,34 +511,17 @@ def enrich_local_roster(
             local_player["player_name"]
         )
 
-        yahoo_player = by_name.get(
-            local_player[
-                "player_name"
-            ].lower()
+        yahoo_player = next(
+            (
+                candidate
+                for candidate in yahoo_players
+                if _matches_local_player(
+                    candidate,
+                    local_player,
+                )
+            ),
+            None,
         )
-
-        # Defence names can differ locally (for example "Tampa Bay
-        # Buccaneers") from Yahoo's shorter display name ("Buccaneers").
-        if (
-            yahoo_player is None
-            and local_player[
-                "position"
-            ] in {"DEF", "DST"}
-        ):
-            for candidate in yahoo_players:
-                if (
-                    candidate[
-                        "position"
-                    ] == "DST"
-                    and candidate.get(
-                        "team"
-                    )
-                    == local_player.get(
-                        "team"
-                    )
-                ):
-                    yahoo_player = candidate
-                    break
 
         if yahoo_player:
             for key, value in (
@@ -429,6 +537,70 @@ def enrich_local_roster(
         )
 
     return enriched
+
+
+def is_directly_acquirable(
+    player,
+):
+    """Return True only for players Yahoo marks as FA/waiver.
+
+    Older narrow snapshots sometimes lack roster_status entirely, so missing
+    status remains allowed for backwards compatibility. When Yahoo supplies an
+    explicit status, players owned by another fantasy team are excluded.
+    """
+
+    raw_status = player.get(
+        "roster_status"
+    )
+
+    if raw_status is None:
+        return True
+
+    status = str(
+        raw_status
+    ).strip()
+
+    if not status:
+        return True
+
+    upper = status.upper()
+
+    return (
+        upper == "FA"
+        or upper == "FREE AGENT"
+        or upper == "WAIVER"
+        or upper.startswith("W (")
+        or upper.startswith("W ")
+    )
+
+
+def get_effective_available_players(
+    local_roster,
+):
+    """Return availability after applying authoritative local membership.
+
+    Saved Yahoo HTML can lag a manual transaction. Re-partition the complete
+    known Yahoo player pool using the local roster so a newly added player is
+    immediately removed from available players and a newly dropped player is
+    immediately eligible to appear there.
+    """
+
+    return [
+        player
+        for player in _snapshot_player_pool()
+        if (
+            is_directly_acquirable(
+                player
+            )
+            and not any(
+                _matches_local_player(
+                    player,
+                    local_player,
+                )
+                for local_player in local_roster
+            )
+        )
+    ]
 
 
 def get_yahoo_provider_status():

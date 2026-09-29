@@ -98,6 +98,53 @@ Manual snapshot
     </button>
 </form>
 
+{% if request.args.get("lineup_saved") == "1" %}
+<div class="yahoo-data-status">
+    Submitted lineup saved for Week {{ data.weekly.week }}.
+</div>
+{% elif request.args.get("lineup_already_saved") == "1" %}
+<div class="yahoo-data-status">
+    Week {{ data.weekly.week }} already has a submitted lineup saved.
+</div>
+{% elif request.args.get("lineup_locked") == "1" %}
+<div class="yahoo-data-status">
+    Submitted lineup can no longer be saved because Week {{ data.weekly.week }} has already started.
+</div>
+{% endif %}
+
+{% if data.submitted_lineup %}
+<div class="yahoo-data-status">
+    Submitted lineup:
+    <strong>saved</strong>
+    · {{ data.submitted_lineup | length }} player(s)
+</div>
+{% else %}
+<form
+    method="post"
+    action="{{ url_for('save_submitted_lineup') }}"
+    class="yahoo-refresh-form"
+    onsubmit="return confirm('Save the current recommended lineup as the lineup you submitted to Yahoo for Week {{ data.weekly.week }}?');"
+>
+    <button
+        type="submit"
+        class="yahoo-refresh-button"
+    >
+        Save Recommended Lineup as Submitted
+    </button>
+</form>
+{% endif %}
+
+{% if data.weekly.cant_cut_players %}
+<div class="yahoo-data-status">
+    Yahoo Can't Cut · Week {{ data.weekly.week }}:
+    <strong>
+        {% for player in data.weekly.cant_cut_players %}
+            {{ player.player_name }}{% if not loop.last %}, {% endif %}
+        {% endfor %}
+    </strong>
+</div>
+{% endif %}
+
 <section class="weekly-summary">
     <div class="weekly-card">
         <span>
@@ -167,7 +214,7 @@ Manual snapshot
                 ET
             {% endif %}
             {% else %}
-                —
+                All starters locked
             {% endif %}
         </strong>
     </div>
@@ -220,6 +267,32 @@ Manual snapshot
                     {% endif %}
                     · {{ item.matchup }}
                 </span>
+
+                {% if item.best_alternative %}
+                <span>
+                    Best bench alternative:
+                    {{ item.best_alternative.name }}
+                    ({{
+                        "%.2f"
+                        | format(
+                            item.best_alternative
+                            .current_week_projection
+                            or 0
+                        )
+                    }})
+                    · edge
+                    {{
+                        "%+.2f"
+                        | format(
+                            item.projection_edge
+                        )
+                    }}
+                </span>
+                {% else %}
+                <span>
+                    No eligible bench alternative.
+                </span>
+                {% endif %}
             </div>
 
             <div class="next-decision-proj">
@@ -234,13 +307,19 @@ Manual snapshot
             </div>
 
             <div>
+                <span class="
+                    {% if item.decision_call in ['REVIEW', 'CLOSE'] %}
+                        status-warning
+                    {% else %}
+                        status-clear
+                    {% endif %}
+                ">
+                    {{ item.decision_call }}
+                </span>
+
                 {% if item.player.status %}
                 <span class="status-warning">
                     {{ item.player.status }}
-                </span>
-                {% else %}
-                <span class="status-clear">
-                    Clear
                 </span>
                 {% endif %}
             </div>
@@ -249,11 +328,17 @@ Manual snapshot
     </div>
 
     {% if
-        data.weekly.next_decision.concern_count == 0
+        data.weekly.next_decision.review_count == 0
     %}
     <div class="next-decision-note">
-        No current status concerns for players
-        locking at this time.
+        No close start/sit calls or current status concerns
+        for players locking at this time.
+    </div>
+    {% else %}
+    <div class="next-decision-note">
+        {{ data.weekly.next_decision.review_count }}
+        decision{% if data.weekly.next_decision.review_count != 1 %}s{% endif %}
+        worth reviewing before this lock.
     </div>
     {% endif %}
 </section>
@@ -346,6 +431,122 @@ Manual snapshot
     </table>
 </section>
 
+{% if data.weekly.start_sit_evidence %}
+<section class="weekly-section">
+    <h2>
+        Start / Sit Evidence
+    </h2>
+
+    <p class="weekly-card-detail">
+        Sleeper projections are rescored to Busy Working Yahoo points.
+    </p>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Call</th>
+                <th>Start</th>
+                <th>Sit</th>
+                <th>Yahoo Edge</th>
+                <th>Sleeper Edge</th>
+                <th>Matchup Context</th>
+                <th>Evidence</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in data.weekly.start_sit_evidence %}
+            <tr>
+                <td>
+                    <strong>
+                        {{ item.recommendation }}
+                    </strong>
+                </td>
+
+                <td>
+                    {{ item.start.name }}
+                    ({{ item.slot }})
+                </td>
+
+                <td>
+                    {{ item.sit.name }}
+                    ({{ item.sit.position }})
+                </td>
+
+                <td>
+                    {{
+                        "%+.2f"
+                        | format(item.yahoo_edge)
+                    }}
+                </td>
+
+                <td>
+                    {% if item.sleeper.edge is not none %}
+                    {{
+                        "%+.2f"
+                        | format(item.sleeper.edge)
+                    }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if item.matchup.start %}
+                    <div>
+                        <strong>
+                            {{ item.start.name }}:
+                            {{ item.matchup.start.display_label }}
+                        </strong>
+                        vs {{ item.matchup.start.opponent }}
+                        · {{
+                            "%+.0f%%"
+                            | format(
+                                item.matchup.start.delta_pct
+                            )
+                        }} vs league avg
+                        · {{ item.matchup.start.games }}-game sample
+                    </div>
+                    {% endif %}
+
+                    {% if item.matchup.sit %}
+                    <div class="weekly-card-detail">
+                        {{ item.sit.name }}:
+                        {{ item.matchup.sit.display_label }}
+                        vs {{ item.matchup.sit.opponent }}
+                        · {{
+                            "%+.0f%%"
+                            | format(
+                                item.matchup.sit.delta_pct
+                            )
+                        }} vs league avg
+                        · {{ item.matchup.sit.games }}-game sample
+                    </div>
+                    {% endif %}
+
+                    {% if not item.matchup.start and not item.matchup.sit %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if item.sleeper.agreement == "agree" %}
+                        AGREE
+                    {% elif item.sleeper.agreement == "disagree" %}
+                        DISAGREE
+                    {% elif item.sleeper.error %}
+                        Sleeper unavailable
+                    {% else %}
+                        Yahoo only
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
 
 <section class="weekly-section">
     <h2>
@@ -436,6 +637,7 @@ Manual snapshot
     <table class="weekly-table">
         <thead>
             <tr>
+                <th>Role</th>
                 <th>Slot</th>
                 <th>Player</th>
                 <th>Status</th>
@@ -446,6 +648,12 @@ Manual snapshot
         <tbody>
             {% for item in data.weekly.status_watch %}
             <tr>
+                <td>
+                    <strong>
+                        {{ item.role }}
+                    </strong>
+                </td>
+
                 <td>
                     {{ item.slot }}
                 </td>
@@ -666,6 +874,114 @@ Manual snapshot
 {% endif %}
 
 
+{% if data.weekly.speculative_waivers %}
+<section class="weekly-section">
+    <h2>
+        Speculative Waiver Opportunities
+    </h2>
+
+    <p class="weekly-card-detail">
+        These moves require dropping a player before the incoming waiver claim
+        can clear. They are kept separate from normal recommendations because
+        the claim may fail.
+    </p>
+
+    <div class="transaction-grid">
+        {% for move in data.weekly.speculative_waivers %}
+        <article class="transaction-card">
+            <div class="transaction-heading">
+                <span class="transaction-label">
+                    {{ move.speculative_verdict }}
+                </span>
+
+                <span class="transaction-type">
+                    {{ move.move_type }}
+                </span>
+            </div>
+
+            <div class="transaction-players">
+                <div class="transaction-add">
+                    <span>CLAIM</span>
+                    <strong>{{ move.add.name }}</strong>
+                    <small>
+                        {{ move.add.position }} · {{ move.add.roster_status }}
+                    </small>
+                </div>
+
+                <div class="transaction-drop">
+                    <span>PRE-DROP</span>
+                    <strong>{{ move.drop.name }}</strong>
+                    <small>{{ move.drop.position }}</small>
+                </div>
+            </div>
+
+            <div class="transaction-metrics">
+                <div>
+                    <span>Upside</span>
+                    <strong>
+                        {{ "%+.2f"|format(move.week_gain) }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Fallback</span>
+                    <strong>
+                        {% if move.fallback %}
+                            {{ move.fallback.name }}
+                        {% else %}
+                            None
+                        {% endif %}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Fallback vs current</span>
+                    <strong>
+                        {{ "%+.2f"|format(move.fallback_delta) }}
+                    </strong>
+                </div>
+            </div>
+
+            <div class="transaction-reasons">
+                <strong>Why?</strong>
+                <ul>
+                    <li>
+                        {{ move.add.name }} cannot clear until
+                        {{ move.waiver_clear_date.strftime("%-d %b") }},
+                        but {{ move.drop.name }} locks first.
+                    </li>
+
+                    {% if move.fallback %}
+                    <li>
+                        Best current free-agent fallback is
+                        {{ move.fallback.name }},
+                        {{
+                            "%+.2f"
+                            | format(move.fallback_delta)
+                        }}
+                        pts versus keeping {{ move.drop.name }}.
+                    </li>
+
+                    {% if move.speculative_verdict == "BETTER FA AVAILABLE" %}
+                    <li>
+                        {{ move.fallback.name }} is immediately available and
+                        offers at least as much current-week upside as waiting
+                        for {{ move.add.name }} to clear waivers.
+                    </li>
+                    {% endif %}
+                    {% else %}
+                    <li>
+                        No current free-agent fallback was found at this position.
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 {% if data.weekly.transactions %}
 <section class="weekly-section">
     <h2>
@@ -787,7 +1103,7 @@ Manual snapshot
                 <ul>
                     {% for reason in move.reasons %}
                     <li>
-                        {{ reason | replace("Week 1", "current week") }}
+                        {{ reason }}
                     </li>
                     {% endfor %}
                 </ul>

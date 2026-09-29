@@ -1,5 +1,7 @@
 from flask import Flask, redirect, render_template, request, url_for
 from pathlib import Path
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import subprocess
 import sys
 from draft_engine import (
@@ -17,16 +19,27 @@ from draft_engine import (
     undo_last_pick,
     update_settings,
 )
+from matchup_context import refresh_matchup_cache
 from player_database import load_players
+from available_engine import (
+    build_available_rankings,
+)
 from recommendation_engine import get_recommendations
 from simulator import choose_opponent_pick
 from database import (
     CURRENT_LEAGUE_NAME,
+    list_recommendation_actions,
     list_seasons,
     load_current_draft_order,
+    load_season_league_state,
     load_season_roster,
     load_team_identity,
+    load_week_lineup,
+    replace_week_lineup,
+    record_recommendation_action,
     save_current_draft_order,
+    save_waiver_priority,
+    update_recommendation_action_status,
 )
 from data_status import get_data_status
 from fantasypros import get_api_usage
@@ -36,6 +49,7 @@ from refresh_data import (
     refresh_ffc,
 )
 from roster_display import build_roster_slots
+from history_engine import build_history_week
 from roster_manager import (
     move_roster_player,
     replace_roster_player,
@@ -51,6 +65,45 @@ from yahoo_provider import (
 )
 
 app = Flask(__name__)
+
+UK_TIME = ZoneInfo(
+    "Europe/London"
+)
+
+
+@app.template_filter("local_datetime")
+def local_datetime(value):
+    """Render a stored UTC SQLite timestamp in UK local time."""
+
+    if not value:
+        return "—"
+
+    if isinstance(
+        value,
+        datetime,
+    ):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(
+                str(value)
+            )
+        except ValueError:
+            return str(value)
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(
+            tzinfo=timezone.utc
+        )
+
+    local = parsed.astimezone(
+        UK_TIME
+    )
+
+    return local.strftime(
+        "%d %b %Y · %H:%M:%S %Z"
+    )
+
 
 @app.route("/")
 def dashboard():
@@ -167,6 +220,11 @@ def settings_page():
         },
         "draft_order":
             load_current_draft_order(),
+
+        "league_state":
+            load_season_league_state(
+                state["season"]
+            ),
         "seasons":
             list_seasons(),
         "player_data":
@@ -184,6 +242,41 @@ def settings_page():
         data=data,
     )
       
+@app.post("/settings/waiver-priority")
+def update_waiver_priority():
+    state = load_state()
+
+    waiver_priority = request.form.get(
+        "waiver_priority",
+        type=int,
+    )
+
+    if (
+        waiver_priority is None
+        or waiver_priority < 1
+        or waiver_priority > state["teams"]
+    ):
+        return redirect(
+            url_for(
+                "settings_page",
+                waiver_error="1",
+            )
+        )
+
+    save_waiver_priority(
+        waiver_priority,
+        season=state["season"],
+        source="manual",
+    )
+
+    return redirect(
+        url_for(
+            "settings_page",
+            waiver_saved="1",
+        )
+    )
+
+
 @app.post("/draft/<string:player_id>")
 def make_pick(player_id):
     state = load_state()
@@ -304,11 +397,376 @@ def weekly():
             ),
         "weekly":
             weekly_data,
+        "submitted_lineup":
+            load_week_lineup(
+                week,
+                season=season,
+            ),
     }
 
     return render_template(
         "weekly.html",
         data=data,
+    )
+
+
+@app.get("/history")
+def history():
+    season = 2026
+    current_week = current_fantasy_week(
+        season
+    )
+
+    requested_week = request.args.get(
+        "week",
+        type=int,
+    )
+
+    available_weeks = list(
+        range(
+            1,
+            current_week + 1,
+        )
+    )
+
+    week = (
+        requested_week
+        if requested_week in available_weeks
+        else current_week
+    )
+
+    history_data = build_history_week(
+        week,
+        season=season,
+    )
+
+    data = {
+        "league": {
+            "name":
+                CURRENT_LEAGUE_NAME,
+            "season":
+                season,
+        },
+        "team":
+            load_team_identity(
+                season
+            ),
+        "history":
+            history_data,
+        "available_weeks":
+            available_weeks,
+    }
+
+    return render_template(
+        "history.html",
+        data=data,
+    )
+
+
+@app.post("/weekly/save-submitted-lineup")
+def save_submitted_lineup():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    existing = load_week_lineup(
+        week,
+        season=season,
+    )
+
+    if existing:
+        return redirect(
+            url_for(
+                "weekly",
+                lineup_already_saved="1",
+            )
+        )
+
+    weekly_data = build_weekly_data(
+        season=season,
+        week=week,
+    )
+
+    if any(
+        player.get(
+            "current_week_actual"
+        ) is not None
+        for player in weekly_data[
+            "roster"
+        ]
+    ):
+        return redirect(
+            url_for(
+                "weekly",
+                lineup_locked="1",
+            )
+        )
+
+    rows = []
+    slot_counts = {}
+
+    def add_row(
+        player,
+        lineup_slot,
+    ):
+        slot = (
+            "DEF"
+            if lineup_slot == "DST"
+            else lineup_slot
+        )
+
+        slot_counts[slot] = (
+            slot_counts.get(
+                slot,
+                0,
+            )
+            + 1
+        )
+
+        rows.append(
+            {
+                "player_id": str(
+                    player[
+                        "yahoo_player_id"
+                    ]
+                ),
+                "player_name":
+                    player["name"],
+                "position":
+                    player["position"],
+                "lineup_slot": slot,
+                "slot_index":
+                    slot_counts[slot],
+                "source":
+                    "confirmed_recommended_lineup",
+            }
+        )
+
+    for item in weekly_data[
+        "lineup"
+    ]:
+        add_row(
+            item["player"],
+            item["slot"],
+        )
+
+    for player in weekly_data[
+        "bench"
+    ]:
+        add_row(
+            player,
+            "BN",
+        )
+
+    for player in weekly_data[
+        "ir_review"
+    ]:
+        add_row(
+            player,
+            "IR",
+        )
+
+    replace_week_lineup(
+        week,
+        rows,
+        season=season,
+        source=
+            "confirmed_recommended_lineup",
+    )
+
+    return redirect(
+        url_for(
+            "weekly",
+            lineup_saved="1",
+        )
+    )
+
+
+@app.get("/available")
+def available_players():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    data = {
+        "league": {
+            "name":
+                CURRENT_LEAGUE_NAME,
+            "season":
+                season,
+        },
+        "team":
+            load_team_identity(
+                season
+            ),
+        "week":
+            week,
+        "target_week":
+            week,
+        "yahoo_status":
+            get_yahoo_provider_status(),
+    }
+
+    data[
+        "recommendation_actions"
+    ] = list_recommendation_actions(
+        season,
+        limit=20,
+    )
+
+    return render_template(
+        "available.html",
+        data=data,
+    )
+
+
+@app.post("/available/track")
+def track_available_recommendation():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    add_name = request.form.get(
+        "add_player_name",
+        "",
+    ).strip()
+
+    if not add_name:
+        return redirect(
+            url_for(
+                "available_players",
+                track_error="1",
+            )
+        )
+
+    record_recommendation_action(
+        season=season,
+        week=week,
+        action_type=request.form.get(
+            "action_type",
+            "waiver_claim",
+        ),
+        priority=request.form.get(
+            "priority",
+            type=int,
+        ),
+        add_player_id=request.form.get(
+            "add_player_id",
+        ),
+        add_player_name=add_name,
+        add_position=request.form.get(
+            "add_position",
+        ),
+        drop_player_id=request.form.get(
+            "drop_player_id",
+        ),
+        drop_player_name=request.form.get(
+            "drop_player_name",
+        ),
+        drop_position=request.form.get(
+            "drop_position",
+        ),
+        recommendation_label=request.form.get(
+            "recommendation_label",
+        ),
+        move_type=request.form.get(
+            "move_type",
+        ),
+        recommendation_rank=request.form.get(
+            "recommendation_rank",
+            type=int,
+        ),
+    )
+
+    return redirect(
+        url_for(
+            "available_players",
+            tracked="1",
+        )
+    )
+
+
+@app.post("/available/action/<int:action_id>/status")
+def update_available_action_status(
+    action_id,
+):
+    status = request.form.get(
+        "status",
+        "",
+    ).strip()
+
+    try:
+        update_recommendation_action_status(
+            action_id,
+            status,
+            season=2026,
+        )
+    except ValueError:
+        return redirect(
+            url_for(
+                "available_players",
+                status_error="1",
+            )
+        )
+
+    return redirect(
+        url_for(
+            "available_players",
+            status_saved="1",
+        )
+    )
+
+
+@app.get("/available/rankings")
+def available_rankings():
+    season = 2026
+    week = current_fantasy_week(
+        season
+    )
+
+    available_data = (
+        build_available_rankings(
+            season=season,
+            week=week,
+            limit=20,
+        )
+    )
+
+    pending_actions = [
+        action
+        for action in list_recommendation_actions(
+            season,
+            limit=50,
+        )
+        if action["status"] == "pending"
+    ]
+
+    tracked_keys = {
+        (
+            str(
+                action.get(
+                    "add_player_id"
+                )
+                or ""
+            )
+            + "::"
+            + str(
+                action.get(
+                    "drop_player_id"
+                )
+                or ""
+            )
+        )
+        for action in pending_actions
+    }
+
+    return render_template(
+        "_available_rankings.html",
+        available=available_data,
+        tracked_keys=tracked_keys,
     )
 
 
@@ -711,24 +1169,47 @@ def refresh_yahoo_data():
         __file__
     ).resolve().parent
 
-    importer = (
-        project_root
-        / "tools"
-        / "import_yahoo_players.py"
-    )
-
     try:
-        subprocess.run(
+        result = subprocess.run(
             [
                 sys.executable,
-                str(importer),
+                "-m",
+                "tools.html_fallback_import",
             ],
             cwd=project_root,
             check=True,
-            timeout=180,
+            timeout=600,
+            capture_output=True,
+            text=True,
         )
 
+        if result.stdout:
+            app.logger.info(
+                "Yahoo refresh output:\n%s",
+                result.stdout,
+            )
+
         yahoo_provider.refresh()
+
+        try:
+            matchup_result = (
+                refresh_matchup_cache(
+                    current_fantasy_week(
+                        2026
+                    ),
+                    season=2026,
+                )
+            )
+
+            app.logger.info(
+                "Sleeper matchup cache: %s",
+                matchup_result,
+            )
+        except Exception:
+            app.logger.exception(
+                "Sleeper matchup refresh failed; "
+                "continuing with cached context."
+            )
 
         return redirect(
             url_for(
@@ -737,14 +1218,36 @@ def refresh_yahoo_data():
             )
         )
 
-    except (
-        subprocess.CalledProcessError,
-        subprocess.TimeoutExpired,
-    ):
+    except subprocess.CalledProcessError as exc:
+        app.logger.error(
+            "Yahoo refresh failed with exit code %s.\n"
+            "stdout:\n%s\n"
+            "stderr:\n%s",
+            exc.returncode,
+            exc.stdout or "(empty)",
+            exc.stderr or "(empty)",
+        )
+
         return redirect(
             url_for(
                 "weekly",
-                refresh_error="1",
+                refresh_error="process",
+            )
+        )
+
+    except subprocess.TimeoutExpired as exc:
+        app.logger.error(
+            "Yahoo refresh timed out after 600 seconds.\n"
+            "stdout:\n%s\n"
+            "stderr:\n%s",
+            exc.stdout or "(empty)",
+            exc.stderr or "(empty)",
+        )
+
+        return redirect(
+            url_for(
+                "weekly",
+                refresh_error="timeout",
             )
         )
 
@@ -936,7 +1439,10 @@ def rebuild_player_data():
 
     if state["session_type"] != "mock":
         return redirect(
-            url_for("settings_page")
+            url_for(
+                "settings_page",
+                refreshed="rebuild",
+            )
         )
 
     rebuild_database()
@@ -950,7 +1456,7 @@ def rebuild_player_data():
 
 if __name__ == "__main__":
     app.run(
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=8080,
         debug=False,
     )

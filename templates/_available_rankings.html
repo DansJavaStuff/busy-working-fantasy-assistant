@@ -1,0 +1,277 @@
+{% if available.waiver_queue %}
+<section class="waiver-queue">
+    <h3>
+        Tonight's Waiver Objective
+    </h3>
+
+    <p class="weekly-card-detail">
+        Submit these claims individually in this order to solve the same roster
+        issue. Yahoo will process them in priority order. After waivers clear,
+        refresh the Yahoo data and the assistant will choose the next issue.
+        Current waiver priority: #{{ available.waiver_priority or "—" }}.
+    </p>
+
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th>Priority</th>
+                <th>Add</th>
+                <th>Drop</th>
+                <th>Type</th>
+                <th>Why</th>
+                <th>Track</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for claim in available.waiver_queue %}
+            <tr>
+                <td>
+                    <strong>
+                        {{ claim.priority }}
+                    </strong>
+                </td>
+
+                <td>
+                    <strong>
+                        {{ claim.add.name }}
+                    </strong>
+                    <div class="weekly-card-detail">
+                        {{ claim.add.position }}
+                        · {{ claim.add.team }}
+                    </div>
+                </td>
+
+                <td>
+                    <strong>
+                        {{ claim.drop.name }}
+                    </strong>
+                    <div class="weekly-card-detail">
+                        {{ claim.drop.position }}
+                    </div>
+                </td>
+
+                <td>
+                    <span class="transaction-label">
+                        {{ claim.call }}
+                    </span>
+                    <div class="weekly-card-detail">
+                        {{ claim.move_type }}
+                    </div>
+                </td>
+
+                <td>
+                    {% if claim.reasons %}
+                        {{ claim.reasons[0] }}
+                    {% else %}
+                        Ranked #{{ claim.rank }} overall.
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% set track_key =
+                        (claim.add.yahoo_player_id|string)
+                        ~ "::"
+                        ~ (claim.drop.yahoo_player_id|string)
+                    %}
+
+                    {% if track_key in tracked_keys %}
+                    <span class="status-clear">
+                        Tracked
+                    </span>
+                    {% else %}
+                    <form
+                        method="post"
+                        action="{{ url_for('track_available_recommendation') }}"
+                    >
+                        <input type="hidden" name="action_type" value="waiver_claim">
+                        <input type="hidden" name="priority" value="{{ claim.priority }}">
+                        <input type="hidden" name="recommendation_rank" value="{{ claim.rank }}">
+                        <input type="hidden" name="add_player_id" value="{{ claim.add.yahoo_player_id }}">
+                        <input type="hidden" name="add_player_name" value="{{ claim.add.name }}">
+                        <input type="hidden" name="add_position" value="{{ claim.add.position }}">
+                        <input type="hidden" name="drop_player_id" value="{{ claim.drop.yahoo_player_id }}">
+                        <input type="hidden" name="drop_player_name" value="{{ claim.drop.name }}">
+                        <input type="hidden" name="drop_position" value="{{ claim.drop.position }}">
+                        <input type="hidden" name="recommendation_label" value="{{ claim.call }}">
+                        <input type="hidden" name="move_type" value="{{ claim.move_type }}">
+                        <button
+                            type="submit"
+                            class="secondary-button"
+                        >
+                            Mark submitted
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if available.sleeper_error %}
+<p class="weekly-card-detail">
+    Sleeper was unavailable for this refresh, so the ranking is using
+    Yahoo and roster-fit evidence only.
+</p>
+{% endif %}
+
+<table class="weekly-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>Pos</th>
+            <th>Team</th>
+            <th>Status</th>
+            <th>Yahoo W{{ available.target_week }}</th>
+            <th>Sleeper W{{ available.target_week }}</th>
+            <th>4-week avg</th>
+            <th>Pos value</th>
+            <th>Best drop</th>
+            <th>Roster gain</th>
+            <th>Call</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for item in available.rankings %}
+        <tr>
+            <td><strong>{{ item.rank }}</strong></td>
+
+            <td>
+                <strong>{{ item.player.name }}</strong>
+
+                {% if item.reasons %}
+                <div class="weekly-card-detail">
+                    {{ item.reasons | join(" ") }}
+                </div>
+                {% endif %}
+            </td>
+
+            <td>{{ item.player.position }}</td>
+            <td>{{ item.player.team }}</td>
+
+            <td>
+                {{ item.player.roster_status or "FA" }}
+            </td>
+
+            <td class="weekly-projection">
+                {{
+                    "%.2f"
+                    | format(
+                        item.target_week_projection
+                    )
+                }}
+            </td>
+
+            <td class="weekly-projection">
+                {% if item.sleeper_next_week is not none %}
+                {{
+                    "%.2f"
+                    | format(
+                        item.sleeper_next_week
+                    )
+                }}
+                {% else %}
+                —
+                {% endif %}
+            </td>
+
+            <td>
+                {{
+                    "%.2f"
+                    | format(
+                        item.four_week_average
+                    )
+                }}
+            </td>
+
+            <td>
+                {{
+                    "%+.2f"
+                    | format(
+                        item.position_value.value
+                    )
+                }}
+            </td>
+
+            <td>
+                {% if item.best_drop %}
+                    {{ item.best_drop.name }}
+                    ({{ item.best_drop.position }})
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+
+            <td>
+                {% if item.roster_gain is not none %}
+                {{
+                    "%+.2f"
+                    | format(
+                        item.roster_gain
+                    )
+                }}
+                {% else %}
+                —
+                {% endif %}
+            </td>
+
+            <td>
+                <span class="transaction-label">
+                    {{ item.move_label }}
+                </span>
+                <div class="weekly-card-detail">
+                    {{ item.move_type }}
+                </div>
+
+                {% if item.best_drop %}
+                {% set item_track_key =
+                    (item.player.yahoo_player_id|string)
+                    ~ "::"
+                    ~ (item.best_drop.yahoo_player_id|string)
+                %}
+
+                {% if item_track_key in tracked_keys %}
+                <div style="margin-top: 8px;">
+                    <span class="status-clear">
+                        Tracked
+                    </span>
+                </div>
+                {% else %}
+                <form
+                    method="post"
+                    action="{{ url_for('track_available_recommendation') }}"
+                    style="margin-top: 8px;"
+                >
+                    <input
+                        type="hidden"
+                        name="action_type"
+                        value="{% if item.player.roster_status and item.player.roster_status[0]|upper == 'W' %}waiver_claim{% else %}free_agent_add{% endif %}"
+                    >
+                    <input type="hidden" name="recommendation_rank" value="{{ item.rank }}">
+                    <input type="hidden" name="add_player_id" value="{{ item.player.yahoo_player_id }}">
+                    <input type="hidden" name="add_player_name" value="{{ item.player.name }}">
+                    <input type="hidden" name="add_position" value="{{ item.player.position }}">
+                    <input type="hidden" name="drop_player_id" value="{{ item.best_drop.yahoo_player_id }}">
+                    <input type="hidden" name="drop_player_name" value="{{ item.best_drop.name }}">
+                    <input type="hidden" name="drop_position" value="{{ item.best_drop.position }}">
+                    <input type="hidden" name="recommendation_label" value="{{ item.move_label }}">
+                    <input type="hidden" name="move_type" value="{{ item.move_type }}">
+                    <button
+                        type="submit"
+                        class="secondary-button"
+                    >
+                        Mark submitted
+                    </button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

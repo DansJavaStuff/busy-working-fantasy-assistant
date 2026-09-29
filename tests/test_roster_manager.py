@@ -5,6 +5,7 @@ from unittest import TestCase, mock
 
 import database
 import roster_manager
+import history_reconstruction
 
 
 class RosterManagerTests(TestCase):
@@ -343,6 +344,326 @@ class RosterManagerTests(TestCase):
         self.assertNotIn(
             "qb2",
             roster,
+        )
+
+    def test_player_week_history_preserves_actuals_and_projections(self):
+        players = {
+            "k1": {
+                "name": "Kicker One",
+                "position": "K",
+                "team": "LAC",
+                "weeks": {
+                    "1": {
+                        "projection": 7.0,
+                        "actual": 9.0,
+                    },
+                    "2": {
+                        "projection": 6.5,
+                        "actual": 4.0,
+                    },
+                },
+            }
+        }
+
+        database.upsert_player_week_history(
+            players,
+            season=2026,
+        )
+
+        week_one = (
+            database.load_player_week_history(
+                1,
+                season=2026,
+            )
+        )
+        week_two = (
+            database.load_player_week_history(
+                2,
+                season=2026,
+            )
+        )
+
+        self.assertEqual(
+            week_one[0]["actual"],
+            9.0,
+        )
+        self.assertEqual(
+            week_one[0]["projection"],
+            7.0,
+        )
+        self.assertEqual(
+            week_two[0]["actual"],
+            4.0,
+        )
+
+        # A later import that lacks an actual must not erase the historical
+        # actual already stored for that player/week.
+        database.upsert_player_week_history(
+            {
+                "k1": {
+                    "name": "Kicker One",
+                    "position": "K",
+                    "team": "LAC",
+                    "weeks": {
+                        "1": {
+                            "projection": 7.2,
+                            "actual": None,
+                        }
+                    },
+                }
+            },
+            season=2026,
+        )
+
+        refreshed = (
+            database.load_player_week_history(
+                1,
+                season=2026,
+            )
+        )
+
+        self.assertEqual(
+            refreshed[0]["actual"],
+            9.0,
+        )
+        self.assertEqual(
+            refreshed[0]["projection"],
+            7.2,
+        )
+
+    def test_weekly_roster_snapshots_keep_weeks_independent(self):
+        database.snapshot_season_roster(
+            2,
+            season=2026,
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+                "bye_week": 8,
+            },
+            season=2026,
+        )
+
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        week_two = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                2,
+                season=2026,
+            )
+        }
+
+        week_three = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                3,
+                season=2026,
+            )
+        }
+
+        self.assertIn(
+            "k1",
+            week_two,
+        )
+        self.assertNotIn(
+            "k2",
+            week_two,
+        )
+        self.assertNotIn(
+            "k1",
+            week_three,
+        )
+        self.assertIn(
+            "k2",
+            week_three,
+        )
+
+    def test_resnapshot_updates_only_current_week_copy(self):
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+                "bye_week": 8,
+            },
+            season=2026,
+        )
+
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        snapshot = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                3,
+                season=2026,
+            )
+        }
+
+        self.assertNotIn(
+            "k1",
+            snapshot,
+        )
+        self.assertIn(
+            "k2",
+            snapshot,
+        )
+        self.assertEqual(
+            snapshot["k2"]["roster_slot"],
+            "K",
+        )
+
+    def test_lock_aware_snapshot_preserves_locked_player(self):
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+            },
+            season=2026,
+        )
+
+        database.snapshot_season_roster(
+            3,
+            season=2026,
+            preserve_player_ids={"k1"},
+        )
+
+        snapshot = {
+            player["player_id"]: player
+            for player in database.load_week_roster(
+                3,
+                season=2026,
+            )
+        }
+
+        self.assertIn(
+            "k1",
+            snapshot,
+        )
+        self.assertNotIn(
+            "k2",
+            snapshot,
+        )
+
+    def test_history_roster_uses_yahoo_player_id_for_join(self):
+        roster = [
+            {
+                "player_id": "local-123",
+                "yahoo_player_id": "31482",
+                "player_name": "Eddy Pineiro",
+                "name": "Eddy Pineiro",
+                "position": "K",
+                "team": "SF",
+                "roster_slot": "K",
+                "slot_index": 1,
+            }
+        ]
+
+        history = (
+            history_reconstruction
+            .canonical_history_roster(
+                roster
+            )
+        )
+
+        self.assertEqual(
+            history[0]["player_id"],
+            "31482",
+        )
+        self.assertEqual(
+            history[0]["roster_slot"],
+            "K",
+        )
+
+    def test_history_reconstruction_rewinds_later_transactions(self):
+        current = database.load_season_roster(
+            2026
+        )
+
+        roster_manager.replace_roster_player(
+            "k1",
+            {
+                "player_id": "k2",
+                "player_name": "Kicker Two",
+                "position": "K",
+                "team": "SF",
+            },
+            season=2026,
+        )
+
+        current = database.load_season_roster(
+            2026
+        )
+
+        transactions = [
+            {
+                "occurred_at":
+                    "2026-09-27T11:26:00",
+                "add_player_id": "k2",
+                "add_player_name":
+                    "Kicker Two",
+                "add_position": "K",
+                "add_team": "SF",
+                "drop_player_id": "k1",
+                "drop_player_name":
+                    "Kicker One",
+                "drop_position": "K",
+                "drop_team": "LAC",
+            }
+        ]
+
+        week_two = (
+            history_reconstruction
+            .roster_at_week_end(
+                current,
+                transactions,
+                target_week=2,
+                season=2026,
+            )
+        )
+
+        by_id = {
+            player["player_id"]: player
+            for player in week_two
+        }
+
+        self.assertIn(
+            "k1",
+            by_id,
+        )
+        self.assertNotIn(
+            "k2",
+            by_id,
+        )
+        self.assertEqual(
+            by_id["k1"]["roster_slot"],
+            "K",
         )
 
     def test_ir_move_is_rejected_for_now(self):

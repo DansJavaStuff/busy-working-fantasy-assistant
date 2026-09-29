@@ -1,9 +1,16 @@
 from pathlib import Path
 from datetime import datetime
+import re
 from zoneinfo import ZoneInfo
 import json
 
-from database import load_season_roster
+from database import (
+    load_season_league_state,
+    load_season_roster,
+    load_week_cant_cut,
+    load_week_lineup,
+    snapshot_season_roster,
+)
 from fantasy_calendar import (
     UK_TIME,
     current_fantasy_week,
@@ -12,11 +19,18 @@ from fantasy_calendar import (
 )
 from yahoo_provider import (
     enrich_local_roster,
+    get_effective_available_players,
     yahoo_provider,
 )
 from transaction_engine import (
     build_bye_coverage,
     build_transaction_recommendations,
+)
+from history_reconstruction import (
+    canonical_history_roster,
+)
+from weekly_evidence import (
+    build_start_sit_evidence,
 )
 
 
@@ -53,6 +67,95 @@ _TRANSACTION_CACHE = {
     "recommendations": None,
 }
 
+_START_SIT_CACHE = {
+    "snapshot_key": None,
+    "evidence": None,
+}
+
+
+def cached_start_sit_evidence(
+    lineup,
+    bench,
+    provider_status,
+    week,
+):
+    captured_at = provider_status.get(
+        "captured_at"
+    )
+
+    decision_key = tuple(
+        sorted(
+            (
+                item["slot"],
+                item["player"].get(
+                    "name",
+                    "",
+                ),
+                item["player"].get(
+                    "current_week_projection",
+                ),
+                item["player"].get(
+                    "current_week_actual",
+                ),
+            )
+            for item in lineup
+        )
+    ) + tuple(
+        sorted(
+            (
+                "BN",
+                player.get(
+                    "name",
+                    "",
+                ),
+                player.get(
+                    "current_week_projection",
+                ),
+                player.get(
+                    "current_week_actual",
+                ),
+            )
+            for player in bench
+        )
+    )
+
+    snapshot_key = (
+        (
+            captured_at.isoformat()
+            if captured_at
+            else None
+        ),
+        week,
+        decision_key,
+    )
+
+    if (
+        _START_SIT_CACHE[
+            "snapshot_key"
+        ] == snapshot_key
+        and _START_SIT_CACHE[
+            "evidence"
+        ] is not None
+    ):
+        return _START_SIT_CACHE[
+            "evidence"
+        ]
+
+    evidence = build_start_sit_evidence(
+        lineup,
+        bench,
+        week,
+    )
+
+    _START_SIT_CACHE[
+        "snapshot_key"
+    ] = snapshot_key
+    _START_SIT_CACHE[
+        "evidence"
+    ] = evidence
+
+    return evidence
+
 
 def cached_transaction_recommendations(
     roster,
@@ -60,6 +163,7 @@ def cached_transaction_recommendations(
     provider_status,
     week,
     waiver_priority=None,
+    cant_cut_ids=None,
 ):
     captured_at = provider_status.get(
         "captured_at"
@@ -91,6 +195,16 @@ def cached_transaction_recommendations(
         ),
         roster_key,
         week,
+        waiver_priority,
+        tuple(
+            sorted(
+                str(player_id)
+                for player_id in (
+                    cant_cut_ids
+                    or set()
+                )
+            )
+        ),
     )
 
     if (
@@ -109,9 +223,12 @@ def cached_transaction_recommendations(
         build_transaction_recommendations(
             roster,
             available,
-            limit=5,
+            # Build deeper than the UI limit because operationally
+            # impossible waiver moves may be filtered below.
+            limit=12,
             current_week=week,
             waiver_priority=waiver_priority,
+            cant_cut_ids=cant_cut_ids,
         )
     )
 
@@ -208,6 +325,56 @@ def add_roster_slots(
         )
 
 
+def apply_submitted_lineup_slots(
+    roster,
+    submitted_lineup,
+):
+    """Overlay confirmed Yahoo lineup slots for weekly decision locking.
+
+    Ownership/history snapshots continue to use the local roster separately;
+    this copy is only for start/sit and game-lock decisions.
+    """
+
+    by_id = {
+        str(row["player_id"]): row
+        for row in (
+            submitted_lineup
+            or []
+        )
+    }
+
+    output = []
+
+    for player in roster:
+        item = dict(player)
+
+        yahoo_id = str(
+            item.get(
+                "yahoo_player_id",
+                "",
+            )
+        )
+
+        submitted = by_id.get(
+            yahoo_id
+        )
+
+        if submitted:
+            item["roster_slot"] = (
+                submitted["lineup_slot"]
+            )
+            item["slot_index"] = (
+                submitted["slot_index"]
+            )
+            item["submitted_lineup"] = True
+
+        output.append(
+            item
+        )
+
+    return output
+
+
 def best_players(
     players,
     position,
@@ -241,6 +408,151 @@ def best_players(
     )
 
     return selected
+
+
+def slot_accepts_position(
+    slot,
+    position,
+):
+    slot = (
+        "DST"
+        if slot in {"DEF", "DST"}
+        else slot
+    )
+
+    position = (
+        "DST"
+        if position in {"DEF", "DST"}
+        else position
+    )
+
+    if slot == "FLEX":
+        return (
+            position
+            in FLEX_POSITIONS
+        )
+
+    return slot == position
+
+
+def build_status_watch(
+    roster,
+    lineup,
+):
+    starter_slots = {
+        item["player"][
+            "yahoo_player_id"
+        ]: item["slot"]
+        for item in lineup
+    }
+
+    watch = []
+
+    for player in roster:
+        status = player.get(
+            "status"
+        )
+
+        if (
+            not status
+            or player.get(
+                "roster_slot"
+            ) == "IR"
+        ):
+            continue
+
+        player_id = player.get(
+            "yahoo_player_id"
+        )
+
+        if player_id in starter_slots:
+            role = "STARTER"
+            slot = starter_slots[
+                player_id
+            ]
+        else:
+            role = "BENCH"
+            slot = (
+                player.get(
+                    "roster_slot"
+                )
+                or "BN"
+            )
+
+        watch.append(
+            {
+                "role": role,
+                "slot": slot,
+                "player": player,
+            }
+        )
+
+    role_order = {
+        "STARTER": 0,
+        "BENCH": 1,
+    }
+
+    watch.sort(
+        key=lambda item: (
+            role_order.get(
+                item["role"],
+                9,
+            ),
+            game_sort_key(
+                item["player"]
+            ),
+            item["player"].get(
+                "name",
+                "",
+            ),
+        )
+    )
+
+    return watch
+
+
+def build_lock_alternatives(
+    starter_item,
+    bench,
+):
+    slot = starter_item[
+        "role"
+    ]
+
+    starter = starter_item[
+        "player"
+    ]
+
+    alternatives = [
+        player
+        for player in bench
+        if (
+            not has_played(player)
+            and is_available_to_play(
+                player
+            )
+            and slot_accepts_position(
+                slot,
+                player.get(
+                    "position"
+                ),
+            )
+            and player.get(
+                "yahoo_player_id"
+            )
+            != starter.get(
+                "yahoo_player_id"
+            )
+        )
+    ]
+
+    alternatives.sort(
+        key=lambda player:
+            projection(player),
+        reverse=True,
+    )
+
+    return alternatives[:3]
 
 
 def has_played(player):
@@ -730,8 +1042,228 @@ def build_lock_groups(
     return groups
 
 
+def waiver_available_date(
+    player,
+    season,
+):
+    status = (
+        player.get("roster_status")
+        or ""
+    )
+
+    match = re.search(
+        r"\bW\s*\(([A-Za-z]{3})\s+(\d{1,2})\)",
+        status,
+    )
+
+    if not match:
+        return None
+
+    try:
+        return datetime.strptime(
+            f"{season} "
+            f"{match.group(1)} "
+            f"{match.group(2)}",
+            "%Y %b %d",
+        ).date()
+    except ValueError:
+        return None
+
+
+def is_free_agent(player):
+    return (
+        str(
+            player.get(
+                "roster_status"
+            )
+            or ""
+        ).upper()
+        == "FA"
+    )
+
+
+def best_fallback_player(
+    available,
+    position,
+    excluded_ids=None,
+):
+    excluded_ids = (
+        excluded_ids
+        or set()
+    )
+
+    candidates = [
+        player
+        for player in available
+        if (
+            player.get(
+                "position"
+            ) == position
+            and is_free_agent(
+                player
+            )
+            and player.get(
+                "yahoo_player_id"
+            )
+            not in excluded_ids
+            and is_available_to_play(
+                player
+            )
+        )
+    ]
+
+    if not candidates:
+        return None
+
+    return max(
+        candidates,
+        key=lambda player:
+            projection(player),
+    )
+
+
+def build_speculative_waiver_moves(
+    transactions,
+    available,
+    season,
+    limit=3,
+):
+    speculative = []
+
+    for transaction in transactions:
+        add_player = transaction["add"]
+        drop_player = transaction["drop"]
+
+        waiver_date = (
+            waiver_available_date(
+                add_player,
+                season,
+            )
+        )
+
+        drop_time = (
+            drop_player.get(
+                "local_game"
+            )
+            or {}
+        ).get(
+            "datetime"
+        )
+
+        now_local = datetime.now(
+            UK_TIME
+        )
+
+        # A speculative pre-drop only exists while the rostered player's
+        # game is still unlocked. Once that player has started/played, the
+        # manager can no longer execute the proposed pre-drop.
+        if (
+            waiver_date is None
+            or drop_time is None
+            or drop_time <= now_local
+            or has_played(
+                drop_player
+            )
+            or drop_time.date()
+            > waiver_date
+        ):
+            continue
+
+        fallback = best_fallback_player(
+            available,
+            drop_player.get(
+                "position"
+            ),
+            {
+                add_player.get(
+                    "yahoo_player_id"
+                )
+            },
+        )
+
+        drop_projection = projection(
+            drop_player
+        )
+
+        fallback_projection = (
+            projection(
+                fallback
+            )
+            if fallback
+            else 0.0
+        )
+
+        fallback_delta = (
+            fallback_projection
+            - drop_projection
+        )
+
+        upside = float(
+            transaction.get(
+                "week_gain",
+                0.0,
+            )
+            or 0.0
+        )
+
+        if (
+            fallback is not None
+            and fallback_delta >= upside
+        ):
+            verdict = "BETTER FA AVAILABLE"
+        elif (
+            upside >= 5.0
+            and fallback is not None
+            and fallback_delta >= -1.5
+        ):
+            verdict = "WORTH REVIEWING"
+        else:
+            verdict = "NOT WORTH PRE-DROP"
+
+        move = dict(
+            transaction
+        )
+
+        move[
+            "speculative_verdict"
+        ] = verdict
+
+        move[
+            "waiver_clear_date"
+        ] = waiver_date
+
+        move[
+            "fallback"
+        ] = fallback
+
+        move[
+            "fallback_delta"
+        ] = fallback_delta
+
+        speculative.append(
+            move
+        )
+
+    speculative.sort(
+        key=lambda move: (
+            move[
+                "speculative_verdict"
+            ]
+            == "WORTH REVIEWING",
+            move.get(
+                "week_gain",
+                0.0,
+            ),
+        ),
+        reverse=True,
+    )
+
+    return speculative[:limit]
+
+
 def add_transaction_deadlines(
     transactions,
+    season,
 ):
     now_local = datetime.now(
         UK_TIME
@@ -744,6 +1276,14 @@ def add_transaction_deadlines(
 
         add_player = move["add"]
         drop_player = move["drop"]
+
+        # A player with a current-week actual has already played and is
+        # roster-locked for this scoring week. Do not recommend dropping that
+        # player as though the move could still affect the current matchup.
+        if has_played(
+            drop_player
+        ):
+            continue
 
         add_game = (
             add_player.get("local_game")
@@ -762,6 +1302,25 @@ def add_transaction_deadlines(
         drop_time = drop_game.get(
             "datetime"
         )
+
+        waiver_date = (
+            waiver_available_date(
+                add_player,
+                season,
+            )
+        )
+
+        # A player on waivers is not immediately actionable. If the player
+        # being dropped locks on or before the waiver-clear date, suppress
+        # the move rather than encouraging the manager to sacrifice this
+        # week's starter before knowing the claim succeeded.
+        if (
+            waiver_date is not None
+            and drop_time is not None
+            and drop_time.date()
+            <= waiver_date
+        ):
+            continue
 
         possible_times = [
             value
@@ -861,13 +1420,37 @@ def build_weekly_data(
         season
     )
 
+    league_state = (
+        load_season_league_state(
+            season
+        )
+    )
+
+    waiver_priority = (
+        league_state.get(
+            "waiver_priority"
+        )
+    )
+
+    cant_cut_players = load_week_cant_cut(
+        week,
+        season=season,
+    )
+
+    cant_cut_ids = {
+        str(player["player_id"])
+        for player in cant_cut_players
+    }
+
     roster = enrich_local_roster(
         local_roster
     )
 
-    available = (
-        yahoo_provider
-        .get_available_players()
+    # Local My Team membership is authoritative. Yahoo snapshots can lag a
+    # manual transaction, so the effective available pool must be rebuilt
+    # against the local roster before transaction recommendations are scored.
+    available = get_effective_available_players(
+        local_roster
     )
 
     roster = [
@@ -879,6 +1462,69 @@ def build_weekly_data(
         for player in roster
     ]
 
+    # Persist current-week ownership while respecting Yahoo game locks.
+    # A rostered player whose game has started (or whose actual is already
+    # present) is frozen in this week's history. Unlocked roster membership can
+    # still change after a real Yahoo transaction is recorded locally.
+    if week == current_fantasy_week(
+        season
+    ):
+        now_local = datetime.now(
+            UK_TIME
+        )
+
+        locked_player_ids = {
+            str(
+                player.get(
+                    "yahoo_player_id",
+                    player.get(
+                        "player_id",
+                        "",
+                    ),
+                )
+            )
+            for player in roster
+            if (
+                player.get(
+                    "current_week_actual"
+                )
+                is not None
+                or (
+                    (
+                        player.get(
+                            "local_game"
+                        )
+                        or {}
+                    ).get(
+                        "datetime"
+                    )
+                    is not None
+                    and (
+                        player[
+                            "local_game"
+                        ][
+                            "datetime"
+                        ]
+                        <= now_local
+                    )
+                )
+            )
+        }
+
+        history_roster = (
+            canonical_history_roster(
+                roster
+            )
+        )
+
+        snapshot_season_roster(
+            week,
+            season=season,
+            roster=history_roster,
+            preserve_player_ids=
+                locked_player_ids,
+        )
+
     available = [
         enrich_player_game_time(
             player,
@@ -887,6 +1533,18 @@ def build_weekly_data(
         )
         for player in available
     ]
+
+    submitted_lineup = load_week_lineup(
+        week,
+        season=season,
+    )
+
+    decision_roster = (
+        apply_submitted_lineup_slots(
+            roster,
+            submitted_lineup,
+        )
+    )
 
     provider_status = (
         yahoo_provider
@@ -912,17 +1570,30 @@ def build_weekly_data(
             available,
             provider_status,
             week,
+            waiver_priority=
+                waiver_priority,
+            cant_cut_ids=
+                cant_cut_ids,
+        )
+    )
+
+    speculative_waivers = (
+        build_speculative_waiver_moves(
+            transactions,
+            available,
+            season,
         )
     )
 
     transactions = (
         add_transaction_deadlines(
-            transactions
+            transactions,
+            season,
         )
-    )
+    )[:5]
 
     lineup = build_best_lineup(
-        roster
+        decision_roster
     )
 
     starter_ids = {
@@ -934,7 +1605,7 @@ def build_weekly_data(
 
     bench = [
         player
-        for player in roster
+        for player in decision_roster
         if (
             player[
                 "yahoo_player_id"
@@ -951,17 +1622,25 @@ def build_weekly_data(
         reverse=True,
     )
 
-    status_watch = [
-        item
-        for item in lineup
-        if item["player"].get(
-            "status"
+    start_sit_evidence = (
+        cached_start_sit_evidence(
+            lineup,
+            bench,
+            provider_status,
+            week,
         )
-    ]
+    )
+
+    status_watch = (
+        build_status_watch(
+            decision_roster,
+            lineup,
+        )
+    )
 
     ir_review = [
         player
-        for player in roster
+        for player in decision_roster
         if player.get(
             "roster_slot"
         ) == "IR"
@@ -1003,7 +1682,7 @@ def build_weekly_data(
     )
 
     lock_groups = build_lock_groups(
-        roster,
+        decision_roster,
         lineup,
         season,
         week,
@@ -1027,20 +1706,85 @@ def build_weekly_data(
         )
     ]
 
-    first_lock = (
-        upcoming_lock_groups[0]
-        if upcoming_lock_groups
-        else None
+    first_lock = next(
+        (
+            group
+            for group in upcoming_lock_groups
+            if any(
+                item["role"] != "BENCH"
+                for item in group["players"]
+            )
+        ),
+        None,
     )
 
     next_decision = None
 
     if first_lock:
-        starters = [
+        raw_starters = [
             item
             for item in first_lock["players"]
             if item["role"] != "BENCH"
         ]
+
+        starters = []
+
+        for item in raw_starters:
+            alternatives = (
+                build_lock_alternatives(
+                    item,
+                    bench,
+                )
+            )
+
+            best_alternative = (
+                alternatives[0]
+                if alternatives
+                else None
+            )
+
+            edge = None
+
+            if best_alternative:
+                edge = (
+                    projection(
+                        item["player"]
+                    )
+                    - projection(
+                        best_alternative
+                    )
+                )
+
+            if item[
+                "player"
+            ].get("status"):
+                decision_call = "REVIEW"
+            elif (
+                edge is not None
+                and edge <= 1.5
+            ):
+                decision_call = "CLOSE"
+            elif (
+                edge is not None
+                and edge <= 3.0
+            ):
+                decision_call = "LEAN START"
+            else:
+                decision_call = "START"
+
+            starters.append(
+                {
+                    **item,
+                    "alternatives":
+                        alternatives,
+                    "best_alternative":
+                        best_alternative,
+                    "projection_edge":
+                        edge,
+                    "decision_call":
+                        decision_call,
+                }
+            )
 
         bench_players = [
             item
@@ -1062,19 +1806,39 @@ def build_weekly_data(
             "starter_count": len(starters),
             "bench_count": len(bench_players),
             "concern_count": len(concerns),
+            "review_count": len(
+                [
+                    item
+                    for item in starters
+                    if item[
+                        "decision_call"
+                    ]
+                    in {
+                        "REVIEW",
+                        "CLOSE",
+                    }
+                ]
+            ),
         }
 
     return {
         "season": season,
         "week": week,
-        "roster": roster,
+        "roster": decision_roster,
         "lineup": lineup,
         "bench": bench,
+
+        "start_sit_evidence":
+            start_sit_evidence,
+
         "status_watch":
             status_watch,
 
         "transactions":
             transactions,
+
+        "speculative_waivers":
+            speculative_waivers,
 
         "future_bye_coverage":
             future_bye_coverage,
@@ -1107,4 +1871,10 @@ def build_weekly_data(
 
         "provider_status":
             provider_status,
+
+        "waiver_priority":
+            waiver_priority,
+
+        "cant_cut_players":
+            cant_cut_players,
     }

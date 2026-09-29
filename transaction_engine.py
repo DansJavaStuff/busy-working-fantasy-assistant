@@ -25,6 +25,18 @@ def projection(
     return float(value)
 
 
+def has_projection(
+    player,
+    field,
+):
+    return player.get(
+        field
+    ) not in {
+        None,
+        "",
+    }
+
+
 def playable(player):
     status = (
         player.get("status")
@@ -1376,13 +1388,52 @@ def move_type(
     return "ROSTER MOVE"
 
 
+def protects_core_starter(
+    drop_player,
+    result,
+):
+    """Avoid recommending a depth move that sacrifices a current skill starter."""
+
+    if (
+        drop_player.get("position")
+        not in {"QB", "RB", "WR", "TE"}
+    ):
+        return False
+
+    if (
+        drop_player.get("roster_slot")
+        in {"BN", "IR", None, ""}
+    ):
+        return False
+
+    # A starter can still be replaced when the transaction genuinely improves
+    # the starting lineup or the four-week starting outlook.  What we reject
+    # is sacrificing a starter merely to gain a little bench/depth value.
+    return (
+        result.get("week_gain", 0.0) < 0.75
+        and result.get(
+            "four_week_gain",
+            0.0,
+        ) < 0.75
+    )
+
+
 def build_transaction_recommendations(
     roster,
     available,
     limit=5,
     current_week=1,
     waiver_priority=None,
+    cant_cut_ids=None,
 ):
+    cant_cut_ids = {
+        str(player_id)
+        for player_id in (
+            cant_cut_ids
+            or set()
+        )
+    }
+
     before = roster_metrics(
         roster,
         available,
@@ -1418,6 +1469,14 @@ def build_transaction_recommendations(
 
     for add_player in candidates:
         for drop_player in roster:
+            if str(
+                drop_player.get(
+                    "yahoo_player_id",
+                    "",
+                )
+            ) in cant_cut_ids:
+                continue
+
             if not transaction_allowed(
                 roster,
                 add_player,
@@ -1470,6 +1529,36 @@ def build_transaction_recommendations(
                 after,
             )
 
+            four_week_data_complete = (
+                has_projection(
+                    add_player,
+                    "next_4_weeks_projection",
+                )
+                and has_projection(
+                    drop_player,
+                    "next_4_weeks_projection",
+                )
+            )
+
+            result[
+                "four_week_data_complete"
+            ] = four_week_data_complete
+
+            # Missing future projections are unknown, not zero. Do not let a
+            # newly added player with incomplete Yahoo data look artificially
+            # worthless compared with a fully populated free agent.
+            if not four_week_data_complete:
+                result["score"] -= (
+                    result["four_week_gain"]
+                    * 0.75
+                )
+                result["score"] -= (
+                    result["bench_gain"]
+                    * 0.20
+                )
+                result["four_week_gain"] = 0.0
+                result["bench_gain"] = 0.0
+
             result[
                 "bye_coverage_gain"
             ] = bye_context["gain"]
@@ -1486,6 +1575,12 @@ def build_transaction_recommendations(
                     "bye_score_adjustment"
                 ]
             )
+
+            if protects_core_starter(
+                drop_player,
+                result,
+            ):
+                continue
 
             if result["score"] <= 0.10:
                 continue
