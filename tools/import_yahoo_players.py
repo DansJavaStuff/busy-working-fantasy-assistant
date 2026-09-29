@@ -73,6 +73,13 @@ CANT_CUT_CLASSES = {
 
 DROP_ACTION_CLASS = "T-action-icon-drop"
 
+CANT_CUT_ELIGIBLE_POSITIONS = {
+    "QB",
+    "RB",
+    "WR",
+    "TE",
+}
+
 
 def clean_text(value):
     return " ".join(
@@ -1525,9 +1532,18 @@ def sync_cant_cut_from_my_team(
             )
         )
 
+    eligible_roster = [
+        player
+        for player in local_roster
+        if player.get(
+            "position"
+        )
+        in CANT_CUT_ELIGIBLE_POSITIONS
+    ]
+
     matched = []
 
-    for local_player in local_roster:
+    for local_player in eligible_roster:
         match = next(
             (
                 observation
@@ -1544,12 +1560,13 @@ def sync_cant_cut_from_my_team(
         if match is not None:
             matched.append(match)
 
-    if len(matched) != len(local_roster):
+    if len(matched) != len(eligible_roster):
         print(
             "Can't Cut auto-sync skipped: "
             "newest My Team pages cover "
             f"{len(matched)} of "
-            f"{len(local_roster)} roster players."
+            f"{len(eligible_roster)} eligible "
+            "offensive roster players."
         )
         return False
 
