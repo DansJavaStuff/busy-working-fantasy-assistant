@@ -1497,15 +1497,17 @@ def snapshot_season_roster(
                 for _ in preserve_player_ids
             )
 
+            # Only generated SQLite parameter markers are interpolated;
+            # every player id remains a bound query parameter.
+            delete_query = (
+                "DELETE FROM season_week_roster "
+                "WHERE season_id = ? "
+                "AND week = ? "
+                f"AND player_id NOT IN ({placeholders})"  # nosec B608
+            )
+
             db.execute(
-                f"""
-                DELETE FROM season_week_roster
-                WHERE season_id = ?
-                  AND week = ?
-                  AND player_id NOT IN (
-                      {placeholders}
-                  )
-                """,
+                delete_query,
                 (
                     season_id,
                     week,
@@ -1535,18 +1537,18 @@ def snapshot_season_roster(
                 for _ in preserve_player_ids
             )
 
+            # As above, the dynamic fragment contains only generated
+            # parameter markers and no caller-controlled values.
+            preserved_query = (
+                "SELECT roster_slot, slot_index "
+                "FROM season_week_roster "
+                "WHERE season_id = ? "
+                "AND week = ? "
+                f"AND player_id IN ({placeholders})"  # nosec B608
+            )
+
             preserved_rows = db.execute(
-                f"""
-                SELECT
-                    roster_slot,
-                    slot_index
-                FROM season_week_roster
-                WHERE season_id = ?
-                  AND week = ?
-                  AND player_id IN (
-                      {placeholders}
-                  )
-                """,
+                preserved_query,
                 (
                     season_id,
                     week,
