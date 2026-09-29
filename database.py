@@ -1,6 +1,6 @@
 import sqlite3
-from pathlib import Path
 from datetime import date, datetime
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -428,6 +428,25 @@ def initialise_database():
                     DEFAULT CURRENT_TIMESTAMP,
 
                 resolved_at TEXT,
+
+                FOREIGN KEY (season_id)
+                    REFERENCES seasons(id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS daily_checklist_progress (
+                season_id INTEGER NOT NULL,
+                checklist_date TEXT NOT NULL,
+                task_key TEXT NOT NULL,
+
+                completed_at TEXT NOT NULL
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                PRIMARY KEY (
+                    season_id,
+                    checklist_date,
+                    task_key
+                ),
 
                 FOREIGN KEY (season_id)
                     REFERENCES seasons(id)
@@ -969,6 +988,112 @@ def save_waiver_priority(
         )
 
     return value
+
+
+def load_daily_checklist_progress(
+    checklist_date,
+    season=None,
+):
+    """Return completed task keys for one local calendar date."""
+
+    initialise_database()
+
+    date_value = date.fromisoformat(
+        str(checklist_date)
+    ).isoformat()
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        rows = db.execute(
+            """
+            SELECT task_key
+            FROM daily_checklist_progress
+            WHERE season_id = ?
+              AND checklist_date = ?
+            ORDER BY task_key
+            """,
+            (
+                season_id,
+                date_value,
+            ),
+        ).fetchall()
+
+    return {
+        row["task_key"]
+        for row in rows
+    }
+
+
+def set_daily_checklist_item(
+    checklist_date,
+    task_key,
+    completed,
+    season=None,
+):
+    """Set or clear one daily checklist item."""
+
+    initialise_database()
+
+    date_value = date.fromisoformat(
+        str(checklist_date)
+    ).isoformat()
+    task_value = str(
+        task_key
+    ).strip()
+
+    if not task_value:
+        raise ValueError(
+            "Checklist task key is required"
+        )
+
+    with connect() as db:
+        season_id = get_or_create_season(
+            db,
+            season,
+        )
+
+        if completed:
+            db.execute(
+                """
+                INSERT INTO daily_checklist_progress (
+                    season_id,
+                    checklist_date,
+                    task_key,
+                    completed_at
+                )
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(
+                    season_id,
+                    checklist_date,
+                    task_key
+                )
+                DO UPDATE SET
+                    completed_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    season_id,
+                    date_value,
+                    task_value,
+                ),
+            )
+        else:
+            db.execute(
+                """
+                DELETE FROM daily_checklist_progress
+                WHERE season_id = ?
+                  AND checklist_date = ?
+                  AND task_key = ?
+                """,
+                (
+                    season_id,
+                    date_value,
+                    task_value,
+                ),
+            )
 
 
 def record_recommendation_action(

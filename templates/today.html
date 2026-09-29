@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}
+What to do today · {{ data.team.team_name }}
+{% endblock %}
+
+{% block favicon %}
+{% if data.team.logo_path %}
+<link
+    rel="icon"
+    type="image/png"
+    href="{{ url_for(
+        'static',
+        filename=data.team.logo_path
+    ) }}"
+>
+{% else %}
+{{ super() }}
+{% endif %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+    :root {
+        --team-primary:
+            {{ data.team.primary_colour }};
+        --team-secondary:
+            {{ data.team.secondary_colour }};
+        --team-accent:
+            {{ data.team.accent_colour }};
+    }
+</style>
+{% endblock %}
+
+{% block header %}
+<header class="topbar weekly-topbar">
+    <div>
+        <div class="eyebrow">
+            WEEK {{ data.week }} · {{ data.checklist.day_name|upper }}
+        </div>
+
+        <h1>
+            ✅ What to do today
+        </h1>
+
+        <div class="subtitle">
+            {{ data.checklist.date_display }}
+        </div>
+    </div>
+
+    <div class="topbar-actions">
+        {% if data.team.logo_path %}
+        <img
+            src="{{ url_for(
+                'static',
+                filename=data.team.logo_path
+            ) }}"
+            alt="{{ data.team.team_name }}"
+            style="
+                max-height: 64px;
+                max-width: 160px;
+            "
+        >
+        {% endif %}
+
+        {% include "_app_nav.html" %}
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<section class="today-intro">
+    <div>
+        <span>Today's focus</span>
+        <strong>{{ data.checklist.focus }}</strong>
+    </div>
+
+    <div class="today-progress">
+        {{ data.completed_count }} / {{ data.checklist.tasks|length }} complete
+    </div>
+</section>
+
+{% if request.args.get("checklist_error") == "1" %}
+<div class="move-message move-error">
+    That checklist item is not part of today's workflow.
+</div>
+{% endif %}
+
+<section class="today-checklist" aria-label="Today's checklist">
+    {% for task in data.checklist.tasks %}
+    <article class="today-task{% if task.completed %} completed{% endif %}">
+        <form
+            method="post"
+            action="{{ url_for('update_today_checklist') }}"
+            class="today-task-form"
+        >
+            <input
+                type="hidden"
+                name="task_key"
+                value="{{ task.key }}"
+            >
+
+            <input
+                type="hidden"
+                name="completed"
+                value="{% if task.completed %}1{% else %}0{% endif %}"
+            >
+
+            <label>
+                <input
+                    type="checkbox"
+                    {% if task.completed %}checked{% endif %}
+                    onchange="
+                        this.form.completed.value =
+                            this.checked ? '1' : '0';
+                        this.form.submit();
+                    "
+                >
+
+                <span class="today-task-copy">
+                    <strong>{{ task.title }}</strong>
+                    <small>{{ task.detail }}</small>
+                </span>
+            </label>
+
+            <noscript>
+                <button type="submit">Save</button>
+            </noscript>
+        </form>
+
+        <a href="{{ task.url }}">
+            {{ task.link_label }} →
+        </a>
+    </article>
+    {% endfor %}
+</section>
+
+{% if data.completed_count == data.checklist.tasks|length %}
+<div class="today-complete-message">
+    ✓ Today's fantasy jobs are complete.
+</div>
+{% endif %}
+
+<section class="weekly-section tomorrow-preview">
+    <div class="eyebrow">COMING TOMORROW</div>
+    <h2>
+        {{ data.tomorrow.day_name }} · {{ data.tomorrow.focus }}
+    </h2>
+
+    <ul>
+        {% for task in data.tomorrow.tasks %}
+        <li>
+            <a href="{{ task.url }}">
+                {{ task.title }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}

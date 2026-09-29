@@ -1645,6 +1645,160 @@ footer {
     background: #fbfcfd;
 }
 
+.today-intro {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+    padding: 20px 22px;
+    border-radius: 14px;
+    background: white;
+    border-top: 4px solid var(--team-accent);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.today-intro span,
+.today-intro strong {
+    display: block;
+}
+
+.today-intro span {
+    margin-bottom: 4px;
+    color: #697586;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.today-intro strong {
+    font-size: 21px;
+}
+
+.today-progress {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #eef6ff;
+    color: #1267a5;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.today-checklist {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.today-task {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 17px 20px;
+    border: 1px solid #dfe4ea;
+    border-radius: 12px;
+    background: white;
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+.today-task.completed {
+    border-color: #b9ddc3;
+    background: #f3fbf5;
+}
+
+.today-task-form {
+    flex: 1;
+    margin: 0;
+}
+
+.today-task-form label {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    cursor: pointer;
+}
+
+.today-task-form input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    margin: 1px 0 0;
+    accent-color: var(--team-secondary);
+}
+
+.today-task-copy strong,
+.today-task-copy small {
+    display: block;
+}
+
+.today-task-copy strong {
+    font-size: 16px;
+}
+
+.today-task-copy small {
+    margin-top: 4px;
+    color: #697586;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.today-task.completed .today-task-copy strong {
+    color: #587061;
+    text-decoration: line-through;
+}
+
+.today-task > a {
+    flex: 0 0 auto;
+    color: var(--team-accent);
+    font-size: 13px;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.today-task > a:hover {
+    text-decoration: underline;
+}
+
+.today-complete-message {
+    margin-bottom: 22px;
+    padding: 16px 18px;
+    border-radius: 12px;
+    background: #eaf8ee;
+    color: #245c34;
+    font-weight: 800;
+}
+
+.tomorrow-preview ul {
+    margin: 12px 0 0;
+    padding-left: 20px;
+}
+
+.tomorrow-preview li {
+    margin: 8px 0;
+}
+
+.tomorrow-preview a {
+    color: var(--team-accent);
+    font-weight: 700;
+}
+
+@media (max-width: 750px) {
+    .today-intro,
+    .today-task {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .today-task > a {
+        margin-left: 36px;
+    }
+}
+
 .available-loading strong,
 .available-loading span,
 .available-load-error strong,

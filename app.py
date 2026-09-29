@@ -1,9 +1,39 @@
-from flask import Flask, redirect, render_template, request, url_for
-from pathlib import Path
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 import subprocess
 import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from flask import Flask, redirect, render_template, request, url_for
+
+from available_engine import (
+    build_available_rankings,
+)
+from daily_checklist import (
+    checklist_for_day,
+    tomorrow_checklist,
+)
+from data_status import get_data_status
+from database import (
+    CURRENT_LEAGUE_NAME,
+    list_recommendation_actions,
+    list_seasons,
+    load_current_draft_order,
+    load_daily_checklist_progress,
+    load_season_league_state,
+    load_season_roster,
+    load_team_identity,
+    load_week_cant_cut,
+    load_week_cant_cut_state,
+    load_week_lineup,
+    record_recommendation_action,
+    replace_week_cant_cut,
+    replace_week_lineup,
+    save_current_draft_order,
+    save_waiver_priority,
+    set_daily_checklist_item,
+    update_recommendation_action_status,
+)
 from draft_engine import (
     create_new_season,
     draft_is_complete,
@@ -19,44 +49,22 @@ from draft_engine import (
     undo_last_pick,
     update_settings,
 )
+from fantasypros import get_api_usage
+from history_engine import build_history_week
 from matchup_context import refresh_matchup_cache
 from player_database import load_players
-from available_engine import (
-    build_available_rankings,
-)
 from recommendation_engine import get_recommendations
-from simulator import choose_opponent_pick
-from database import (
-    CURRENT_LEAGUE_NAME,
-    list_recommendation_actions,
-    list_seasons,
-    load_current_draft_order,
-    load_season_league_state,
-    load_season_roster,
-    load_team_identity,
-    load_week_cant_cut,
-    load_week_cant_cut_state,
-    load_week_lineup,
-    replace_week_cant_cut,
-    replace_week_lineup,
-    record_recommendation_action,
-    save_current_draft_order,
-    save_waiver_priority,
-    update_recommendation_action_status,
-)
-from data_status import get_data_status
-from fantasypros import get_api_usage
 from refresh_data import (
     rebuild_database,
     refresh_all,
     refresh_ffc,
 )
 from roster_display import build_roster_slots
-from history_engine import build_history_week
 from roster_manager import (
     move_roster_player,
     replace_roster_player,
 )
+from simulator import choose_opponent_pick
 from weekly_engine import (
     build_weekly_data,
     current_fantasy_week,
@@ -72,6 +80,14 @@ app = Flask(__name__)
 UK_TIME = ZoneInfo(
     "Europe/London"
 )
+
+
+def current_uk_date():
+    """Return today's date using the user's UK timezone."""
+
+    return datetime.now(
+        UK_TIME
+    ).date()
 
 
 @app.template_filter("local_datetime")
@@ -96,7 +112,7 @@ def local_datetime(value):
 
     if parsed.tzinfo is None:
         parsed = parsed.replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
 
     local = parsed.astimezone(
@@ -108,7 +124,7 @@ def local_datetime(value):
     )
 
 
-@app.route("/")
+@app.route("/draft")
 def dashboard():
     state = load_state()
     players = load_players()
@@ -205,6 +221,99 @@ def dashboard():
     return render_template(
         "dashboard.html",
         data=data,
+    )
+
+
+@app.get("/")
+@app.get("/today")
+def today_page():
+    season = 2026
+    local_date = current_uk_date()
+    checklist = checklist_for_day(
+        local_date
+    )
+    completed = load_daily_checklist_progress(
+        local_date,
+        season=season,
+    )
+
+    for task in checklist["tasks"]:
+        task["completed"] = (
+            task["key"] in completed
+        )
+        task["url"] = url_for(
+            task["endpoint"]
+        )
+
+    tomorrow = tomorrow_checklist(
+        local_date
+    )
+
+    for task in tomorrow["tasks"]:
+        task["url"] = url_for(
+            task["endpoint"]
+        )
+
+    data = {
+        "league": {
+            "name": CURRENT_LEAGUE_NAME,
+            "season": season,
+        },
+        "team": load_team_identity(
+            season
+        ),
+        "week": current_fantasy_week(
+            season,
+            local_date,
+        ),
+        "checklist": checklist,
+        "tomorrow": tomorrow,
+        "completed_count": len(
+            completed
+        ),
+    }
+
+    return render_template(
+        "today.html",
+        data=data,
+    )
+
+
+@app.post("/today/checklist")
+def update_today_checklist():
+    season = 2026
+    local_date = current_uk_date()
+    checklist = checklist_for_day(
+        local_date
+    )
+    valid_keys = {
+        task["key"]
+        for task in checklist["tasks"]
+    }
+    task_key = request.form.get(
+        "task_key",
+        "",
+    ).strip()
+
+    if task_key not in valid_keys:
+        return redirect(
+            url_for(
+                "today_page",
+                checklist_error="1",
+            )
+        )
+
+    set_daily_checklist_item(
+        local_date,
+        task_key,
+        request.form.get(
+            "completed"
+        ) == "1",
+        season=season,
+    )
+
+    return redirect(
+        url_for("today_page")
     )
 
 @app.get("/settings")
