@@ -354,6 +354,54 @@ class TransactionEngineTests(TestCase):
             1,
         )
 
+    def test_cant_cut_player_is_never_recommended_as_drop(self):
+        roster = base_roster()
+
+        protected = next(
+            item
+            for item in roster
+            if item["yahoo_player_id"] == "wr3"
+        )
+
+        protected[
+            "current_week_projection"
+        ] = 1.0
+        protected[
+            "next_4_weeks_projection"
+        ] = 4.0
+
+        available = [
+            player(
+                "fa-wr",
+                "Available Star WR",
+                "WR",
+                bye_week=12,
+                week_projection=20.0,
+                four_week_projection=80.0,
+            ),
+        ]
+
+        recommendations = (
+            build_transaction_recommendations(
+                roster,
+                available,
+                limit=20,
+                current_week=4,
+                cant_cut_ids={
+                    "wr3",
+                },
+            )
+        )
+
+        self.assertFalse(
+            any(
+                move["drop"][
+                    "yahoo_player_id"
+                ] == "wr3"
+                for move in recommendations
+            )
+        )
+
     def test_missing_four_week_projection_does_not_create_fake_upgrade(self):
         roster = base_roster()
 
