@@ -134,6 +134,17 @@ Manual snapshot
 </form>
 {% endif %}
 
+{% if data.weekly.cant_cut_players %}
+<div class="yahoo-data-status">
+    Yahoo Can't Cut · Week {{ data.weekly.week }}:
+    <strong>
+        {% for player in data.weekly.cant_cut_players %}
+            {{ player.player_name }}{% if not loop.last %}, {% endif %}
+        {% endfor %}
+    </strong>
+</div>
+{% endif %}
+
 <section class="weekly-summary">
     <div class="weekly-card">
         <span>
