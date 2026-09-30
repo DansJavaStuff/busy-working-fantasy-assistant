@@ -704,20 +704,12 @@ def save_submitted_lineup():
         season=season,
     )
 
-    if existing:
-        return redirect(
-            url_for(
-                "weekly",
-                lineup_already_saved="1",
-            )
-        )
-
     weekly_data = build_weekly_data(
         season=season,
         week=week,
     )
 
-    if any(
+    if not existing and any(
         player.get(
             "current_week_actual"
         ) is not None
@@ -807,7 +799,13 @@ def save_submitted_lineup():
     return redirect(
         url_for(
             "weekly",
-            lineup_saved="1",
+            **{
+                (
+                    "lineup_updated"
+                    if existing
+                    else "lineup_saved"
+                ): "1",
+            },
         )
     )
 
