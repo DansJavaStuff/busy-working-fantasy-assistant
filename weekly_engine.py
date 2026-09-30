@@ -82,6 +82,9 @@ def cached_start_sit_evidence(
     captured_at = provider_status.get(
         "captured_at"
     )
+    generated_at = provider_status.get(
+        "generated_at"
+    )
 
     decision_key = tuple(
         sorted(
@@ -123,6 +126,11 @@ def cached_start_sit_evidence(
         (
             captured_at.isoformat()
             if captured_at
+            else None
+        ),
+        (
+            generated_at.isoformat()
+            if generated_at
             else None
         ),
         week,
@@ -168,6 +176,9 @@ def cached_transaction_recommendations(
     captured_at = provider_status.get(
         "captured_at"
     )
+    generated_at = provider_status.get(
+        "generated_at"
+    )
 
     roster_key = tuple(
         sorted(
@@ -191,6 +202,11 @@ def cached_transaction_recommendations(
         (
             captured_at.isoformat()
             if captured_at
+            else None
+        ),
+        (
+            generated_at.isoformat()
+            if generated_at
             else None
         ),
         roster_key,

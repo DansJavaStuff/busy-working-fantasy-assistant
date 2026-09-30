@@ -385,11 +385,19 @@ def build_available_rankings(
     captured_at = provider_status.get(
         "captured_at"
     )
+    generated_at = provider_status.get(
+        "generated_at"
+    )
 
     snapshot_key = (
         (
             captured_at.isoformat()
             if captured_at
+            else None
+        ),
+        (
+            generated_at.isoformat()
+            if generated_at
             else None
         ),
         int(week),
