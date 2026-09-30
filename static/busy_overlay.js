@@ -98,12 +98,19 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll(
-            ".yahoo-refresh-form, .js-busy-form"
-        ).forEach(function (form) {
-            form.addEventListener("submit", function () {
-                showBusyOverlay(form);
-            });
+        document.addEventListener("submit", function (event) {
+            const form = event.target;
+
+            if (
+                !form.matches(
+                    ".yahoo-refresh-form, .js-busy-form"
+                )
+                || event.defaultPrevented
+            ) {
+                return;
+            }
+
+            showBusyOverlay(form);
         });
 
         showYahooRefreshResult();
