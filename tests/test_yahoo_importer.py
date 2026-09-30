@@ -1,5 +1,5 @@
-from datetime import date
 import os
+from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -172,6 +172,97 @@ class YahooImporterCombinedSourceTests(TestCase):
                 ),
                 2,
             )
+
+    def test_newest_file_supplies_roster_status_across_horizons(self):
+        with TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+            current_week = (
+                data_dir
+                / "Yahoo_Player_list_week4-Proj.html"
+            )
+            four_week = (
+                data_dir
+                / "Yahoo_Player_list_4week-Proj.html"
+            )
+
+            current_week.write_text(
+                "current",
+                encoding="utf-8",
+            )
+            four_week.write_text(
+                "four-week",
+                encoding="utf-8",
+            )
+
+            os.utime(
+                four_week,
+                ns=(1_000, 1_000),
+            )
+            os.utime(
+                current_week,
+                ns=(2_000, 2_000),
+            )
+
+            def parse_page(path):
+                if path == current_week:
+                    projection = 10.5
+                    roster_status = (
+                        "Watt You Doing"
+                    )
+                else:
+                    projection = 37.0
+                    roster_status = (
+                        "W (Sep 30)"
+                    )
+
+                return {
+                    "burden": {
+                        "yahoo_player_id": "burden",
+                        "name": "Luther Burden III",
+                        "team": "CHI",
+                        "position": "WR",
+                        "status": None,
+                        "roster_status": roster_status,
+                        "projection": projection,
+                        "projection_stats": {},
+                    }
+                }
+
+            with patch.object(
+                import_yahoo_players,
+                "parse_page",
+                side_effect=parse_page,
+            ):
+                merged = (
+                    import_yahoo_players
+                    .merge_projection_sources(
+                        {
+                            "week_4_projection": [
+                                current_week
+                            ],
+                            "next_4_weeks_projection": [
+                                four_week
+                            ],
+                        }
+                    )
+                )
+
+        player = merged["burden"]
+
+        self.assertEqual(
+            player["week_4_projection"],
+            10.5,
+        )
+        self.assertEqual(
+            player[
+                "next_4_weeks_projection"
+            ],
+            37.0,
+        )
+        self.assertEqual(
+            player["roster_status"],
+            "Watt You Doing",
+        )
 
 
 class YahooProviderWeekTests(TestCase):
