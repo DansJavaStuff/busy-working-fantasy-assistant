@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -6,6 +6,7 @@ import available_engine
 from available_engine import (
     _position_baselines,
     _position_value,
+    _qb_bye_context,
     build_available_rankings,
     target_week_projection,
 )
@@ -19,6 +20,45 @@ class AvailableEngineTests(TestCase):
         available_engine._AVAILABLE_CACHE[
             "data"
         ] = None
+        self.cant_cut_patcher = (
+            patch.object(
+                available_engine,
+                "load_week_cant_cut",
+                return_value=[],
+            )
+        )
+        self.cant_cut_patcher.start()
+        self.addCleanup(
+            self.cant_cut_patcher.stop
+        )
+
+    def test_qb_bye_drop_excludes_cant_cut_player(self):
+        roster = [
+            {
+                "yahoo_player_id": "qb1",
+                "name": "Primary QB",
+                "position": "QB",
+                "bye_week": 7,
+                "next_4_weeks_projection": 100.0,
+            },
+            {
+                "yahoo_player_id": "qb2",
+                "name": "Protected QB",
+                "position": "QB",
+                "bye_week": 7,
+                "next_4_weeks_projection": 60.0,
+            },
+        ]
+
+        context = _qb_bye_context(
+            roster,
+            {"qb2"},
+        )
+
+        self.assertTrue(context["conflict"])
+        self.assertIsNone(
+            context["bye_conflict_drop"]
+        )
 
     def test_target_week_projection_reads_weeks_model(self):
         player = {
@@ -160,7 +200,7 @@ class AvailableEngineTests(TestCase):
                 21,
                 12,
                 0,
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             )
         }
 
@@ -242,6 +282,143 @@ class AvailableEngineTests(TestCase):
             12.0,
         )
 
+    def test_rankings_exclude_cant_cut_drop_and_refresh_cache(self):
+        puka = {
+            "yahoo_player_id": "puka",
+            "name": "Puka Nacua",
+            "position": "WR",
+            "next_4_weeks_projection": 36.0,
+        }
+        sutton = {
+            "yahoo_player_id": "sutton",
+            "name": "Courtland Sutton",
+            "position": "WR",
+            "next_4_weeks_projection": 28.0,
+        }
+        braelon = {
+            "yahoo_player_id": "braelon",
+            "name": "Braelon Allen",
+            "position": "RB",
+            "team": "NYJ",
+            "weeks": {
+                "4": {
+                    "projection": 8.0,
+                }
+            },
+            "next_4_weeks_projection": 32.0,
+        }
+        roster = [puka, sutton]
+        provider_status = {
+            "captured_at": datetime(
+                2026,
+                9,
+                30,
+                12,
+                0,
+                tzinfo=UTC,
+            )
+        }
+
+        def transaction_moves(*args, **kwargs):
+            protected = kwargs.get(
+                "cant_cut_ids",
+                set(),
+            )
+            drop = (
+                sutton
+                if "puka" in protected
+                else puka
+            )
+            return [
+                {
+                    "add": braelon,
+                    "drop": drop,
+                    "score": 2.0,
+                    "bye_score_adjustment": 0.0,
+                    "label": "ADD",
+                    "move_type": "DEPTH UPGRADE",
+                    "reasons": [],
+                }
+            ]
+
+        with patch.object(
+            available_engine,
+            "load_season_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "enrich_local_roster",
+            return_value=roster,
+        ), patch.object(
+            available_engine,
+            "load_season_league_state",
+            return_value={
+                "waiver_priority": 10,
+            },
+        ), patch.object(
+            available_engine,
+            "load_week_cant_cut",
+            side_effect=[
+                [],
+                [
+                    {
+                        "player_id": "puka",
+                        "player_name": "Puka Nacua",
+                    }
+                ],
+            ],
+        ), patch.object(
+            available_engine,
+            "get_effective_available_players",
+            return_value=[braelon],
+        ), patch.object(
+            available_engine.yahoo_provider,
+            "get_status",
+            return_value=provider_status,
+        ), patch.object(
+            available_engine,
+            "build_transaction_recommendations",
+            side_effect=transaction_moves,
+        ), patch.object(
+            available_engine,
+            "four_week_average",
+            side_effect=lambda player:
+                float(
+                    player.get(
+                        "next_4_weeks_projection",
+                        0,
+                    )
+                )
+                / 4.0,
+        ):
+            unprotected = build_available_rankings(
+                2026,
+                4,
+                limit=1,
+                sleeper_fetch=lambda *args, **kwargs:
+                    [],
+            )
+            protected = build_available_rankings(
+                2026,
+                4,
+                limit=1,
+                sleeper_fetch=lambda *args, **kwargs:
+                    [],
+            )
+
+        self.assertEqual(
+            unprotected["rankings"][0][
+                "best_drop"
+            ]["name"],
+            "Puka Nacua",
+        )
+        self.assertEqual(
+            protected["rankings"][0][
+                "best_drop"
+            ]["name"],
+            "Courtland Sutton",
+        )
+
     def test_shared_qb_bye_is_presented_as_bye_fix(self):
         roster = [
             {
@@ -283,7 +460,7 @@ class AvailableEngineTests(TestCase):
                 21,
                 12,
                 0,
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             )
         }
 
@@ -373,7 +550,7 @@ class AvailableEngineTests(TestCase):
                 21,
                 12,
                 0,
-                tzinfo=timezone.utc,
+                tzinfo=UTC,
             )
         }
 
