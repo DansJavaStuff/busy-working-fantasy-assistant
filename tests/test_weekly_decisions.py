@@ -237,6 +237,71 @@ class WeeklyDecisionTests(TestCase):
             [],
         )
 
+    def test_unavailable_bench_player_is_not_recommended(self):
+        lineup = [
+            {
+                "slot": "FLEX",
+                "player": {
+                    "name": "Available Starter",
+                    "position": "RB",
+                    "current_week_projection": 9.0,
+                    "current_week_actual": None,
+                },
+            }
+        ]
+
+        bench = [
+            {
+                "name": "Unavailable Bench Player",
+                "position": "WR",
+                "status": "O",
+                "current_week_projection": 15.0,
+                "current_week_actual": None,
+            }
+        ]
+
+        self.assertEqual(
+            build_start_sit_decisions(
+                lineup,
+                bench,
+            ),
+            [],
+        )
+
+    def test_questionable_bench_player_is_still_reviewed(self):
+        lineup = [
+            {
+                "slot": "FLEX",
+                "player": {
+                    "name": "Available Starter",
+                    "position": "RB",
+                    "current_week_projection": 9.0,
+                    "current_week_actual": None,
+                },
+            }
+        ]
+
+        bench = [
+            {
+                "name": "Questionable Bench Player",
+                "position": "WR",
+                "status": "Q",
+                "current_week_projection": 10.0,
+                "current_week_actual": None,
+            }
+        ]
+
+        decisions = build_start_sit_decisions(
+            lineup,
+            bench,
+        )
+
+        self.assertEqual(len(decisions), 1)
+        self.assertEqual(
+            decisions[0]["sit"]["name"],
+            "Questionable Bench Player",
+        )
+
 
 if __name__ == "__main__":
     import unittest
