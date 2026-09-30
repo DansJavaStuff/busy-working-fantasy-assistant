@@ -102,9 +102,9 @@ Manual snapshot
 <div class="yahoo-data-status">
     Submitted lineup saved for Week {{ data.weekly.week }}.
 </div>
-{% elif request.args.get("lineup_already_saved") == "1" %}
+{% elif request.args.get("lineup_updated") == "1" %}
 <div class="yahoo-data-status">
-    Week {{ data.weekly.week }} already has a submitted lineup saved.
+    Submitted lineup updated for Week {{ data.weekly.week }}.
 </div>
 {% elif request.args.get("lineup_locked") == "1" %}
 <div class="yahoo-data-status">
@@ -118,21 +118,29 @@ Manual snapshot
     <strong>saved</strong>
     · {{ data.submitted_lineup | length }} player(s)
 </div>
-{% else %}
+{% endif %}
+
 <form
     method="post"
     action="{{ url_for('save_submitted_lineup') }}"
     class="yahoo-refresh-form"
+    {% if data.submitted_lineup %}
+    onsubmit="return confirm('Update the saved Week {{ data.weekly.week }} lineup from the current recommendation? Players whose games have started will remain locked.');"
+    {% else %}
     onsubmit="return confirm('Save the current recommended lineup as the lineup you submitted to Yahoo for Week {{ data.weekly.week }}?');"
+    {% endif %}
 >
     <button
         type="submit"
         class="yahoo-refresh-button"
     >
+        {% if data.submitted_lineup %}
+        Update Saved Lineup from Recommendation
+        {% else %}
         Save Recommended Lineup as Submitted
+        {% endif %}
     </button>
 </form>
-{% endif %}
 
 {% if data.weekly.cant_cut_players %}
 <div class="yahoo-data-status">
