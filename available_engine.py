@@ -1,6 +1,7 @@
 from database import (
     load_season_league_state,
     load_season_roster,
+    load_week_cant_cut,
 )
 from sleeper_compare import compare_players
 from transaction_engine import (
@@ -12,7 +13,6 @@ from yahoo_provider import (
     get_effective_available_players,
     yahoo_provider,
 )
-
 
 _AVAILABLE_CACHE = {
     "snapshot_key": None,
@@ -213,7 +213,17 @@ def _bye_week(player):
         return None
 
 
-def _qb_bye_context(roster):
+def _qb_bye_context(
+    roster,
+    cant_cut_ids=None,
+):
+    cant_cut_ids = {
+        str(player_id)
+        for player_id in (
+            cant_cut_ids or set()
+        )
+    }
+
     qbs = [
         player
         for player in roster
@@ -265,7 +275,15 @@ def _qb_bye_context(roster):
         alternatives = [
             player
             for player in qbs
-            if player is not primary
+            if (
+                player is not primary
+                and str(
+                    player.get(
+                        "yahoo_player_id",
+                        "",
+                    )
+                ) not in cant_cut_ids
+            )
         ]
 
         if alternatives:
@@ -341,6 +359,19 @@ def build_available_rankings(
         )
     )
 
+    cant_cut_players = (
+        load_week_cant_cut(
+            week,
+            season=season,
+        )
+    )
+
+    cant_cut_ids = {
+        str(player["player_id"])
+        for player in cant_cut_players
+        if player.get("player_id")
+    }
+
     available = (
         get_effective_available_players(
             local_roster
@@ -375,6 +406,7 @@ def build_available_rankings(
         ),
         int(limit),
         waiver_priority,
+        tuple(sorted(cant_cut_ids)),
     )
 
     if (
@@ -387,7 +419,8 @@ def build_available_rankings(
 
     qb_context = (
         _qb_bye_context(
-            roster
+            roster,
+            cant_cut_ids,
         )
     )
 
@@ -405,6 +438,7 @@ def build_available_rankings(
             limit=40,
             current_week=week,
             waiver_priority=waiver_priority,
+            cant_cut_ids=cant_cut_ids,
         )
     )
 
