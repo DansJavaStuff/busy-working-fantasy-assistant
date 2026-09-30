@@ -8,6 +8,14 @@ FLEX_POSITIONS = {
     "TE",
 }
 
+UNAVAILABLE_STATUSES = {
+    "O",
+    "IR",
+    "IR-R",
+    "PUP",
+    "SUSP",
+}
+
 
 def normalise_name(name):
     if not name:
@@ -42,6 +50,15 @@ def slot_accepts(slot, position):
         return position in {"DEF", "DST"}
 
     return slot == position
+
+
+def is_available_to_play(player):
+    status = (
+        player.get("status")
+        or ""
+    ).upper()
+
+    return status not in UNAVAILABLE_STATUSES
 
 
 def fantasypros_index(cache):
@@ -210,9 +227,14 @@ def build_start_sit_decisions(
     unlocked_bench = [
         player
         for player in bench
-        if player.get(
-            "current_week_actual"
-        ) is None
+        if (
+            player.get(
+                "current_week_actual"
+            ) is None
+            and is_available_to_play(
+                player
+            )
+        )
     ]
 
     decisions = []

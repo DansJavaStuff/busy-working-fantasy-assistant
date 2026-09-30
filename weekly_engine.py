@@ -100,6 +100,9 @@ def cached_start_sit_evidence(
                 item["player"].get(
                     "current_week_actual",
                 ),
+                item["player"].get(
+                    "status",
+                ),
             )
             for item in lineup
         )
@@ -116,6 +119,9 @@ def cached_start_sit_evidence(
                 ),
                 player.get(
                     "current_week_actual",
+                ),
+                player.get(
+                    "status",
                 ),
             )
             for player in bench
