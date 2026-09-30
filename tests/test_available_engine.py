@@ -551,7 +551,26 @@ class AvailableEngineTests(TestCase):
                 12,
                 0,
                 tzinfo=UTC,
-            )
+            ),
+            "generated_at": datetime(
+                2026,
+                9,
+                21,
+                12,
+                1,
+                tzinfo=UTC,
+            ),
+        }
+        refreshed_status = {
+            **provider_status,
+            "generated_at": datetime(
+                2026,
+                9,
+                21,
+                12,
+                2,
+                tzinfo=UTC,
+            ),
         }
 
         def fail(*args, **kwargs):
@@ -580,17 +599,26 @@ class AvailableEngineTests(TestCase):
         ), patch.object(
             available_engine.yahoo_provider,
             "get_status",
-            return_value=provider_status,
+            side_effect=[
+                provider_status,
+                refreshed_status,
+            ],
         ), patch.object(
             available_engine,
             "build_transaction_recommendations",
             return_value=[],
-        ), patch.object(
+        ) as builder, patch.object(
             available_engine,
             "four_week_average",
             return_value=8.0,
         ):
             result = build_available_rankings(
+                2026,
+                2,
+                limit=1,
+                sleeper_fetch=fail,
+            )
+            refreshed = build_available_rankings(
                 2026,
                 2,
                 limit=1,
@@ -605,6 +633,15 @@ class AvailableEngineTests(TestCase):
         self.assertIn(
             "Sleeper unavailable",
             result["sleeper_error"],
+        )
+
+        self.assertEqual(
+            len(refreshed["rankings"]),
+            1,
+        )
+        self.assertEqual(
+            builder.call_count,
+            2,
         )
 
 

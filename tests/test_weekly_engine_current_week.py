@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -583,8 +583,16 @@ class WeeklyEngineCurrentWeekTests(TestCase):
                 21,
                 12,
                 0,
-                tzinfo=timezone.utc,
-            )
+                tzinfo=UTC,
+            ),
+            "generated_at": datetime(
+                2026,
+                9,
+                21,
+                12,
+                1,
+                tzinfo=UTC,
+            ),
         }
 
         weekly_engine._START_SIT_CACHE[
@@ -622,14 +630,39 @@ class WeeklyEngineCurrentWeekTests(TestCase):
                 )
             )
 
+            provider_status[
+                "generated_at"
+            ] = datetime(
+                2026,
+                9,
+                21,
+                12,
+                2,
+                tzinfo=UTC,
+            )
+
+            refreshed = (
+                cached_start_sit_evidence(
+                    lineup,
+                    bench,
+                    provider_status,
+                    2,
+                )
+            )
+
         self.assertEqual(
             first,
             second,
         )
 
         self.assertEqual(
+            second,
+            refreshed,
+        )
+
+        self.assertEqual(
             builder.call_count,
-            1,
+            2,
         )
 
 
