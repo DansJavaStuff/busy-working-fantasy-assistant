@@ -2056,6 +2056,7 @@ def merge_projection_sources(
     cache_stats=None,
 ):
     merged = {}
+    freshest_roster_status = {}
 
     for (
         projection_name,
@@ -2124,6 +2125,42 @@ def merge_projection_sources(
                 f"{len(page_players)} "
                 f"players"
             )
+
+            source_freshness = (
+                path.stat().st_mtime_ns,
+                path.name,
+            )
+
+            for (
+                player_id,
+                page_player,
+            ) in page_players.items():
+                roster_status = (
+                    page_player.get(
+                        "roster_status"
+                    )
+                )
+
+                if not roster_status:
+                    continue
+
+                current = (
+                    freshest_roster_status.get(
+                        player_id
+                    )
+                )
+
+                if (
+                    current is None
+                    or source_freshness
+                    > current[0]
+                ):
+                    freshest_roster_status[
+                        player_id
+                    ] = (
+                        source_freshness,
+                        roster_status,
+                    )
 
             projection_players.update(
                 page_players
@@ -2226,19 +2263,17 @@ def merge_projection_sources(
                     player["status"]
                 )
 
-            roster_status = (
-                player.get(
-                    "roster_status"
-                )
-            )
-
-            if roster_status:
-                # Ownership is maintained by the local roster layer. Yahoo's
-                # roster-status field is informational only, so the newest
-                # parsed snapshot is allowed to replace an older value.
-                existing[
-                    "roster_status"
-                ] = roster_status
+    for (
+        player_id,
+        (_, roster_status),
+    ) in freshest_roster_status.items():
+        if player_id in merged:
+            # Projection horizons are merged independently, but ownership
+            # must reflect the newest downloaded Yahoo page rather than the
+            # snapshot type that happens to be processed last.
+            merged[player_id][
+                "roster_status"
+            ] = roster_status
 
     return merged
 
