@@ -265,6 +265,46 @@ class YahooImporterCombinedSourceTests(TestCase):
         )
 
 
+    def test_newest_injury_status_can_clear_or_replace_old_flag(self):
+        with TemporaryDirectory() as directory:
+            newer = Path(directory) / "Yahoo_Player_list_week4-Proj.html"
+            older = Path(directory) / "Yahoo_Player_list_4week-Proj.html"
+            newer.write_text("newer", encoding="utf-8")
+            older.write_text("older", encoding="utf-8")
+            os.utime(newer, ns=(2_000, 2_000))
+            os.utime(older, ns=(1_000, 1_000))
+
+            for newer_status in (None, "Q", "O"):
+                with self.subTest(status=newer_status):
+                    def parse_page(path):
+                        return {
+                            "puka": {
+                                "yahoo_player_id": "puka",
+                                "name": "Puka Nacua",
+                                "team": "LAR",
+                                "position": "WR",
+                                "status": (
+                                    newer_status if path == newer else "IR"
+                                ),
+                                "roster_status": None,
+                                "projection": 15.0,
+                                "projection_stats": {},
+                            }
+                        }
+
+                    with patch.object(
+                        import_yahoo_players,
+                        "parse_page",
+                        side_effect=parse_page,
+                    ):
+                        merged = import_yahoo_players.merge_projection_sources({
+                            "week_4_projection": [newer],
+                            "next_4_weeks_projection": [older],
+                        })
+
+                    self.assertEqual(merged["puka"]["status"], newer_status)
+
+
 class YahooProviderWeekTests(TestCase):
     def test_fantasy_week_advances_on_tuesday(self):
         self.assertEqual(

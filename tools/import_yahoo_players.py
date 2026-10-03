@@ -2057,6 +2057,7 @@ def merge_projection_sources(
 ):
     merged = {}
     freshest_roster_status = {}
+    freshest_injury_status = {}
 
     for (
         projection_name,
@@ -2135,6 +2136,16 @@ def merge_projection_sources(
                 player_id,
                 page_player,
             ) in page_players.items():
+                current_injury = freshest_injury_status.get(player_id)
+                if (
+                    current_injury is None
+                    or source_freshness > current_injury[0]
+                ):
+                    freshest_injury_status[player_id] = (
+                        source_freshness,
+                        page_player.get("status"),
+                    )
+
                 roster_status = (
                     page_player.get(
                         "roster_status"
@@ -2274,6 +2285,11 @@ def merge_projection_sources(
             merged[player_id][
                 "roster_status"
             ] = roster_status
+
+    for player_id, (_, status) in freshest_injury_status.items():
+        if player_id in merged:
+            # An empty marker on a newer page clears an older injury flag.
+            merged[player_id]["status"] = status
 
     return merged
 
