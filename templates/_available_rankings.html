@@ -1,11 +1,11 @@
 {% if available.waiver_queue %}
 <section class="waiver-queue">
     <h3>
-        Tonight's Waiver Objective
+        Recommended Waiver Claims
     </h3>
 
     <p class="weekly-card-detail">
-        Submit these claims individually in this order to solve the same roster
+        These actionable claims address the same roster
         issue. Yahoo will process them in priority order. After waivers clear,
         refresh the Yahoo data and the assistant will choose the next issue.
         Current waiver priority: #{{ available.waiver_priority or "—" }}.
@@ -118,6 +118,13 @@
 </p>
 {% endif %}
 
+<p class="weekly-card-detail">
+    HOLD means keep your current player; WATCH means monitor the option.
+    The combined move score weights this week's starting-lineup gain,
+    the four-week outlook, bench depth and bye coverage; it is not projected points.
+    Speculative pre-drop claims are excluded from the recommended claim queue.
+</p>
+
 <table class="weekly-table">
     <thead>
         <tr>
@@ -131,7 +138,7 @@
             <th>4-week avg</th>
             <th>Pos value</th>
             <th>Best drop</th>
-            <th>Roster gain</th>
+            <th>Combined move score</th>
             <th>Call</th>
         </tr>
     </thead>
@@ -215,6 +222,11 @@
                         item.roster_gain
                     )
                 }}
+                <div class="weekly-card-detail">
+                    Lineup: {{ "%+.2f"|format(item.move.week_gain) }} pts this week<br>
+                    Outlook: {{ "%+.2f"|format(item.move.four_week_gain) }} pts/week<br>
+                    Bench depth: {{ "%+.2f"|format(item.move.bench_gain) }}
+                </div>
                 {% else %}
                 —
                 {% endif %}
@@ -227,6 +239,11 @@
                 <div class="weekly-card-detail">
                     {{ item.move_type }}
                 </div>
+                {% if item.speculative %}
+                <div class="weekly-card-detail">
+                    Speculative pre-drop · {{ item.speculative.speculative_verdict }}
+                </div>
+                {% endif %}
 
                 {% if item.best_drop %}
                 {% set item_track_key =

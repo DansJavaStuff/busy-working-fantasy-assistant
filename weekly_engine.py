@@ -1230,7 +1230,7 @@ def build_speculative_waiver_moves(
 
         if (
             fallback is not None
-            and fallback_delta >= upside
+            and fallback_projection >= projection(add_player)
         ):
             verdict = "BETTER FA AVAILABLE"
         elif (

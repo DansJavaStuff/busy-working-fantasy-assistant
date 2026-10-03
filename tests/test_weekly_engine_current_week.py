@@ -494,6 +494,16 @@ class WeeklyEngineCurrentWeekTests(TestCase):
             places=2,
         )
 
+        # A small lineup gain must not make an inferior individual fallback
+        # appear better than the waiver target.
+        move["week_gain"] = 0.05
+        available[1]["current_week_projection"] = 7.0
+        output = build_speculative_waiver_moves([move], available, 2099)
+        self.assertEqual(
+            output[0]["speculative_verdict"],
+            "NOT WORTH PRE-DROP",
+        )
+
     def test_large_speculative_upside_with_safe_fallback_is_worth_reviewing(self):
         move = {
             "week_gain": 8.0,
