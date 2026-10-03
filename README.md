@@ -2,6 +2,9 @@
 
 A personal Fantasy NFL assistant built for the **Busy Working** Yahoo Fantasy Football league.
 
+For the latest development handover, completed fixes and next steps, read
+[`current_status.md`](current_status.md). Update it when work completes or pauses.
+
 The project currently focuses on making the 2026 live draft reliable and useful, with the longer-term goal of becoming a season-long assistant for roster management, waiver analysis, start/sit decisions, matchup planning and trade evaluation.
 
 ## Current Status
