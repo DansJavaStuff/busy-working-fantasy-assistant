@@ -8,11 +8,30 @@ from available_engine import (
     _position_value,
     _qb_bye_context,
     build_available_rankings,
+    is_actionable_waiver,
     target_week_projection,
 )
 
 
 class AvailableEngineTests(TestCase):
+    def test_claim_queue_excludes_hold_watch_and_speculative_moves(self):
+        for label in ("HOLD", "WATCH", "SHORTLIST"):
+            with self.subTest(label=label):
+                self.assertFalse(is_actionable_waiver({
+                    "best_drop": {"name": "Bateman"},
+                    "move_label": label,
+                }))
+
+        for label in ("STRONG MOVE", "CONSIDER", "BYE FIX"):
+            with self.subTest(label=label):
+                item = {
+                    "best_drop": {"name": "Bateman"},
+                    "move_label": label,
+                }
+                self.assertTrue(is_actionable_waiver(item))
+                item["speculative"] = {"speculative_verdict": "WORTH REVIEWING"}
+                self.assertFalse(is_actionable_waiver(item))
+
     def setUp(self):
         available_engine._AVAILABLE_CACHE[
             "snapshot_key"

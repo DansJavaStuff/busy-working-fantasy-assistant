@@ -927,7 +927,7 @@ Manual snapshot
 
             <div class="transaction-metrics">
                 <div>
-                    <span>Upside</span>
+                    <span>Starting lineup gain this week</span>
                     <strong>
                         {{ "%+.2f"|format(move.week_gain) }}
                     </strong>
@@ -945,7 +945,7 @@ Manual snapshot
                 </div>
 
                 <div>
-                    <span>Fallback vs current</span>
+                    <span>Fallback player vs drop · this week</span>
                     <strong>
                         {{ "%+.2f"|format(move.fallback_delta) }}
                     </strong>
@@ -975,8 +975,8 @@ Manual snapshot
                     {% if move.speculative_verdict == "BETTER FA AVAILABLE" %}
                     <li>
                         {{ move.fallback.name }} is immediately available and
-                        offers at least as much current-week upside as waiting
-                        for {{ move.add.name }} to clear waivers.
+                        has at least as high a player projection this week as
+                        {{ move.add.name }} awaiting waiver clearance.
                     </li>
                     {% endif %}
                     {% else %}
@@ -997,6 +997,11 @@ Manual snapshot
     <h2>
         Recommended Moves
     </h2>
+    <p class="weekly-card-detail">
+        HOLD means keep your current player; WATCH means monitor the option.
+        Lineup gains are projected points; bench depth and bye impact are
+        separate values used to assess the move.
+    </p>
 
     <div class="transaction-grid">
         {% for move in data.weekly.transactions %}
@@ -1070,7 +1075,7 @@ Manual snapshot
                 </div>
 
                 <div>
-                    <span>4-week / week</span>
+                    <span>Starting lineup gain · four-week pts/week</span>
                     <strong>
                         {{
                             "%+.2f"
@@ -1082,7 +1087,7 @@ Manual snapshot
                 </div>
 
                 <div>
-                    <span>Depth</span>
+                    <span>Bench depth value gain</span>
                     <strong>
                         {{
                             "%+.2f"

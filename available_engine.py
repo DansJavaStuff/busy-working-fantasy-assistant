@@ -4,6 +4,10 @@ from database import (
     load_week_cant_cut,
 )
 from sleeper_compare import compare_players
+from weekly_engine import (
+    build_speculative_waiver_moves,
+    enrich_player_game_time,
+)
 from transaction_engine import (
     build_transaction_recommendations,
     four_week_average,
@@ -333,6 +337,15 @@ def _qb_bye_adjustment(
     return -4.0
 
 
+def is_actionable_waiver(item):
+    """Only definite moves belong in the normal claim instructions."""
+    return bool(
+        item.get("best_drop")
+        and item.get("move_label") in {"STRONG MOVE", "CONSIDER", "BYE FIX"}
+        and not item.get("speculative")
+    )
+
+
 def build_available_rankings(
     season,
     week,
@@ -449,6 +462,28 @@ def build_available_rankings(
             cant_cut_ids=cant_cut_ids,
         )
     )
+
+    timed_moves = [
+        {
+            **move,
+            "add": enrich_player_game_time(move["add"], season, week),
+            "drop": enrich_player_game_time(move["drop"], season, week),
+        }
+        for move in moves
+    ]
+    timed_available = [
+        {
+            **enrich_player_game_time(player, season, week),
+            "current_week_projection": target_week_projection(player, week),
+        }
+        for player in available
+    ]
+    speculative_by_add = {
+        str(move["add"]["yahoo_player_id"]): move
+        for move in build_speculative_waiver_moves(
+            timed_moves, timed_available, season, limit=len(moves),
+        )
+    }
 
     move_by_add = {
         str(
@@ -759,6 +794,22 @@ def build_available_rankings(
                 )
 
         item["reasons"] = reasons
+        speculative = speculative_by_add.get(
+            str(player["yahoo_player_id"])
+        )
+        item["speculative"] = speculative
+        if speculative:
+            reasons.insert(
+                0,
+                "Requires a speculative pre-drop before the claim clears. "
+                + speculative["speculative_verdict"] + ".",
+            )
+            if speculative.get("fallback"):
+                reasons.insert(
+                    1,
+                    "Immediate free-agent alternative: "
+                    + speculative["fallback"]["name"] + ".",
+                )
 
     candidates.sort(
         key=lambda item:
@@ -909,9 +960,7 @@ def build_available_rankings(
         ):
             continue
 
-        if not item.get(
-            "best_drop"
-        ):
+        if not is_actionable_waiver(item):
             continue
 
         waiver_candidates.append(
