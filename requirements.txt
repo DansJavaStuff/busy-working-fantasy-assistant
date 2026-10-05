@@ -15,4 +15,4 @@ urllib3==2.8.0
 waitress==3.0.2
 Werkzeug==3.1.8
 
-beautifulsoup4>=4.12,<5
+beautifulsoup4>=4.15.0,<5
