@@ -1,0 +1,66 @@
+<div class="move-table-scroll" role="region" aria-label="{{ table_label }}" tabindex="0">
+    <table class="weekly-table">
+        <thead>
+            <tr>
+                <th scope="col">Week</th>
+                <th scope="col">Add</th>
+                <th scope="col">Drop</th>
+                <th scope="col">Status</th>
+                <th scope="col">Outcome</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for action in actions %}
+            <tr>
+                <td>
+                    {{ action.week }}
+                    {% if action.priority %}
+                    <div class="weekly-card-detail">Claim {{ action.priority }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <strong>{{ action.add_player_name }}</strong>
+                    <span class="weekly-card-detail">{{ action.add_position or '' }}</span>
+                    <details class="move-details">
+                        <summary>Details</summary>
+                        <div class="weekly-card-detail">
+                            {{ action.move_type or action.action_type }}
+                            {% if action.recommendation_label %}
+                                · {{ action.recommendation_label }}
+                            {% endif %}
+                        </div>
+                        <div class="weekly-card-detail">
+                            Submitted: {{ action.submitted_at | local_datetime }}
+                        </div>
+                        {% if action.notes %}
+                        <p class="weekly-card-detail">{{ action.notes }}</p>
+                        {% endif %}
+                    </details>
+                </td>
+                <td>
+                    {{ action.drop_player_name or '—' }}
+                    <span class="weekly-card-detail">{{ action.drop_position or '' }}</span>
+                </td>
+                <td><strong>{{ action.status | upper }}</strong></td>
+                <td>
+                    {% if action.status == 'pending' %}
+                    <form method="post" class="move-outcome-form"
+                          action="{{ url_for('update_available_action_status', action_id=action.id) }}">
+                        <select name="status" required aria-label="Outcome for {{ action.add_player_name }}">
+                            <option value="" selected disabled>Choose outcome…</option>
+                            <option value="succeeded">Succeeded</option>
+                            <option value="failed">Failed</option>
+                            <option value="superseded">Superseded</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                        <button type="submit" class="secondary-button">Save</button>
+                    </form>
+                    {% else %}
+                    {{ action.resolved_at | local_datetime }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
