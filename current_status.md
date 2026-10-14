@@ -100,6 +100,8 @@ Weekly, Available, Waivers, Roster and league settings.
   sticky headings. Row details expand to show type, recommendation and dates.
 - Pending outcomes use a dropdown and Save button, with all four outcomes kept.
 - The existing 20-move query limit is unchanged and stated beside history.
+- CI identified CVE-2026-102598 in Werkzeug 3.1.8; the dependency pin is
+  updated to the audit-recommended fix, 3.1.9.
 - No roster, scoring or waiver-processing logic changed.
 - Validation: 140 unit tests pass; changed templates compile and render pending,
   completed, mixed and empty states. Browser visual QA was unavailable because
