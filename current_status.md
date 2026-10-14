@@ -1,6 +1,6 @@
 # Busy Working NFL — current handover
 
-Last updated: 3 October 2026 (Europe/London).
+Last updated: 14 October 2026 (Europe/London).
 
 ## Read this first in a new chat
 
@@ -68,8 +68,8 @@ Weekly, Available, Waivers, Roster and league settings.
   the Lloyd move; it was a HOLD rather than a recommended immediate claim.
 - Puka Nacua's stale Out status has been fixed; Daniel confirmed he returned to
   the recommended starting lineup.
-- Next playing task agreed: Sunday 4 October, refresh data and review final
-  lineup before the expected 18:00 BST games. Check any earlier player locks too.
+- The Sunday 4 October plan above is historical. No current roster, waiver
+  priority or latest data freshness has been confirmed as of 14 October.
 
 ## Recent completed fixes
 
@@ -92,6 +92,22 @@ Weekly, Available, Waivers, Roster and league settings.
 - Matchup labels are context, not the recommendation itself. Evans can be
   recommended over Pollard despite a tougher matchup when both Yahoo and Sleeper
   project more points. Early-season matchup figures have small samples.
+
+## Latest screen change — 14 October 2026
+
+- Available / Tracked Moves now separates pending moves from completed history.
+- History is collapsed by default; each table scrolls within a bounded area with
+  sticky headings. Row details expand to show type, recommendation and dates.
+- Pending outcomes use a dropdown and Save button, with all four outcomes kept.
+- The existing 20-move query limit is unchanged and stated beside history.
+- CI identified CVE-2026-102598 in Werkzeug 3.1.8; the dependency pin is
+  updated to the audit-recommended fix, 3.1.9.
+- No roster, scoring or waiver-processing logic changed.
+- Validation: 140 unit tests pass; changed templates compile and render pending,
+  completed, mixed and empty states. Browser visual QA was unavailable because
+  the local Playwright browser executable is missing.
+- The supplied screenshot could not be read from its attachment path; this change
+  was based on the current Available template. User visual confirmation is pending.
 
 ## Validation and deployment
 
@@ -120,8 +136,8 @@ python -m unittest discover -s tests -v
 
 ## Unfinished work and next development decision
 
-No unfinished application fix remains from this session. The recommendation
-clarity task is complete. No subsequent development task has been selected yet.
+The recommendation clarity task is complete. The 14 October tracked-moves
+layout tidy-up is the latest development task; confirm it on the Pi after updating.
 
 After Sunday's refresh, collect any concrete recommendation discrepancies, then
 choose the next task using the broader roadmap. Possible follow-up: compare
