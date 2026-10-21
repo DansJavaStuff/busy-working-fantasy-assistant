@@ -1,6 +1,6 @@
 # Busy Working NFL — current handover
 
-Last updated: 14 October 2026 (Europe/London).
+Last updated: 21 October 2026 (Europe/London).
 
 ## Read this first in a new chat
 
@@ -107,11 +107,27 @@ Weekly, Available, Waivers, Roster and league settings.
   completed, mixed and empty states. Browser visual QA was unavailable because
   the local Playwright browser executable is missing.
 - The supplied screenshot could not be read from its attachment path; this change
-  was based on the current Available template. User visual confirmation is pending.
+  was based on the current Available template. Daniel confirmed the layout looks much better on 14 October.
+
+## Latest recommendation change — 21 October 2026
+
+- Daniel approved treating DEF/K as weekly streams in the 12-team league.
+- Transaction scores and move labels for DEF/K now use current-week lineup gain
+  only; four-week projections, bench value and future bye adjustments cannot
+  outweigh a better stream. Future metrics remain visible as context.
+- Available's DEF/K positional value also uses current-week projections only.
+- All DEF/K candidates reach transaction evaluation, even outside the general
+  60-player candidate cap. Future-bye deduplication does not hide streams.
+- Offensive-player transaction scoring remains unchanged; roster legality,
+  availability and Can't Cut checks still apply.
+- Regression: Colts 5.51, Lions 5.79 (four-week average 6.54), Titans FA 7.72
+  (average 4.12): Titans scores +2.21 and STRONG MOVE; Lions +0.28 and HOLD.
+  Covered for both DST and K, including a future-only upgrade being rejected.
+- Validation: 143 unit tests pass. Deployment is pending the Pi update.
 
 ## Validation and deployment
 
-Last application change: PR #23, merged to main as
+Previous recommendation-clarity baseline: PR #23, merged to main as
 `9dd5d137f50ab0e705bd66b2392c48853f9d67e2`.
 Link: https://github.com/DansJavaStuff/busy-working-fantasy-assistant/pull/23
 
@@ -136,8 +152,9 @@ python -m unittest discover -s tests -v
 
 ## Unfinished work and next development decision
 
-The recommendation clarity task is complete. The 14 October tracked-moves
-layout tidy-up is the latest development task; confirm it on the Pi after updating.
+The recommendation clarity and tracked-moves layout tasks are complete.
+The 21 October DEF/K streaming change is the latest task; confirm the Titans/Lions
+ranking after updating the Pi and refreshing recommendations.
 
 After Sunday's refresh, collect any concrete recommendation discrepancies, then
 choose the next task using the broader roadmap. Possible follow-up: compare

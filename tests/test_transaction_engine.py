@@ -133,6 +133,36 @@ def base_roster():
 
 
 class TransactionEngineTests(TestCase):
+    def test_streams_prioritise_this_week_over_future_average_and_byes(self):
+        for position, roster_id in (("DST", "dst1"), ("K", "k1")):
+            with self.subTest(position=position):
+                roster = base_roster()
+                current = next(p for p in roster if p["yahoo_player_id"] == roster_id)
+                current.update(current_week_projection=5.51, next_4_weeks_projection=21.48, bye_week=13)
+                options = [
+                    player("lions", "Long-term option", position, bye_week=12,
+                           week_projection=5.79, four_week_projection=26.16),
+                    player("titans", "Weekly option", position, bye_week=13,
+                           week_projection=7.72, four_week_projection=16.48),
+                    player("future", "Future only", position, bye_week=12,
+                           week_projection=5.0, four_week_projection=80.0),
+                ]
+                moves = build_transaction_recommendations(roster, options, limit=20, current_week=7)
+                streams = [m for m in moves if m["drop"]["yahoo_player_id"] == roster_id]
+                self.assertEqual([m["add"]["yahoo_player_id"] for m in streams], ["titans", "lions"])
+                self.assertAlmostEqual(streams[0]["score"], 2.21)
+                self.assertEqual(streams[0]["label"], "STRONG MOVE")
+                self.assertLess(streams[0]["four_week_gain"], 0)
+                self.assertEqual(streams[0]["bye_score_adjustment"], 0)
+                self.assertEqual(streams[1]["label"], "HOLD")
+
+    def test_stream_is_not_excluded_by_general_candidate_cap(self):
+        options = [player(str(i), "QB option", "QB", week_projection=30, four_week_projection=120)
+                   for i in range(61)]
+        options.append(player("stream", "Weekly defence", "DST", week_projection=10, four_week_projection=1))
+        moves = build_transaction_recommendations(base_roster(), options, limit=100, current_week=1)
+        self.assertTrue(any(m["add"]["yahoo_player_id"] == "stream" for m in moves))
+
     def test_normal_week_is_good(self):
         coverage = build_bye_coverage(
             base_roster(),

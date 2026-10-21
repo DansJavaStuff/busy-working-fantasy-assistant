@@ -1234,6 +1234,12 @@ def build_reasons(
             "starting-lineup projection."
         )
 
+    if result.get("streaming"):
+        reasons.append(
+            "Weekly stream: ranked on this week's lineup gain only. "
+            "Future projections and bye weeks are context, not scoring factors."
+        )
+
     if result["four_week_gain"] >= 0.25:
         reasons.append(
             "Improves the four-week outlook "
@@ -1359,13 +1365,7 @@ def move_type(
         add_player["position"] == "DST"
         and drop_player["position"] == "DST"
     ):
-        if (
-            result["week_gain"]
-            > result["four_week_gain"]
-        ):
-            return "DST STREAM"
-
-        return "DST UPGRADE"
+        return "DST STREAM"
 
     if (
         add_player["position"] == "K"
@@ -1465,6 +1465,15 @@ def build_transaction_recommendations(
         reverse=True,
     )[:60]
 
+    # Streaming candidates must not disappear behind offensive players with
+    # stronger long-term projections in the general candidate cap.
+    candidate_ids = {player["yahoo_player_id"] for player in candidates}
+    candidates.extend(
+        player for player in available
+        if player.get("position") in {"K", "DST"}
+        and player["yahoo_player_id"] not in candidate_ids
+    )
+
     results = []
 
     for add_player in candidates:
@@ -1559,6 +1568,12 @@ def build_transaction_recommendations(
                 result["four_week_gain"] = 0.0
                 result["bench_gain"] = 0.0
 
+            result["streaming"] = add_player.get("position") in {"K", "DST"}
+            if result["streaming"]:
+                # We can replace these positions again next week. A future
+                # downgrade must not hide a useful current-week stream.
+                result["score"] = result["week_gain"]
+
             result[
                 "bye_coverage_gain"
             ] = bye_context["gain"]
@@ -1566,8 +1581,7 @@ def build_transaction_recommendations(
             result[
                 "bye_score_adjustment"
             ] = (
-                bye_context["gain"]
-                * 0.25
+                0.0 if result["streaming"] else bye_context["gain"] * 0.25
             )
 
             result["score"] += (
@@ -1672,7 +1686,7 @@ def build_transaction_recommendations(
         if add_id in seen_adds:
             continue
 
-        bye_fix_key = tuple(
+        bye_fix_key = () if result.get("streaming") else tuple(
             (
                 item["week"],
                 tuple(item["positions"]),
