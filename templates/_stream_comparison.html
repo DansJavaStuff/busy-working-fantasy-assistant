@@ -1,0 +1,22 @@
+<details class="weekly-card-detail">
+    <summary>{{ comparison.verdict }}</summary>
+    <p>
+        Yahoo drives this move. Sleeper supplies a second-source estimate
+        rescored to this league's rules. RotoWire, when listed, is the provider
+        behind Sleeper's feed, not a third opinion.
+    </p>
+    {% for side, label in [('add', 'Add'), ('drop', 'Keep')] %}
+        {% set result = comparison[side] %}
+        <p>
+            <strong>{{ label }}: {{ result.name or 'No matching projection' }}</strong><br>
+            Yahoo: {{ '%.2f'|format(result.yahoo_projection) if result.yahoo_projection is defined else 'Unavailable' }}
+            · Sleeper: {{ '%.2f'|format(result.sleeper_yahoo_projection) if result.sleeper_yahoo_projection is defined and result.sleeper_yahoo_projection is not none else 'Unavailable' }}<br>
+            Provider: {{ result.provider or 'Not supplied' }}<br>
+            Projection updated: {{ result.updated_display or 'Not supplied' }}<br>
+            {{ result.coverage_note or 'Second-source data unavailable.' }}
+        </p>
+    {% endfor %}
+    {% if comparison.edge is not none %}
+    <p>Second-source add vs keep: {{ '%+.2f'|format(comparison.edge) }} pts.</p>
+    {% endif %}
+</details>

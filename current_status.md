@@ -127,6 +127,31 @@ Weekly, Available, Waivers, Roster and league settings.
   the audit-recommended fixed release 2026.10.19.
 - Validation: 143 unit tests pass. Deployment is pending the Pi update.
 
+## DEF/K second-source comparison — 21 October 2026
+
+- Live Sleeper Week7 K/DEF projection responses identify `company: rotowire`.
+  Correct earlier explanation: no direct RotoWire integration exists, but the
+  Sleeper feed itself carries RotoWire projections; do not count these as two
+  independent opinions.
+- Weekly streaming cards and Available now expose add/keep comparison, provider,
+  provider update time and coverage notes, including unavailable/disagreement.
+- K uses total field goals minus 40–49/50+ makes for sub-40 attempts because
+  short-distance bands can be incomplete. All sub-40 kicks score 2 in this league.
+- DEF uses supplied points-allowed bands and aggregate defensive TDs without
+  re-adding interception/fumble TD components. It is a rescored estimate, not an
+  expected score derived from a probability distribution. Missing required
+  components yield unavailable; preset Sleeper fantasy totals are never substituted.
+- DEF/K comparison is evidence only: Yahoo still drives move scores and ranking.
+  Offensive blending remains unchanged. Per-position feed errors preserve other
+  comparisons. Feed and Available caches expire after 15 minutes.
+- Live captured Week7 feed rescored Titans 7.33, Colts 5.36, Lions 5.43; this
+  supports the current-week Titans move. These figures are observations, not
+  durable player advice.
+- Validation: 148 unit tests pass, including Available keeping Yahoo ranking
+  unchanged when the second source disagrees. Changed templates compile and
+  render partial/missing evidence; live K/DEF feed probes succeeded. Browser
+  visual QA remains unavailable locally. Deployment awaits Pi update and UI confirmation.
+
 ## Validation and deployment
 
 Previous recommendation-clarity baseline: PR #23, merged to main as
@@ -155,8 +180,8 @@ python -m unittest discover -s tests -v
 ## Unfinished work and next development decision
 
 The recommendation clarity and tracked-moves layout tasks are complete.
-The 21 October DEF/K streaming change is the latest task; confirm the Titans/Lions
-ranking after updating the Pi and refreshing recommendations.
+The latest task adds DEF/K second-source comparisons. Confirm the comparison
+coverage and Titans/Lions ranking after updating the Pi and refreshing.
 
 After Sunday's refresh, collect any concrete recommendation discrepancies, then
 choose the next task using the broader roadmap. Possible follow-up: compare

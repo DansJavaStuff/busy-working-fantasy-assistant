@@ -184,7 +184,19 @@
                     )
                 }}
                 {% else %}
-                —
+                Unavailable
+                {% endif %}
+                <div class="weekly-card-detail">
+                    {{ item.sleeper_details.provider or 'Sleeper' }}
+                </div>
+                {% if item.source_comparison %}
+                    {% with comparison=item.source_comparison %}
+                        {% include "_stream_comparison.html" %}
+                    {% endwith %}
+                {% else %}
+                    <div class="weekly-card-detail">
+                        {{ item.sleeper_details.coverage_note or 'No independent comparison available.' }}
+                    </div>
                 {% endif %}
             </td>
 

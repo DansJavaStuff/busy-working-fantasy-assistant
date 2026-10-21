@@ -29,6 +29,7 @@ from transaction_engine import (
 from history_reconstruction import (
     canonical_history_roster,
 )
+from sleeper_compare import attach_stream_evidence
 from weekly_evidence import (
     build_start_sit_evidence,
 )
@@ -1613,6 +1614,8 @@ def build_weekly_data(
             season,
         )
     )[:5]
+
+    transactions = attach_stream_evidence(transactions, week)
 
     lineup = build_best_lineup(
         decision_roster
