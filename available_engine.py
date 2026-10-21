@@ -183,9 +183,11 @@ def _position_value(
         )
     )
 
+    # DEF/K are weekly streams: future averages remain visible as context.
     value = (
-        next_edge * 0.55
-        + four_edge * 0.45
+        next_edge
+        if position in {"K", "DST"}
+        else next_edge * 0.55 + four_edge * 0.45
     )
 
     return {

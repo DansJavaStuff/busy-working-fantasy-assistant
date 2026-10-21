@@ -14,6 +14,18 @@ from available_engine import (
 
 
 class AvailableEngineTests(TestCase):
+    def test_stream_position_value_ignores_future_projection(self):
+        baselines = {p: {"next_week": 5.0, "four_week": 5.0} for p in ("K", "DST", "WR")}
+        for position in ("K", "DST"):
+            with self.subTest(position=position):
+                weekly = _position_value(position, 7.72, 4.12, baselines)
+                future = _position_value(position, 5.79, 6.54, baselines)
+                self.assertAlmostEqual(weekly["value"], 2.72)
+                self.assertGreater(weekly["value"], future["value"])
+                self.assertEqual(weekly["value"], _position_value(position, 7.72, 99, baselines)["value"])
+        self.assertNotEqual(_position_value("WR", 7.72, 4.12, baselines)["value"],
+                            _position_value("WR", 7.72, 99, baselines)["value"])
+
     def test_claim_queue_excludes_hold_watch_and_speculative_moves(self):
         for label in ("HOLD", "WATCH", "SHORTLIST"):
             with self.subTest(label=label):
