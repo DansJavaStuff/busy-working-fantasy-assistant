@@ -1,5 +1,6 @@
-<details class="weekly-card-detail">
+<details class="weekly-card-detail stream-comparison">
     <summary>{{ comparison.verdict }}</summary>
+    <div class="stream-comparison-body">
     <p>
         Yahoo drives this move. Sleeper supplies a second-source estimate
         rescored to this league's rules. RotoWire, when listed, is the provider
@@ -19,4 +20,5 @@
     {% if comparison.edge is not none %}
     <p>Second-source add vs keep: {{ '%+.2f'|format(comparison.edge) }} pts.</p>
     {% endif %}
+    </div>
 </details>

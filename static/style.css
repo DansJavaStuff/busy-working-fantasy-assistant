@@ -1924,3 +1924,30 @@ footer {
         grid-column: 1 / -1;
     }
 }
+
+.stream-comparison-dialog {
+    width: min(640px, calc(100vw - 48px));
+    max-height: 80vh;
+    overflow: auto;
+    box-sizing: border-box;
+    border: 1px solid #e3e7ed;
+    border-radius: 12px;
+    padding: 24px;
+    color: #273244;
+}
+
+.stream-comparison-dialog::backdrop {
+    background: rgba(21, 27, 38, 0.45);
+}
+
+.stream-comparison-dialog header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.stream-comparison-dialog h2 {
+    margin-top: 0;
+    font-size: 20px;
+}
