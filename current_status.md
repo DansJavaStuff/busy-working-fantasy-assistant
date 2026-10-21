@@ -152,6 +152,19 @@ Weekly, Available, Waivers, Roster and league settings.
   render partial/missing evidence; live K/DEF feed probes succeeded. Browser
   visual QA remains unavailable locally. Deployment awaits Pi update and UI confirmation.
 
+## Wider Weekly and Available layouts — 21 October 2026
+
+- Daniel supplied desktop screenshots confirming the second-source comparison
+  renders on the Pi. Both Yahoo and RotoWire marginally favour Bates over Smack;
+  HOLD / too close to call is appropriate.
+- Added a scoped 1800px container for Weekly and Available (previously 1200px).
+  Existing mobile padding/layout remains in force; other pages retain their width.
+- Weekly move cards keep three columns at desktop widths of 1200px and above,
+  and align at the top so expanded details do not stretch neighbouring cards.
+- Follow-up identified but not yet implemented: investigate unmatched projections
+  for Chris Godwin Jr., Tyrone Tracy Jr. and Mike Washington Jr.; possible naming
+  mismatches, not proof that the provider has no projection.
+
 ## Validation and deployment
 
 Previous recommendation-clarity baseline: PR #23, merged to main as
