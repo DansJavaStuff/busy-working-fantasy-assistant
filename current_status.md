@@ -161,9 +161,8 @@ Weekly, Available, Waivers, Roster and league settings.
   Existing mobile padding/layout remains in force; other pages retain their width.
 - Weekly move cards keep three columns at desktop widths of 1200px and above,
   and align at the top so expanded details do not stretch neighbouring cards.
-- Follow-up identified but not yet implemented: investigate unmatched projections
-  for Chris Godwin Jr., Tyrone Tracy Jr. and Mike Washington Jr.; possible naming
-  mismatches, not proof that the provider has no projection.
+- The unmatched Jr. names identified here are addressed by the suffix-matching
+  change below, verified against the live provider feed.
 
 ## Mobile summary view — 21 October 2026
 
@@ -178,6 +177,22 @@ Weekly, Available, Waivers, Roster and league settings.
 - If JavaScript is unavailable, full content remains accessible by default.
 - Validation: 148 tests pass; templates compile; JS syntax/toggle smoke checks
   pass. Browser visual QA is still pending user confirmation.
+
+## Suffix matching and comparison dialogs — 21 October 2026
+
+- Live Week7 Sleeper feeds confirmed Chris Godwin/TB/WR, Tyrone Tracy/NYG/RB,
+  and Mike Washington/LV/RB omit the Jr. suffix Yahoo supplies.
+- Exact names are preferred. If absent, suffix-insensitive matching is permitted
+  only with matching team and position and exactly one candidate. Ambiguous,
+  wrong-team, wrong-position and fuzzy-name matches stay unavailable.
+- Desktop (>700px) second-source comparisons open in an accessible native dialog
+  with Close/Escape and focus return. The grid no longer grows a row when a
+  comparison opens. Mobile and browsers without dialog support retain details.
+- Validation: all 150 tests pass; templates compile; JS syntax/dialog smoke
+  checks pass; live captured feed now matches all three players (rescored 7.75,
+  6.33 and 5.29 respectively). Browser visual QA of the dialog is pending.
+- Previous widened desktop screenshots confirmed the layout and Titans starting
+  slot; mobile summary has not yet been visually confirmed.
 
 ## Validation and deployment
 

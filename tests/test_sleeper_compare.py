@@ -5,6 +5,30 @@ import sleeper_compare
 
 
 class SleeperCompareTests(TestCase):
+    def test_suffix_fallback_requires_unique_team_and_position(self):
+        cases = [("Chris Godwin Jr.", "Chris Godwin", "TB", "WR"),
+                 ("Tyrone Tracy Jr.", "Tyrone Tracy", "NYG", "RB"),
+                 ("Mike Washington Jr.", "Mike Washington", "LV", "RB"),
+                 ("Kenneth Walker", "Kenneth Walker III", "SEA", "RB")]
+        for yahoo, provider, team, position in cases:
+            with self.subTest(name=yahoo):
+                target = {"name": yahoo, "team": team, "position": position}
+                row = {"team": team, "player": {"full_name": provider, "position": position}}
+                self.assertIs(sleeper_compare.find_projection([row], target), row)
+                self.assertIsNone(sleeper_compare.find_projection([row, dict(row)], target))
+                self.assertIsNone(sleeper_compare.find_projection([row], {**target, "team": "OTHER"}))
+                self.assertIsNone(sleeper_compare.find_projection([row], {**target, "team": None}))
+                self.assertIsNone(sleeper_compare.find_projection([row], {**target, "position": "TE"}))
+
+    def test_exact_name_wins_and_suffix_collisions_are_rejected(self):
+        target = {"name": "Alex Smith Jr.", "team": "TB", "position": "WR"}
+        def row(name):
+            return {"team": "TB", "player": {"full_name": name, "position": "WR"}}
+        exact = row("Alex Smith Jr.")
+        self.assertIs(sleeper_compare.find_projection([exact, row("Alex Smith")], target), exact)
+        self.assertIsNone(sleeper_compare.find_projection([row("Alex Smith"), row("Alex Smith Sr.")], target))
+        self.assertIsNone(sleeper_compare.find_projection([row("Alan Smith")], target))
+
     def test_kicker_uses_total_makes_and_custom_distance_weights(self):
         stats = {"fgm": 1.55, "fgm_0_19": .05, "fgm_20_29": .23,
                  "fgm_30_39": .42, "fgm_40_49": .38, "fgm_50p": .19, "xpm": 2.27,

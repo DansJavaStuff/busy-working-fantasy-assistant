@@ -5,7 +5,7 @@ from time import monotonic
 import requests
 
 from league_settings import DEFENSE_SCORING, KICKER_SCORING, OFFENSE_SCORING
-from player_database import normalise_name
+from player_database import normalise_name, normalise_name_without_suffix
 
 
 BASE_URL = "https://api.sleeper.com"
@@ -233,16 +233,27 @@ def find_projection(rows, player):
         row
         for row in rows
         if normalise_name(_row_name(row)) == target_name
+        and (not _projection_player(row).get("position")
+             or _projection_player(row)["position"] == player.get("position"))
     ]
 
-    if target_team:
-        team_matches = [
-            row for row in matches
-            if _row_team(row) == target_team
-        ]
-        if len(team_matches) == 1:
-            matches = team_matches
+    if matches:
+        if target_team:
+            matches = [row for row in matches if _row_team(row) == target_team]
+        return matches[0] if len(matches) == 1 else None
 
+    # Only relax a missing suffix when team and position establish a unique
+    # identity. Never use a fuzzy surname match or choose one ambiguous row.
+    target_base = normalise_name_without_suffix(player.get("name"))
+    if not target_team or not target_base:
+        return None
+    matches = [
+        row for row in rows
+        if normalise_name_without_suffix(_row_name(row)) == target_base
+        and _row_team(row) == target_team
+        and str(_projection_player(row).get("position") or "").upper()
+        == str(player.get("position") or "").upper()
+    ]
     return matches[0] if len(matches) == 1 else None
 
 
