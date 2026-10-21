@@ -1834,3 +1834,19 @@ footer {
         transform: rotate(360deg);
     }
 }
+
+/* Data-heavy weekly pages can use wider desktop displays. */
+.container-wide {
+    max-width: 1800px;
+    box-sizing: border-box;
+}
+
+.container-wide .transaction-grid {
+    align-items: start;
+}
+
+@media (min-width: 1200px) {
+    .container-wide .transaction-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
