@@ -72,6 +72,8 @@
 
 {% block content %}
 
+{% include "_mobile_view_toggle.html" %}
+
 <div class="yahoo-data-status">
     Yahoo data:
     <strong>
@@ -447,13 +449,13 @@ Manual snapshot
         Start / Sit Evidence
     </h2>
 
-    <p class="weekly-card-detail">
+    <p class="weekly-card-detail mobile-detail">
         Sleeper projections are rescored to Busy Working Yahoo points.
         The call is the recommendation; a negative edge favours the bench
         option over the player currently starting.
     </p>
 
-    <table class="weekly-table">
+    <table class="weekly-table start-sit-table mobile-decision-table">
         <thead>
             <tr>
                 <th>Recommendation</th>
@@ -469,18 +471,18 @@ Manual snapshot
         <tbody>
             {% for item in data.weekly.start_sit_evidence %}
             <tr>
-                <td>
+                <td data-label="Recommendation">
                     <strong>
                         {{ item.recommendation }}
                     </strong>
                 </td>
 
-                <td>
+                <td data-label="Current starter">
                     {{ item.start.name }}
                     ({{ item.slot }})
                 </td>
 
-                <td>
+                <td data-label="Bench option">
                     {{ item.sit.name }}
                     ({{ item.sit.position }})
                 </td>
@@ -954,7 +956,7 @@ Manual snapshot
                 </div>
             </div>
 
-            <div class="transaction-reasons">
+            <div class="transaction-reasons mobile-detail">
                 <strong>Why?</strong>
                 <ul>
                     <li>
@@ -999,7 +1001,7 @@ Manual snapshot
     <h2>
         Recommended Moves
     </h2>
-    <p class="weekly-card-detail">
+    <p class="weekly-card-detail mobile-detail">
         HOLD means keep your current player; WATCH means monitor the option.
         DEF/K streams are ranked on this week’s lineup gain only; future projections
         and byes are context. Lineup gains are projected points; bench depth and bye impact are
@@ -1121,7 +1123,7 @@ Manual snapshot
                 {% endif %}
             </div>
                     {% if move.reasons %}
-            <div class="transaction-reasons">
+            <div class="transaction-reasons mobile-detail">
                 <strong>Why?</strong>
 
                 <ul>

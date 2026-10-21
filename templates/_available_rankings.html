@@ -4,14 +4,14 @@
         Recommended Waiver Claims
     </h3>
 
-    <p class="weekly-card-detail">
+    <p class="weekly-card-detail mobile-detail">
         These actionable claims address the same roster
         issue. Yahoo will process them in priority order. After waivers clear,
         refresh the Yahoo data and the assistant will choose the next issue.
         Current waiver priority: #{{ available.waiver_priority or "—" }}.
     </p>
 
-    <table class="weekly-table">
+    <table class="weekly-table mobile-decision-table">
         <thead>
             <tr>
                 <th>Priority</th>
@@ -26,13 +26,13 @@
         <tbody>
             {% for claim in available.waiver_queue %}
             <tr>
-                <td>
+                <td data-label="Priority">
                     <strong>
                         {{ claim.priority }}
                     </strong>
                 </td>
 
-                <td>
+                <td data-label="Add">
                     <strong>
                         {{ claim.add.name }}
                     </strong>
@@ -42,7 +42,7 @@
                     </div>
                 </td>
 
-                <td>
+                <td data-label="Drop">
                     <strong>
                         {{ claim.drop.name }}
                     </strong>
@@ -51,7 +51,7 @@
                     </div>
                 </td>
 
-                <td>
+                <td data-label="Call">
                     <span class="transaction-label">
                         {{ claim.call }}
                     </span>
@@ -68,7 +68,7 @@
                     {% endif %}
                 </td>
 
-                <td>
+                <td data-label="Track">
                     {% set track_key =
                         (claim.add.yahoo_player_id|string)
                         ~ "::"
@@ -112,13 +112,13 @@
 {% endif %}
 
 {% if available.sleeper_error %}
-<p class="weekly-card-detail">
+<p class="weekly-card-detail mobile-detail">
     Sleeper was unavailable for this refresh, so the ranking is using
     Yahoo and roster-fit evidence only.
 </p>
 {% endif %}
 
-<p class="weekly-card-detail">
+<p class="weekly-card-detail mobile-detail">
     HOLD means keep your current player; WATCH means monitor the option.
     The combined move score weights this week's starting-lineup gain,
     the four-week outlook, bench depth and bye coverage; it is not projected points.
@@ -126,7 +126,7 @@
     Speculative pre-drop claims are excluded from the recommended claim queue.
 </p>
 
-<table class="weekly-table">
+<table class="weekly-table available-shortlist mobile-decision-table">
     <thead>
         <tr>
             <th>#</th>
@@ -149,11 +149,15 @@
         <tr>
             <td><strong>{{ item.rank }}</strong></td>
 
-            <td>
+            <td data-label="Player">
                 <strong>{{ item.player.name }}</strong>
+                {% if item.source_comparison %}
+                <div class="mobile-only">{{ item.source_comparison.verdict }}</div>
+                {% endif %}
+                <div class="mobile-only">{{ item.player.position }} · {{ item.player.team }}</div>
 
                 {% if item.reasons %}
-                <div class="weekly-card-detail">
+                <div class="weekly-card-detail mobile-detail">
                     {{ item.reasons | join(" ") }}
                 </div>
                 {% endif %}
@@ -162,11 +166,11 @@
             <td>{{ item.player.position }}</td>
             <td>{{ item.player.team }}</td>
 
-            <td>
+            <td data-label="Status">
                 {{ item.player.roster_status or "FA" }}
             </td>
 
-            <td class="weekly-projection">
+            <td class="weekly-projection" data-label="Yahoo this week">
                 {{
                     "%.2f"
                     | format(
@@ -186,7 +190,7 @@
                 {% else %}
                 Unavailable
                 {% endif %}
-                <div class="weekly-card-detail">
+                <div class="weekly-card-detail mobile-detail">
                     {{ item.sleeper_details.provider or 'Sleeper' }}
                 </div>
                 {% if item.source_comparison %}
@@ -194,7 +198,7 @@
                         {% include "_stream_comparison.html" %}
                     {% endwith %}
                 {% else %}
-                    <div class="weekly-card-detail">
+                    <div class="weekly-card-detail mobile-detail">
                         {{ item.sleeper_details.coverage_note or 'No independent comparison available.' }}
                     </div>
                 {% endif %}
@@ -218,7 +222,7 @@
                 }}
             </td>
 
-            <td>
+            <td data-label="Drop">
                 {% if item.best_drop %}
                     {{ item.best_drop.name }}
                     ({{ item.best_drop.position }})
@@ -235,7 +239,7 @@
                         item.roster_gain
                     )
                 }}
-                <div class="weekly-card-detail">
+                <div class="weekly-card-detail mobile-detail">
                     Lineup: {{ "%+.2f"|format(item.move.week_gain) }} pts this week<br>
                     Outlook: {{ "%+.2f"|format(item.move.four_week_gain) }} pts/week<br>
                     Bench depth: {{ "%+.2f"|format(item.move.bench_gain) }}
@@ -245,7 +249,7 @@
                 {% endif %}
             </td>
 
-            <td>
+            <td data-label="Recommendation">
                 <span class="transaction-label">
                     {{ item.move_label }}
                 </span>

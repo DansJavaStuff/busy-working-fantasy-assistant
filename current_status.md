@@ -165,6 +165,20 @@ Weekly, Available, Waivers, Roster and league settings.
   for Chris Godwin Jr., Tyrone Tracy Jr. and Mike Washington Jr.; possible naming
   mismatches, not proof that the provider has no projection.
 
+## Mobile summary view — 21 October 2026
+
+- Daniel prioritises his MacBook display (15.4-inch Retina, 2880x1800 physical
+  pixels; browser CSS viewport depends on scaling). Desktop retains full detail.
+- Weekly and Available default to a summary at widths up to 700 CSS pixels:
+  decisions, add/drop, status, current-week points and deadlines remain visible.
+- Available shortlist, waiver queue and Start/Sit tables become compact labelled
+  cards. Long explanations and secondary metrics are hidden in summary mode.
+- Source-comparison verdicts and speculative warnings remain visible. A mobile
+  Show details / Show summary toggle restores full reasoning and tables.
+- If JavaScript is unavailable, full content remains accessible by default.
+- Validation: 148 tests pass; templates compile; JS syntax/toggle smoke checks
+  pass. Browser visual QA is still pending user confirmation.
+
 ## Validation and deployment
 
 Previous recommendation-clarity baseline: PR #23, merged to main as

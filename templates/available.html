@@ -118,6 +118,8 @@ Available Players · {{ data.team.team_name }}
 
 {% block content %}
 
+{% include "_mobile_view_toggle.html" %}
+
 <div class="yahoo-data-status">
     Yahoo data:
     <strong>
@@ -178,7 +180,7 @@ Available Players · {{ data.team.team_name }}
         Available Players Shortlist
     </h2>
 
-    <p class="weekly-card-detail">
+    <p class="weekly-card-detail mobile-detail">
         Ranked for Week {{ data.target_week }} and the next few weeks.
         Yahoo supplies the baseline; Sleeper is used as an independent second
         opinion for shortlisted offensive players and DEF/K streams. DEF/K

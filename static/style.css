@@ -1850,3 +1850,77 @@ footer {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
+
+.mobile-view-controls,
+.mobile-only {
+    display: none;
+}
+
+@media (max-width: 700px) {
+    .mobile-view-controls:not([hidden]) {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .mobile-summary .mobile-detail,
+    .mobile-summary .transaction-metrics > div:not(:first-child) {
+        display: none;
+    }
+
+    .mobile-summary .mobile-only {
+        display: block;
+        margin-top: 6px;
+        font-size: 12px;
+        font-weight: normal;
+    }
+
+    .mobile-summary .mobile-decision-table,
+    .mobile-summary .mobile-decision-table tbody {
+        display: block;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .mobile-summary .mobile-decision-table thead {
+        display: none;
+    }
+
+    .mobile-summary .mobile-decision-table tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        border: 1px solid #e3e7ed;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        padding: 8px;
+    }
+
+    .mobile-summary .mobile-decision-table td {
+        display: none;
+        border: 0;
+        padding: 8px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .mobile-summary .mobile-decision-table td[data-label] {
+        display: block;
+    }
+
+    .mobile-summary .mobile-decision-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        color: #697586;
+        font-size: 12px;
+        font-weight: normal;
+        margin-bottom: 4px;
+    }
+
+    .mobile-summary .mobile-decision-table td[data-label="Player"],
+    .mobile-summary .mobile-decision-table td[data-label="Recommendation"],
+    .mobile-summary .mobile-decision-table td[data-label="Track"] {
+        grid-column: 1 / -1;
+    }
+}
