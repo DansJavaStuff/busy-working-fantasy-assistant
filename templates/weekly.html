@@ -1044,6 +1044,12 @@ Manual snapshot
                 </div>
             </div>
 
+            {% if move.source_comparison %}
+                {% with comparison=move.source_comparison %}
+                    {% include "_stream_comparison.html" %}
+                {% endwith %}
+            {% endif %}
+
             {% if move.transaction_deadline %}
             <div class="transaction-deadline">
                 <span>

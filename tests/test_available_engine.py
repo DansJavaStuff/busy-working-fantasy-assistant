@@ -14,6 +14,30 @@ from available_engine import (
 
 
 class AvailableEngineTests(TestCase):
+    def test_stream_comparison_includes_keep_player_without_changing_yahoo_rank(self):
+        roster = [{"yahoo_player_id": "colts", "name": "Colts", "team": "IND", "position": "DST", "current_week_projection": 5.51}]
+        available = [{"yahoo_player_id": "titans", "name": "Titans", "team": "TEN", "position": "DST", "weeks": {"7": {"projection": 7.72}}, "next_4_weeks_projection": 16.48}]
+        moves = [{"add": available[0], "drop": roster[0], "score": 2.21, "week_gain": 2.21,
+                  "label": "STRONG MOVE", "move_type": "DST STREAM", "reasons": []}]
+        targets = []
+        def compare(players, **kwargs):
+            targets.extend(players)
+            return [{"name": p["name"], "team": p["team"], "position": "DST",
+                     "sleeper_yahoo_projection": 1 if p["name"] == "Titans" else 10} for p in players]
+        with patch.object(available_engine, "load_season_roster", return_value=roster), \
+             patch.object(available_engine, "enrich_local_roster", return_value=roster), \
+             patch.object(available_engine, "load_season_league_state", return_value={}), \
+             patch.object(available_engine, "get_effective_available_players", return_value=available), \
+             patch.object(available_engine.yahoo_provider, "get_status", return_value={}), \
+             patch.object(available_engine, "build_transaction_recommendations", return_value=moves):
+            result = build_available_rankings(2026, 7, sleeper_fetch=compare)
+        item = result["rankings"][0]
+        self.assertEqual({p["name"] for p in targets}, {"Titans", "Colts"})
+        self.assertEqual(item["consensus_next_week"], 7.72)
+        self.assertEqual(item["roster_gain"], 2.21)
+        self.assertEqual(item["source_comparison"]["verdict"], "SOURCES DISAGREE")
+        self.assertEqual(targets[0]["current_week_projection"], 7.72)
+
     def test_stream_position_value_ignores_future_projection(self):
         baselines = {p: {"next_week": 5.0, "four_week": 5.0} for p in ("K", "DST", "WR")}
         for position in ("K", "DST"):

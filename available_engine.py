@@ -1,9 +1,11 @@
+from time import monotonic
+
 from database import (
     load_season_league_state,
     load_season_roster,
     load_week_cant_cut,
 )
-from sleeper_compare import compare_players
+from sleeper_compare import compare_players, stream_move_evidence
 from weekly_engine import (
     build_speculative_waiver_moves,
     enrich_player_game_time,
@@ -437,6 +439,7 @@ def build_available_rankings(
         == snapshot_key
         and _AVAILABLE_CACHE["data"]
         is not None
+        and monotonic() - _AVAILABLE_CACHE.get("updated_at", 0) < 900
     ):
         return _AVAILABLE_CACHE["data"]
 
@@ -595,21 +598,14 @@ def build_available_rankings(
         reverse=True,
     )
 
-    # Keep the network call targeted.  Sleeper currently
-    # supports the offensive positions we rescore here.
+    # Offensive comparisons remain targeted; include all stream candidates and
+    # rostered DEF/K so both sides of an add/drop can be checked.
     sleeper_targets = [
-        item["player"]
-        for item in candidates[:30]
-        if item["player"].get(
-            "position"
-        )
-        in {
-            "QB",
-            "RB",
-            "WR",
-            "TE",
-        }
-    ]
+        {**item["player"], "current_week_projection": item["target_week_projection"]}
+        for item in candidates
+        if item["player"].get("position") in {"K", "DST"}
+        or item in candidates[:30]
+    ] + [player for player in roster if player.get("position") in {"K", "DST"}]
 
     sleeper_error = None
 
@@ -648,11 +644,15 @@ def build_available_rankings(
             else None
         )
 
-        item["sleeper_next_week"] = (
-            sleeper_projection
+        item["sleeper_next_week"] = sleeper_projection
+        item["sleeper_details"] = sleeper_row or {}
+        item["source_comparison"] = (
+            stream_move_evidence(move_by_add[str(player["yahoo_player_id"])], sleeper_results)
+            if player.get("position") in {"K", "DST"}
+            and str(player["yahoo_player_id"]) in move_by_add else None
         )
 
-        if sleeper_projection is None:
+        if sleeper_projection is None or player.get("position") in {"K", "DST"}:
             consensus_next_week = (
                 item[
                     "target_week_projection"
@@ -1092,5 +1092,6 @@ def build_available_rankings(
     _AVAILABLE_CACHE[
         "data"
     ] = data
+    _AVAILABLE_CACHE["updated_at"] = monotonic()
 
     return data
