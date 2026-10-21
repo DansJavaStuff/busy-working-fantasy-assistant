@@ -123,6 +123,8 @@ Weekly, Available, Waivers, Roster and league settings.
 - Regression: Colts 5.51, Lions 5.79 (four-week average 6.54), Titans FA 7.72
   (average 4.12): Titans scores +2.21 and STRONG MOVE; Lions +0.28 and HOLD.
   Covered for both DST and K, including a future-only upgrade being rejected.
+- CI identified PYSEC-2026-4320 in certifi 2026.7.22; updated its pin to
+  the audit-recommended fixed release 2026.10.19.
 - Validation: 143 unit tests pass. Deployment is pending the Pi update.
 
 ## Validation and deployment
