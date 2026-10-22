@@ -38,6 +38,30 @@ class AvailableEngineTests(TestCase):
         self.assertEqual(item["source_comparison"]["verdict"], "SOURCES DISAGREE")
         self.assertEqual(targets[0]["current_week_projection"], 7.72)
 
+    def test_failed_feed_retries_after_one_minute_without_yahoo_refresh(self):
+        player = {"yahoo_player_id": "dal", "name": "Cowboys", "position": "DST", "team": "DAL", "weeks": {"7": {"projection": 6.15}}}
+        calls = []
+        def fetch(*args, **kwargs):
+            calls.append(True)
+            return [{"name": "Cowboys", "feed_unavailable": len(calls) == 1,
+                     "sleeper_yahoo_projection": None if len(calls) == 1 else 7.16}]
+        with patch.object(available_engine, "load_season_roster", return_value=[]), \
+             patch.object(available_engine, "enrich_local_roster", return_value=[]), \
+             patch.object(available_engine, "load_season_league_state", return_value={}), \
+             patch.object(available_engine, "get_effective_available_players", return_value=[player]), \
+             patch.object(available_engine.yahoo_provider, "get_status", return_value={}), \
+             patch.object(available_engine, "build_transaction_recommendations", return_value=[]), \
+             patch.object(available_engine, "monotonic", return_value=100) as clock:
+            first = build_available_rankings(2026, 7, sleeper_fetch=fetch)
+            clock.return_value = 130
+            self.assertIs(build_available_rankings(2026, 7, sleeper_fetch=fetch), first)
+            clock.return_value = 161
+            recovered = build_available_rankings(2026, 7, sleeper_fetch=fetch)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(first["rankings"][0]["target_week_projection"], 6.15)
+        self.assertEqual(recovered["rankings"][0]["sleeper_next_week"], 7.16)
+        self.assertEqual(available_engine._AVAILABLE_CACHE["max_age"], 900)
+
     def test_stream_position_value_ignores_future_projection(self):
         baselines = {p: {"next_week": 5.0, "four_week": 5.0} for p in ("K", "DST", "WR")}
         for position in ("K", "DST"):

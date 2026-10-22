@@ -1,3 +1,4 @@
+import logging
 from time import monotonic
 
 from database import (
@@ -5,7 +6,7 @@ from database import (
     load_season_roster,
     load_week_cant_cut,
 )
-from sleeper_compare import compare_players, stream_move_evidence
+from sleeper_compare import SLEEPER_UNAVAILABLE_MESSAGE, compare_players, stream_move_evidence
 from weekly_engine import (
     build_speculative_waiver_moves,
     enrich_player_game_time,
@@ -439,7 +440,7 @@ def build_available_rankings(
         == snapshot_key
         and _AVAILABLE_CACHE["data"]
         is not None
-        and monotonic() - _AVAILABLE_CACHE.get("updated_at", 0) < 900
+        and monotonic() - _AVAILABLE_CACHE.get("updated_at", 0) < _AVAILABLE_CACHE.get("max_age", 900)
     ):
         return _AVAILABLE_CACHE["data"]
 
@@ -621,7 +622,8 @@ def build_available_rankings(
         )
     except Exception as exc:
         sleeper_results = []
-        sleeper_error = str(exc)
+        logging.getLogger(__name__).warning("Sleeper comparison failed: %s", exc, exc_info=True)
+        sleeper_error = SLEEPER_UNAVAILABLE_MESSAGE
 
     sleeper = _sleeper_index(
         sleeper_results
@@ -1093,5 +1095,9 @@ def build_available_rankings(
         "data"
     ] = data
     _AVAILABLE_CACHE["updated_at"] = monotonic()
+    _AVAILABLE_CACHE["max_age"] = (
+        60 if sleeper_error or any(row.get("feed_unavailable") for row in sleeper_results)
+        else 900
+    )
 
     return data

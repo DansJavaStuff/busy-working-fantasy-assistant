@@ -1,3 +1,4 @@
+import logging
 import math
 from datetime import UTC, datetime
 from time import monotonic
@@ -10,6 +11,11 @@ from player_database import normalise_name, normalise_name_without_suffix
 
 BASE_URL = "https://api.sleeper.com"
 SEASON = 2026
+logger = logging.getLogger(__name__)
+SLEEPER_UNAVAILABLE_MESSAGE = (
+    "Sleeper unavailable temporarily. Yahoo projection is still available. "
+    "Reload the page after a minute to retry."
+)
 
 
 SLEEPER_TO_YAHOO = {
@@ -276,7 +282,8 @@ def compare_players(players, week, season=SEASON):
             feeds[position] = fetch_week_position(position, week, season=season)
         except Exception as exc:
             feeds[position] = []
-            errors[position] = "Sleeper feed unavailable: " + str(exc)
+            logger.warning("Sleeper %s projection fetch failed: %s", position, exc, exc_info=True)
+            errors[position] = SLEEPER_UNAVAILABLE_MESSAGE
 
     results = []
 
@@ -303,6 +310,7 @@ def compare_players(players, week, season=SEASON):
                     "sleeper_generic_half_ppr": None,
                     "raw_stats": None,
                     "coverage_note": errors.get(feed_position, "No matching weekly projection."),
+                    "feed_unavailable": feed_position in errors,
                     "source": "Sleeper",
                     "provider": None,
                     "updated_at": None,
