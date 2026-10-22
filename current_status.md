@@ -1,6 +1,6 @@
 # Busy Working NFL — current handover
 
-Last updated: 21 October 2026 (Europe/London).
+Last updated: 22 October 2026 (Europe/London).
 
 ## Read this first in a new chat
 
@@ -193,6 +193,21 @@ Weekly, Available, Waivers, Roster and league settings.
   6.33 and 5.29 respectively). Browser visual QA of the dialog is pending.
 - Previous widened desktop screenshots confirmed the layout and Titans starting
   slot; mobile summary has not yet been visually confirmed.
+
+## Temporary Sleeper connection failures — 22 October 2026
+
+- Daniel reported a temporary DNS resolution failure for api.sleeper.com exposed
+  as a long raw requests/urllib3 error on Available. This is a connection error,
+  not a missing Cowboys projection or a Yahoo data problem.
+- Feed exceptions now show a short temporary-unavailability message. Full error
+  details and traceback go to Python logs (systemd journal on the Pi).
+- Available caches failed comparison responses for 60 seconds instead of 15
+  minutes; reload after a minute retries without a new Yahoo import. Successful
+  rankings/feeds retain the 15-minute cache. No background retry is scheduled.
+- Validation: all 151 tests pass, including failure/cache/recovery with unchanged
+  Yahoo data. Persistent DNS failures still require checking the Pi's networking;
+  this change improves presentation/recovery and does not repair DNS itself.
+- Daniel confirmed the suffix-matching/dialog changes look better on the Pi.
 
 ## Validation and deployment
 

@@ -82,7 +82,10 @@ class SleeperCompareTests(TestCase):
         with patch.object(sleeper_compare, "fetch_week_position", side_effect=fetch):
             results = sleeper_compare.compare_players(players, 7)
         self.assertIsNone(results[0]["sleeper_yahoo_projection"])
-        self.assertIn("offline", results[0]["coverage_note"])
+        self.assertNotIn("offline", results[0]["coverage_note"])
+        self.assertIn("temporarily", results[0]["coverage_note"])
+        self.assertTrue(results[0]["feed_unavailable"])
+        self.assertFalse(results[1].get("feed_unavailable", False))
         self.assertEqual(results[1]["sleeper_yahoo_projection"], 4)
 
     def test_scores_busy_working_offense_rules(self):
