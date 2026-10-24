@@ -10,7 +10,7 @@ from flask import Flask
 
 import database
 import matchup_routes
-from matchups import SLOTS, list_matchups, load_matchup, matchup_summary, save_matchups
+from matchups import fill_actuals_from_history, SLOTS, list_matchups, load_matchup, matchup_summary, save_matchups
 
 
 def record(week=1, status="final"):
@@ -183,3 +183,98 @@ class MatchupTests(TestCase):
         response = self.client().post("/settings/season-schedule", data={"opponent_8": "Future opponent"})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(load_matchup(8)["opponent"], "Future opponent")
+
+
+class MatchupActualsTests(TestCase):
+    setUp = MatchupTests.setUp
+    client = MatchupTests.client
+    # Reuse the isolated database setup and route client, without rerunning base tests.
+    def test_fill_uses_both_lineups_and_reconciles_zero_negative_totals(self):
+        entry = record(7, "live")
+        players = {}
+        for side in ("own", "opponent"):
+            for i, row in enumerate(entry[side + "_lineup"]):
+                players[side + str(i)] = {"name": row["name"], "position": row["position"],
+                    "team": row["team"], "weeks": {"7": {"actual": i - 2, "projection": 999}}}
+        database.upsert_player_week_history(players, 2026)
+        original = copy.deepcopy(entry)
+        draft, filled, issues = fill_actuals_from_history(entry)
+        self.assertEqual(entry, original)
+        self.assertEqual(filled, 18)
+        self.assertEqual(issues, [])
+        self.assertEqual(draft["own_actual"], 18)
+        self.assertEqual(draft["opponent_actual"], 18)
+        self.assertEqual(draft["own_lineup"][0]["actual"], -2)
+        self.assertEqual(draft["own_lineup"][2]["actual"], 0)
+        self.assertEqual(draft["status"], "live")
+        self.assertEqual(draft["own_projection"], 10)
+        self.assertIsNone(load_matchup(7))
+        draft["status"] = "final"
+        save_matchups([draft])
+        self.assertEqual(matchup_summary(load_matchup(7))["result"], "Tied")
+
+    def test_wrong_week_season_and_projection_only_remain_unknown(self):
+        entry = record(7, "live")
+        row = entry["own_lineup"][0]
+        player = {"p": {"name": row["name"], "position": "QB", "team": "GB",
+                         "weeks": {"6": {"actual": 42}, "7": {"projection": 20}}}}
+        database.upsert_player_week_history(player, 2026)
+        player["p"]["weeks"] = {"7": {"actual": 99}}
+        database.upsert_player_week_history(player, 2027)
+        draft, filled, issues = fill_actuals_from_history(entry)
+        self.assertEqual(filled, 0)
+        self.assertEqual(len(issues), 18)
+        self.assertIsNone(draft["own_actual"])
+        self.assertIsNone(draft["own_lineup"][0]["actual"])
+
+    def test_suffix_and_defence_aliases_and_team_disambiguation(self):
+        entry = record(7, "live")
+        entry["own_lineup"][0].update(name="Patrick Mahomes II", team="KC")
+        entry["own_lineup"][-1].update(name="Jaguars", team="JAX")
+        database.upsert_player_week_history({
+            "p": {"name": "Patrick Mahomes", "position": "QB", "team": "KC", "weeks": {"7": {"actual": 20}}},
+            "q": {"name": "Patrick Mahomes", "position": "QB", "team": "GB", "weeks": {"7": {"actual": 99}}},
+            "d": {"name": "Jacksonville Jaguars", "position": "DEF", "team": "JAC", "weeks": {"7": {"actual": -1}}},
+        }, 2026)
+        draft, filled, _ = fill_actuals_from_history(entry)
+        self.assertEqual(filled, 2)
+        self.assertEqual(draft["own_lineup"][0]["actual"], 20)
+        self.assertEqual(draft["own_lineup"][-1]["actual"], -1)
+
+    def test_ambiguous_identity_and_team_mismatch_never_guess(self):
+        entry = record(7, "live")
+        name = entry["own_lineup"][0]["name"]
+        database.upsert_player_week_history({
+            str(i): {"name": name, "position": "QB", "team": "GB", "weeks": {"7": {"actual": i}}}
+            for i in (1, 2)
+        }, 2026)
+        draft, _, issues = fill_actuals_from_history(entry)
+        self.assertIsNone(draft["own_lineup"][0]["actual"])
+        self.assertIn("ambiguous", issues[0])
+        entry["own_lineup"][0]["team"] = "KC"
+        draft, filled, _ = fill_actuals_from_history(entry)
+        self.assertEqual(filled, 0)
+
+    def test_form_preview_is_unsaved_and_final_record_stays_protected(self):
+        entry = record(7)
+        save_matchups([entry])
+        row = entry["own_lineup"][0]
+        database.upsert_player_week_history({"p": {"name": row["name"], "position": "QB", "team": "GB",
+            "weeks": {"7": {"actual": 30}}}}, 2026)
+        form = {"week": "7", "opponent": "Opponent", "status": "final", "action": "fill_actuals",
+                "own_actual": 8, "opponent_actual": 9}
+        for side in ("own", "opponent"):
+            for r in entry[side + "_lineup"]:
+                for key in ("name", "position", "team", "projection", "actual", "state"):
+                    form[side + "_" + r["slot"] + "_" + key] = r[key]
+        response = self.client().post("/matchup/save", data=form)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Filled 1 starter scores", response.data)
+        self.assertIn(b"Nothing has been saved yet", response.data)
+        self.assertEqual(load_matchup(7)["own_actual"], 8)
+        del form["action"]
+        form["own_QB_actual"] = 30
+        form["own_actual"] = 37
+        response = self.client().post("/matchup/save", data=form)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(load_matchup(7)["own_actual"], 8)

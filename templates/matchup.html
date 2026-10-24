@@ -40,8 +40,12 @@
     </div>
 </section>
 <section class="weekly-section">
-<details {% if error or not match.opponent %}open{% endif %}>
+<details {% if error or score_preview or not match.opponent %}open{% endif %}>
     <summary><strong>Edit opponent, lineups and scores</strong></summary>
+    {% if score_preview %}
+    <div role="status"><p><strong>Filled {{ score_preview.filled }} starter scores from the Week {{ match.week }} database actuals.</strong> Review the scores below, then save. Nothing has been saved yet.</p>
+    {% if score_preview.issues %}<p>Unresolved scores are blank; import missing actuals or enter them manually. Totals appear only when all nine starter scores are known.</p><ul>{% for issue in score_preview.issues %}<li>{{ issue }}</li>{% endfor %}</ul>{% endif %}</div>
+    {% endif %}
     <p>Enter the actual starting lineups shown on Yahoo. Leave unknown scores blank; a zero means an actual zero. Final matchups require all nine starters and matching team totals. Saved historical entries are not changed by Player List imports.</p>
     <form method="post" action="{{ url_for('matchups.save') }}">
         <input type="hidden" name="week" value="{{ match.week }}">
@@ -68,6 +72,8 @@
         </table>
         </div>
         {% endfor %}
+        <p>Confirm the starters on both sides, including their positions and NFL teams, then fill their actual points from your regular Yahoo actuals import. This replaces the draft scores and recalculates complete team totals; unavailable or ambiguous scores stay blank. Imported actuals may be in progress: confirm against Yahoo before marking Final. Original projections and recorded game states are kept.</p>
+        <button class="secondary-button" type="submit" name="action" value="fill_actuals">Fill scores from imported actuals</button>
         <p><label><input type="checkbox" name="correct_confirmed" value="yes"> Explicit correction: allow changes to confirmed results or locked starters. The previous saved record is retained.</label></p>
         <button class="primary-button" type="submit">Save matchup</button>
     </form>

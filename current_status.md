@@ -248,11 +248,18 @@ python -m unittest discover -s tests -v
 - A separate private JSON download transcribes the supplied screenshots: Weeks
   1–6 final, Week 7 planned. Import it once through Settings after deployment.
   It is intentionally outside Git. Re-importing identical records is safe.
+- Matchup editor now offers "Fill scores from imported actuals": confirm the
+  starters, preview same-week/same-season DB actuals for both sides, review and save.
+  Exact/suffix/defence matching checks position and entered NFL team; ambiguous or
+  missing actuals stay blank, never becoming projections or fabricated zeros.
+  Complete nine-starter totals are calculated; incomplete totals remain blank.
+  This does not auto-finalise games, change projections/states, or bypass protected
+  final records. Regular refresh does not silently rewrite saved matchups.
 - The importer accepts structured JSON, not images or HTML. All-or-nothing
   validation checks final totals against all nine player scores on each side.
 - Retrospective Yahoo projections are not timestamped pre-game assistant
   predictions. Do not use them to claim validated recommendation performance.
-- Validation: all 163 tests pass, including guarded corrections, atomic imports,
+- Validation: all 168 tests pass, including DB actual-score lookup, guarded corrections, atomic imports,
   form error recovery, escaping, negative scores and preserving unknown scores.
   Flask pages render successfully; browser visual QA remains pending.
 - Deployment: pull main and restart busy-working, then import the private file.
@@ -263,7 +270,7 @@ python -m unittest discover -s tests -v
 
 Validate the new matchup layout and imported records on Daniel's MacBook/Pi.
 Enter the remaining fixture list in Settings when available, then record Week 7
-actuals and final starters after the games. Future development options include
+actuals and final starters after the games, using the DB-fill preview. Future development options include
 matchup HTML extraction, player-ID reconciliation, automatic kickoff locking and
 pre-game recommendation snapshots. These are not implemented in this change.
 

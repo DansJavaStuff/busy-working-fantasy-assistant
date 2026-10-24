@@ -10,11 +10,28 @@ starting slots and recorded game states. These entries are independent of the
 current roster tables and Player List imports. They do not change the assistant's
 recommended lineup or submit anything to Yahoo.
 
-Enter actual scores only when known. Blank means unknown; zero and negative
-scores are valid. Mark a game locked manually when confirming its starter on
-Yahoo. This is a record of the observed state, not automatic kickoff detection.
-Final matchups require nine starters on each side, actual scores for all players,
-and team totals matching the player sums within 0.05 points.
+## Fill scores after confirming starters
+
+1. Import the relevant week's actual points through the normal Yahoo refresh.
+2. Open that week's matchup and expand the editor. Confirm the starters on both
+   sides, their positions and NFL teams against Yahoo.
+3. Choose **Fill scores from imported actuals**. The app previews actual points
+   from `season_player_week` for that exact season and week. It does not save yet.
+4. Review the scores and totals, then save. Choose Final only after all games have
+   finished and the result agrees with Yahoo; Monday's totals may still be live.
+
+Exact names are preferred, with suffix-tolerant offensive matching and team-code
+matching for defence aliases. Position and entered NFL team must agree; ambiguous
+identities are not guessed. A missing actual stays blank even when a projection
+exists. Real zero and negative scores are retained. Each side's total is calculated
+only when all nine starters have known actuals; incomplete totals remain blank.
+The fill action replaces draft scores, including clearing unresolved old scores,
+but keeps original projections and manually recorded game states.
+
+You can still enter scores manually. Mark a game locked manually when confirming
+its starter on Yahoo. This is a record of the observed state, not automatic kickoff
+detection. Final matchups require nine starters on each side, actual scores for all
+players, and team totals matching the player sums within 0.05 points.
 
 Final records and the identity/projection of locked starters are protected.
 Deliberate corrections use the checkbox in the matchup editor. Previous payloads

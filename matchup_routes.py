@@ -4,7 +4,7 @@ from flask import Blueprint, redirect, render_template, request, url_for
 
 from database import load_team_identity
 from fantasy_calendar import current_fantasy_week
-from matchups import SLOTS, load_matchup, matchup_summary, opponent_names, save_matchups
+from matchups import fill_actuals_from_history, SLOTS, load_matchup, matchup_summary, opponent_names, save_matchups
 
 blueprint = Blueprint("matchups", __name__)
 SEASON = 2026
@@ -17,7 +17,7 @@ def selected_week():
     return week
 
 
-def render_page(week, edit_record=None, error=None):
+def render_page(week, edit_record=None, error=None, score_preview=None):
     match = load_matchup(week, SEASON) or {
         "week": week, "opponent": "", "status": "planned", "source": "manual_entry",
         "own_lineup": [], "opponent_lineup": [],
@@ -32,7 +32,7 @@ def render_page(week, edit_record=None, error=None):
     return render_template("matchup.html", match=matchup_summary(match), edit=edit,
                            rows=rows_for(match), edit_rows=rows_for(edit),
                            names=opponent_names(SEASON), data={"team": load_team_identity(SEASON)},
-                           error=error, saved=request.args.get("saved"))
+                           error=error, score_preview=score_preview, saved=request.args.get("saved"))
 
 
 @blueprint.get("/matchup")
@@ -66,6 +66,10 @@ def save():
                     continue
                 rows.append({"slot": slot, **row})
             record[side + "_lineup"] = rows
+        if request.form.get("action") == "fill_actuals":
+            draft, filled, issues = fill_actuals_from_history(record, SEASON)
+            return render_page(week, edit_record=draft,
+                               score_preview={"filled": filled, "issues": issues})
         save_matchups([record], SEASON, correct_confirmed=request.form.get("correct_confirmed") == "yes")
     except ValueError as exc:
         if "record" in locals():
