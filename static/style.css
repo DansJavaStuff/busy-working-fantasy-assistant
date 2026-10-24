@@ -1951,3 +1951,19 @@ footer {
     margin-top: 0;
     font-size: 20px;
 }
+
+.matchup-scoreboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+}
+.matchup-scoreboard label { display: grid; gap: 8px; }
+.matchup-scroll { overflow: auto; margin: 16px 0; }
+.matchup-scroll:focus-visible { outline: 2px solid #1478b4; }
+.matchup-editor { min-width: 900px; }
+.matchup-editor input { width: 100%; min-width: 85px; box-sizing: border-box; }
+.matchup-editor td:nth-child(2) { min-width: 200px; }
+.matchup-editor td:nth-child(2) input + input { margin-top: 6px; }
+.matchup-scoreboard input, .matchup-editor input, .matchup-editor select,
+#season-schedule input { padding: 8px; border: 1px solid #cbd2db; border-radius: 5px; }

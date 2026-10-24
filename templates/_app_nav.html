@@ -9,7 +9,7 @@
     </a>
 
     <a
-        {% if request.endpoint == 'weekly' %}
+        {% if request.endpoint in ['weekly', 'matchups.page'] %}
         class="active"
         {% endif %}
         href="{{ url_for('weekly') }}"

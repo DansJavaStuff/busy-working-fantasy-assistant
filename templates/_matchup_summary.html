@@ -1,0 +1,14 @@
+<section class="weekly-section">
+    <h2>Matchup · Week {{ matchup_week }}</h2>
+    {% if matchup %}
+    <p><strong>{{ data.team.team_name }} vs {{ matchup.opponent }}</strong>
+       · {{ matchup.status | title }} · {{ matchup.result }}</p>
+    {% if matchup.own_actual is not none and matchup.opponent_actual is not none %}
+    <p>Recorded score: <strong>{{ '%.2f'|format(matchup.own_actual) }} – {{ '%.2f'|format(matchup.opponent_actual) }}</strong></p>
+    {% endif %}
+    {% else %}
+    <p>No opponent recorded for this week.</p>
+    {% endif %}
+    <a class="secondary-button" href="{{ url_for('matchups.page', week=matchup_week) }}">View / update matchup</a>
+    · <a href="{{ url_for('settings_page', _anchor='season-schedule') }}">Season schedule</a>
+</section>

@@ -1,0 +1,25 @@
+<section class="settings-panel" id="season-schedule">
+    <h2>Season schedule &amp; matchup history</h2>
+    {% if request.args.get('schedule_saved') %}<p role="status">Schedule / matchup import saved.</p>{% endif %}
+    <p>Set the season's opponents here. Names from current Yahoo ownership imports and recorded matchups are suggested; you can enter another team. Leave unknown fixtures blank. Changing a week with recorded lineups requires an explicit correction in its matchup editor.</p>
+    <form method="post" action="{{ url_for('matchups.schedule') }}">
+        <div class="matchup-scroll" role="region" aria-label="Season schedule" tabindex="0">
+        <table class="weekly-table"><thead><tr><th>Week</th><th>Opponent</th><th>Result / status</th><th>Matchup</th></tr></thead><tbody>
+        {% for week in range(1,18) %}{% set match = schedule.get(week) %}<tr>
+            <th scope="row">{{ week }}{% if week >= 15 %} · Playoffs{% endif %}</th>
+            <td><input aria-label="Week {{ week }} opponent" name="opponent_{{ week }}" list="schedule-opponents" value="{{ match.opponent if match else '' }}" maxlength="100"></td>
+            <td>{{ match.result if match and match.status == 'final' else (match.status if match else 'Not set') }}</td>
+            <td><a href="{{ url_for('matchups.page', week=week) }}">View / edit</a></td>
+        </tr>{% endfor %}</tbody></table>
+        </div>
+        <button type="submit" class="primary-button">Save season schedule</button>
+    </form>
+    <datalist id="schedule-opponents">{% for name in opponent_names %}<option value="{{ name }}">{% endfor %}</datalist>
+    <details><summary>Import saved matchup records</summary>
+        <p>Import a matchup JSON file, including the one prepared from your screenshots. Existing final results cannot be overwritten by an import; use the matchup editor for deliberate corrections. A repeated identical import is safe.</p>
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('matchups.import_file') }}">
+            <label>Matchup JSON file <input type="file" name="matchup_file" accept=".json,application/json" required></label>
+            <button type="submit" class="secondary-button">Import matchups</button>
+        </form>
+    </details>
+</section>
