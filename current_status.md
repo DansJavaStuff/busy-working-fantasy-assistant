@@ -1,6 +1,6 @@
 # Busy Working NFL — current handover
 
-Last updated: 22 October 2026 (Europe/London).
+Last updated: 24 October 2026 (Europe/London).
 
 ## Read this first in a new chat
 
@@ -234,20 +234,38 @@ Standard test command with dependencies installed:
 python -m unittest discover -s tests -v
 ```
 
+## Season schedule and matchup records — 24 October 2026
+
+- Settings now supports the Weeks 1–17 opponent schedule, using ownership names
+  as suggestions while allowing typed names and empty future weeks.
+- Weekly and History link to a separate matchup page with both nine-slot starting
+  lineups, original Yahoo projections, actual scores, results and recorded states.
+- Schema 14 adds season_matchups and matchup_revisions. Current roster, existing
+  history, recommendations and Player List imports remain independent.
+- Locked starter identities/projections/states and final records require explicit
+  corrections; old versions are archived. Scores can update as games progress.
+  States are recorded manually; automatic kickoff locking is not implemented.
+- A separate private JSON download transcribes the supplied screenshots: Weeks
+  1–6 final, Week 7 planned. Import it once through Settings after deployment.
+  It is intentionally outside Git. Re-importing identical records is safe.
+- The importer accepts structured JSON, not images or HTML. All-or-nothing
+  validation checks final totals against all nine player scores on each side.
+- Retrospective Yahoo projections are not timestamped pre-game assistant
+  predictions. Do not use them to claim validated recommendation performance.
+- Validation: all 163 tests pass, including guarded corrections, atomic imports,
+  form error recovery, escaping, negative scores and preserving unknown scores.
+  Flask pages render successfully; browser visual QA remains pending.
+- Deployment: pull main and restart busy-working, then import the private file.
+  Daniel has not yet confirmed this feature on the Pi. See docs/MATCHUPS.md.
+- Yahoo API access is still pending; Daniel reported contacting Yahoo on Reddit.
+
 ## Unfinished work and next development decision
 
-The recommendation clarity and tracked-moves layout tasks are complete.
-The latest task adds DEF/K second-source comparisons. Confirm the comparison
-coverage and Titans/Lions ranking after updating the Pi and refreshing.
-
-After Sunday's refresh, collect any concrete recommendation discrepancies, then
-choose the next task using the broader roadmap. Possible follow-up: compare
-Week4 recommendations/projections with actual outcomes. This is a proposal, not
-an agreed development commitment.
-
-One technical item to verify before claiming full kickoff-lock protection:
-existing lineup locking primarily uses recorded actual scores. Exact kickoff
-locking and late-game FLEX behaviour have not been audited in this session.
+Validate the new matchup layout and imported records on Daniel's MacBook/Pi.
+Enter the remaining fixture list in Settings when available, then record Week 7
+actuals and final starters after the games. Future development options include
+matchup HTML extraction, player-ID reconciliation, automatic kickoff locking and
+pre-game recommendation snapshots. These are not implemented in this change.
 
 ## Checkout cautions for the next agent
 

@@ -75,7 +75,11 @@ from yahoo_provider import (
     yahoo_provider,
 )
 
+from matchup_routes import blueprint as matchup_blueprint
+from matchups import list_matchups, load_matchup, matchup_summary, opponent_names
+
 app = Flask(__name__)
+app.register_blueprint(matchup_blueprint)
 
 UK_TIME = ZoneInfo(
     "Europe/London"
@@ -400,6 +404,8 @@ def settings_page():
     return render_template(
         "settings.html",
         data=data,
+        schedule={m["week"]: matchup_summary(m) for m in list_matchups(season)},
+        opponent_names=[n for n in opponent_names(season) if n != load_team_identity(season)["team_name"]],
     )
 
 
@@ -636,6 +642,8 @@ def weekly():
     return render_template(
         "weekly.html",
         data=data,
+        matchup=matchup_summary(load_matchup(week, season)),
+        matchup_week=week,
     )
 
 
@@ -689,6 +697,8 @@ def history():
     return render_template(
         "history.html",
         data=data,
+        matchup=matchup_summary(load_matchup(week, season)),
+        matchup_week=week,
     )
 
 

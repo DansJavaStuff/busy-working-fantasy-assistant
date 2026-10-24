@@ -11,7 +11,7 @@ CURRENT_LEAGUE_KEY = "busy-working"
 CURRENT_LEAGUE_NAME = "Busy Working"
 CURRENT_YAHOO_LEAGUE_ID = "688636"
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -432,6 +432,23 @@ def initialise_database():
                 FOREIGN KEY (season_id)
                     REFERENCES seasons(id)
                     ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS season_matchups (
+                season_id INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+                week INTEGER NOT NULL CHECK (week BETWEEN 1 AND 17),
+                opponent TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (season_id, week)
+            );
+
+            CREATE TABLE IF NOT EXISTS matchup_revisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                season_id INTEGER NOT NULL REFERENCES seasons(id) ON DELETE CASCADE,
+                week INTEGER NOT NULL,
+                payload TEXT NOT NULL,
+                saved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS daily_checklist_progress (

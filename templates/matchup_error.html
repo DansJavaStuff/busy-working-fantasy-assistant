@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="weekly-section">
+    <h1>Matchup not saved</h1>
+    <p role="alert">{{ error }}</p>
+    <p>Use your browser's Back button to return to the form and correct the entry.</p>
+    <a href="{{ url_for('matchups.page') }}">Open current matchup</a>
+    · <a href="{{ url_for('settings_page', _anchor='season-schedule') }}">Season schedule</a>
+</section>
+{% endblock %}
