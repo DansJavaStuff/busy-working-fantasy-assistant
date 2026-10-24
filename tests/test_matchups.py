@@ -10,7 +10,7 @@ from flask import Flask
 
 import database
 import matchup_routes
-from matchups import fill_actuals_from_history, SLOTS, list_matchups, load_matchup, matchup_summary, save_matchups
+from matchups import fill_actuals_from_history, matchup_player_choices, selected_player_choice, SLOTS, list_matchups, load_matchup, matchup_summary, save_matchups
 
 
 def record(week=1, status="final"):
@@ -278,3 +278,119 @@ class MatchupActualsTests(TestCase):
         response = self.client().post("/matchup/save", data=form)
         self.assertEqual(response.status_code, 400)
         self.assertEqual(load_matchup(7)["own_actual"], 8)
+
+
+class MatchupPlayerSelectorTests(TestCase):
+    setUp = MatchupTests.setUp
+    client = MatchupTests.client
+
+    def seed(self):
+        database.upsert_player_week_history({
+            "qb": {"name": "Quarter Back", "position": "QB", "team": "GB", "weeks": {"6": {"actual": 15}, "7": {"projection": 22}}},
+            "wr": {"name": "Receiver Jr.", "position": "WR", "team": "KC", "weeks": {"7": {"actual": 8}}},
+            "dst": {"name": "Jacksonville Jaguars", "position": "DEF", "team": "JAC", "weeks": {"7": {"actual": -2}}},
+            "future": {"name": "Future player", "position": "RB", "team": "GB", "weeks": {"8": {"projection": 10}}},
+        }, 2026)
+
+    def test_choices_are_season_and_historical_week_specific(self):
+        self.seed()
+        choices = matchup_player_choices(7)
+        self.assertEqual({p["player_id"] for p in choices}, {"qb", "wr", "dst"})
+        self.assertEqual(matchup_player_choices(5), [])
+        self.assertEqual(matchup_player_choices(7, 2027), [])
+        self.assertEqual(next(p for p in choices if p["player_id"] == "dst")["position"], "DST")
+
+    def test_saved_name_aliases_match_without_changing_historical_identity(self):
+        self.seed()
+        choices = matchup_player_choices(7)
+        self.assertEqual(selected_player_choice({"name": "Receiver", "position": "WR", "team": "KC"}, choices), "wr")
+        self.assertEqual(selected_player_choice({"name": "Jaguars", "position": "DST", "team": "JAX"}, choices), "dst")
+        self.assertEqual(selected_player_choice({"name": "Missing player", "position": "RB", "team": "GB"}, choices), "saved")
+
+    def test_selector_filters_by_slot_and_renders_saved_missing_player(self):
+        self.seed()
+        save_matchups([record(7, "live")])
+        response = self.client().get("/matchup?week=7")
+        html = response.get_data(as_text=True)
+        import re
+        qb = re.search(r'<select[^>]*name="own_QB_player_id"[^>]*>(.*?)</select>', html, re.S)[1]
+        flex = re.search(r'<select[^>]*name="own_FLEX_player_id"[^>]*>(.*?)</select>', html, re.S)[1]
+        self.assertIn('value="qb"', qb)
+        self.assertNotIn('value="wr"', qb)
+        self.assertIn('value="saved" selected', qb)
+        self.assertIn('value="wr"', flex)
+        self.assertNotIn('value="qb"', flex)
+        self.assertIn('Search Your starters QB players', html)
+
+    def test_selected_id_resolves_identity_server_side_and_fetches_actual(self):
+        self.seed()
+        form = {"week": "7", "opponent": "Opponent", "status": "live", "action": "fill_actuals",
+                "own_WR1_player_id": "wr", "own_WR1_name": "Old stale player",
+                "own_WR1_team": "GB", "own_WR1_position": "RB", "own_WR1_actual": 99}
+        response = self.client().post("/matchup/save", data=form)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Filled 1 starter scores", response.data)
+        self.assertIn(b'Receiver Jr.', response.data)
+        form.pop("action")
+        response = self.client().post("/matchup/save", data=form)
+        self.assertEqual(response.status_code, 302)
+        player = load_matchup(7)["own_lineup"][0]
+        self.assertEqual((player["name"], player["position"], player["team"], player["player_id"]),
+                         ("Receiver Jr.", "WR", "KC", "wr"))
+        self.assertIsNone(player["actual"])
+
+    def test_invalid_ids_ineligible_slots_and_forged_saved_option_rejected(self):
+        self.seed()
+        for selection in ("missing", "wr", "saved"):
+            response = self.client().post("/matchup/save", data={
+                "week": "7", "opponent": "Opponent", "status": "live", "own_QB_player_id": selection})
+            self.assertEqual(response.status_code, 400)
+            self.assertIsNone(load_matchup(7))
+
+    def test_stable_player_id_resolves_duplicate_names(self):
+        self.seed()
+        database.upsert_player_week_history({"wr2": {"name": "Receiver Jr.", "position": "WR", "team": "KC",
+                                                     "weeks": {"7": {"actual": 99}}}}, 2026)
+        entry = {"week": 7, "opponent": "Opponent", "own_lineup": [{"slot": "WR1", "name": "Receiver Jr.",
+                  "position": "WR", "team": "KC", "player_id": "wr"}]}
+        draft, filled, _ = fill_actuals_from_history(entry)
+        self.assertEqual(filled, 1)
+        self.assertEqual(draft["own_lineup"][0]["actual"], 8)
+
+    def test_unchanged_selected_historical_alias_keeps_projection_and_name(self):
+        self.seed()
+        entry = {"week": 7, "opponent": "Opponent", "own_lineup": [{"slot": "WR1", "name": "Receiver",
+                  "position": "WR", "team": "KC", "projection": 11, "state": "locked"}]}
+        save_matchups([entry])
+        response = self.client().post("/matchup/save", data={"week": "7", "opponent": "Opponent", "status": "live",
+            "own_WR1_player_id": "wr", "own_WR1_name": "Receiver", "own_WR1_position": "WR",
+            "own_WR1_team": "KC", "own_WR1_projection": "11", "own_WR1_state": "locked"})
+        self.assertEqual(response.status_code, 302)
+        row = load_matchup(7)["own_lineup"][0]
+        self.assertEqual(row["name"], "Receiver")
+        self.assertEqual(row["projection"], 11)
+
+    def test_same_player_id_cannot_occupy_two_slots_even_with_different_aliases(self):
+        entry = {"week": 7, "opponent": "Opponent", "own_lineup": [
+            {"slot": "WR1", "name": "Receiver", "position": "WR", "team": "KC", "player_id": "wr"},
+            {"slot": "FLEX", "name": "Receiver Jr.", "position": "WR", "team": "KC", "player_id": "wr"}]}
+        with self.assertRaisesRegex(ValueError, "unique valid identity"):
+            save_matchups([entry])
+
+    def test_unchanged_final_legacy_record_does_not_require_correction_for_id_upgrade(self):
+        self.seed()
+        entry = record(7)
+        entry["own_lineup"][0]["name"] = "Quarter Back"
+        save_matchups([entry])
+        original = load_matchup(7)
+        form = {"week": "7", "opponent": "Opponent", "status": "final",
+                "own_actual": 8, "opponent_actual": 9, "own_projection": 10, "opponent_projection": 11}
+        for side in ("own", "opponent"):
+            for row in entry[side + "_lineup"]:
+                prefix = side + "_" + row["slot"] + "_"
+                form[prefix + "player_id"] = "qb" if side == "own" and row["slot"] == "QB" else "saved"
+                for key in ("name", "position", "team", "projection", "actual", "state"):
+                    form[prefix + key] = row[key]
+        response = self.client().post("/matchup/save", data=form)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(load_matchup(7), original)

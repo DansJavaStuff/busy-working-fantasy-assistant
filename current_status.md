@@ -248,6 +248,12 @@ python -m unittest discover -s tests -v
 - A separate private JSON download transcribes the supplied screenshots: Weeks
   1–6 final, Week 7 planned. Import it once through Settings after deployment.
   It is intentionally outside Git. Re-importing identical records is safe.
+- Matchup starters now use searchable native dropdowns filtered by eligible
+  position (FLEX RB/WR/TE), sourced from season DB history up to the selected week.
+  Selection fills canonical name/position/NFL team and stores player ID. Current
+  fantasy ownership does not hide historical players. Existing unmatched starters
+  remain selectable as saved records. Server validates IDs/slot eligibility even
+  without JavaScript; changing selection clears obsolete row scores/projections.
 - Matchup editor now offers "Fill scores from imported actuals": confirm the
   starters, preview same-week/same-season DB actuals for both sides, review and save.
   Exact/suffix/defence matching checks position and entered NFL team; ambiguous or
@@ -259,7 +265,7 @@ python -m unittest discover -s tests -v
   validation checks final totals against all nine player scores on each side.
 - Retrospective Yahoo projections are not timestamped pre-game assistant
   predictions. Do not use them to claim validated recommendation performance.
-- Validation: all 168 tests pass, including DB actual-score lookup, guarded corrections, atomic imports,
+- Validation: all 177 tests pass, including DB actual-score lookup, guarded corrections, atomic imports,
   form error recovery, escaping, negative scores and preserving unknown scores.
   Flask pages render successfully; browser visual QA remains pending.
 - Deployment: pull main and restart busy-working, then import the private file.

@@ -4,6 +4,7 @@
 {% block header %}
 <header class="topbar"><div><h1>{{ data.team.team_name }} · Matchup</h1><span>2026 season</span></div>{% include '_app_nav.html' %}</header>
 {% endblock %}
+{% block head_extra %}<script defer src="{{ url_for('static', filename='matchup_players.js') }}"></script>{% endblock %}
 {% block content %}
 <section class="weekly-section">
     <form method="get" class="history-controls">
@@ -46,7 +47,7 @@
     <div role="status"><p><strong>Filled {{ score_preview.filled }} starter scores from the Week {{ match.week }} database actuals.</strong> Review the scores below, then save. Nothing has been saved yet.</p>
     {% if score_preview.issues %}<p>Unresolved scores are blank; import missing actuals or enter them manually. Totals appear only when all nine starter scores are known.</p><ul>{% for issue in score_preview.issues %}<li>{{ issue }}</li>{% endfor %}</ul>{% endif %}</div>
     {% endif %}
-    <p>Enter the actual starting lineups shown on Yahoo. Leave unknown scores blank; a zero means an actual zero. Final matchups require all nine starters and matching team totals. Saved historical entries are not changed by Player List imports.</p>
+    <p>Search and select the actual starters shown on Yahoo. Each slot lists eligible imported players from this season up to the selected week, including players who have since moved fantasy teams. Name, position and NFL team fill automatically. {% if not player_choices %}<strong>No player choices are available yet: import player data for this season/week first.</strong>{% endif %} Leave unknown scores blank; a zero means an actual zero. Final matchups require all nine starters and matching team totals. Saved historical entries are not changed by Player List imports.</p>
     <form method="post" action="{{ url_for('matchups.save') }}">
         <input type="hidden" name="week" value="{{ match.week }}">
         <div class="matchup-scoreboard">
@@ -64,8 +65,20 @@
             <thead><tr><th>Slot</th><th>Player / NFL team</th><th>Position</th><th>Original projection</th><th>Actual score</th><th>Recorded state</th></tr></thead>
             <tbody>{% for row in edit_rows %}{% set p = row[side] %}{% set prefix = side ~ '_' ~ row.slot ~ '_' %}<tr>
                 <th scope="row">{{ row.slot }}</th>
-                <td><input aria-label="{{ label }} {{ row.slot }} player" name="{{ prefix }}name" value="{{ p.name or '' }}" maxlength="100"><input aria-label="{{ label }} {{ row.slot }} NFL team" name="{{ prefix }}team" value="{{ p.team or '' }}" placeholder="NFL team, e.g. GB" maxlength="10"></td>
-                <td><select aria-label="{{ label }} {{ row.slot }} position" name="{{ prefix }}position">{% for pos in (['RB','WR','TE'] if row.slot == 'FLEX' else [row.slot|replace('1','')|replace('2','')]) %}<option {% if p.position == pos %}selected{% endif %}>{{ pos }}</option>{% endfor %}</select></td>
+                <td data-player-picker>
+                    <input type="search" data-player-search aria-label="Search {{ label }} {{ row.slot }} players" placeholder="Search player or NFL team" autocomplete="off">
+                    <select data-player-select aria-label="{{ label }} {{ row.slot }} player" name="{{ prefix }}player_id">
+                        <option value="">Choose player…</option>
+                        {% if p.choice == 'saved' %}<option value="saved" selected>Saved starter: {{ p.name }} · {{ p.position }} · {{ p.team }}</option>{% endif %}
+                        {% for player in player_choices %}{% if player.position in (['RB','WR','TE'] if row.slot == 'FLEX' else [row.slot|replace('1','')|replace('2','')]) %}
+                        <option value="{{ player.player_id }}" data-name="{{ player.name }}" data-team="{{ player.team }}" data-position="{{ player.position }}" {% if p.choice == player.player_id %}selected{% endif %}>{{ player.name }} · {{ player.position }} · {{ player.team }}</option>
+                        {% endif %}{% endfor %}
+                    </select>
+                    <input type="hidden" data-player-field="name" name="{{ prefix }}name" value="{{ p.name or '' }}">
+                    <input type="hidden" data-player-field="team" name="{{ prefix }}team" value="{{ p.team or '' }}">
+                    <small data-player-team>{{ p.team or '' }}</small>
+                </td>
+                <td><span data-player-position>{{ p.position or '—' }}</span><input type="hidden" data-player-field="position" name="{{ prefix }}position" value="{{ p.position or '' }}"></td>
                 {% for field in ['projection','actual'] %}<td><input aria-label="{{ label }} {{ row.slot }} {{ field }}" type="number" step="0.01" name="{{ prefix }}{{ field }}" value="{{ p[field] if p[field] is defined and p[field] is not none else '' }}"></td>{% endfor %}
                 <td><select aria-label="{{ label }} {{ row.slot }} game state" name="{{ prefix }}state">{% for state in ['not_started','locked','final'] %}<option value="{{ state }}" {% if p.state == state %}selected{% endif %}>{{ state|replace('_',' ') }}</option>{% endfor %}</select></td>
             </tr>{% endfor %}</tbody>

@@ -1967,3 +1967,7 @@ footer {
 .matchup-editor td:nth-child(2) input + input { margin-top: 6px; }
 .matchup-scoreboard input, .matchup-editor input, .matchup-editor select,
 #season-schedule input { padding: 8px; border: 1px solid #cbd2db; border-radius: 5px; }
+
+.matchup-editor [data-player-select] { width: 100%; margin-top: 6px; }
+.matchup-editor [data-player-picker] { min-width: 260px; }
+.matchup-editor [data-player-team] { display: block; margin-top: 4px; }
