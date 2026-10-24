@@ -1,9 +1,10 @@
 """Manually confirmed fantasy matchups, independent of current ownership imports."""
+import copy
 import json
 import math
 
 import database
-from player_database import normalise_name
+from player_database import fantasypros_team_key, normalise_name, normalise_name_without_suffix
 from yahoo_provider import NORMALIZED_FILE, is_directly_acquirable
 
 SLOTS = ("QB", "RB1", "RB2", "WR1", "WR2", "TE", "FLEX", "K", "DST")
@@ -156,3 +157,41 @@ def matchup_summary(match):
         result = "Won" if own > other else "Lost" if own < other else "Tied"
     return {**match, "result": result,
             "margin": round(own - other, 2) if own is not None and other is not None else None}
+
+
+def fill_actuals_from_history(record, season=2026):
+    """Preview imported actuals for the selected starters; never save or finalise."""
+    draft = copy.deepcopy(record)
+    # Validate identities without requiring final totals before we have filled them.
+    check = {**draft, "status": "planned"}
+    draft = {**validate_matchup(check), "status": record.get("status", "planned")}
+    history = database.load_player_week_history(draft["week"], season)
+    issues = []
+    filled = 0
+    for side in ("own", "opponent"):
+        for row in draft[side + "_lineup"]:
+            position = row["position"]
+            team = fantasypros_team_key(row["team"])
+            candidates = [p for p in history
+                          if ("DST" if p["position"] in {"DEF", "D/ST"} else p["position"]) == position
+                          and (not team or fantasypros_team_key(p["team"]) == team)]
+            exact = [p for p in candidates if normalise_name(p["player_name"]) == normalise_name(row["name"])]
+            if exact:
+                candidates = exact
+            elif position != "DST":
+                candidates = [p for p in candidates if normalise_name_without_suffix(p["player_name"])
+                              == normalise_name_without_suffix(row["name"])]
+            elif not team:
+                candidates = []
+            # No guessing across duplicate identities, and projections never count as actuals.
+            row["actual"] = None
+            if len(candidates) == 1 and candidates[0]["actual"] is not None:
+                row["actual"] = points(candidates[0]["actual"])
+                filled += 1
+            else:
+                reason = "ambiguous player match" if len(candidates) > 1 else "no imported actual score"
+                issues.append(f"{'Your' if side == 'own' else 'Opponent'} {row['slot']} · {row['name']}: {reason}.")
+        rows = draft[side + "_lineup"]
+        draft[side + "_actual"] = (round(sum(r["actual"] for r in rows), 2)
+                                   if len(rows) == 9 and all(r["actual"] is not None for r in rows) else None)
+    return draft, filled, issues
