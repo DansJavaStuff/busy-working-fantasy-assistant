@@ -13,15 +13,23 @@ recommended lineup or submit anything to Yahoo.
 ## Fill scores after confirming starters
 
 1. Import the relevant week's actual points through the normal Yahoo refresh.
-2. Open that week's matchup and expand the editor. Confirm the starters on both
-   sides, their positions and NFL teams against Yahoo.
+2. Open that week's matchup and expand the editor. Search by player name or NFL
+   team, then select the starters on both sides. Choices are filtered by slot;
+   FLEX allows RB/WR/TE. Name, position and NFL team fill automatically.
 3. Choose **Fill scores from imported actuals**. The app previews actual points
    from `season_player_week` for that exact season and week. It does not save yet.
 4. Review the scores and totals, then save. Choose Final only after all games have
    finished and the result agrees with Yahoo; Monday's totals may still be live.
 
-Exact names are preferred, with suffix-tolerant offensive matching and team-code
-matching for defence aliases. Position and entered NFL team must agree; ambiguous
+Selectors use this season's imported player identities up to the selected week,
+regardless of current fantasy ownership. Saved starters absent from that list can
+be retained as saved entries. Import player data first if the list is empty.
+Changing a player clears the draft row's old projection, score and game state,
+and clears team actual totals; use the fill action to recalculate them.
+
+Selected players retain their database IDs for actual-score lookup. Older entries
+without IDs use exact names first, with suffix-tolerant offensive matching and
+team-code matching for defence aliases. Position and entered NFL team must agree; ambiguous
 identities are not guessed. A missing actual stays blank even when a projection
 exists. Real zero and negative scores are retained. Each side's total is calculated
 only when all nine starters have known actuals; incomplete totals remain blank.

@@ -46,7 +46,7 @@ def validate_matchup(raw):
         rows = raw.get(side + "_lineup", [])
         if not isinstance(rows, list) or len(rows) > 9:
             raise ValueError("Each side supports nine starting slots.")
-        clean, seen_slots, seen_names = [], set(), set()
+        clean, seen_slots, seen_names, seen_ids = [], set(), set(), set()
         for row in rows:
             if not isinstance(row, dict):
                 raise ValueError("Invalid lineup row.")
@@ -68,6 +68,12 @@ def validate_matchup(raw):
                           "team": str(row.get("team") or "").strip()[:10],
                           "projection": points(row.get("projection")),
                           "actual": points(row.get("actual")), "state": state})
+            if row.get("player_id"):
+                player_id = str(row["player_id"])
+                if len(player_id) > 100 or player_id in seen_ids:
+                    raise ValueError("A player must have a unique valid identity on each side.")
+                clean[-1]["player_id"] = player_id
+                seen_ids.add(player_id)
             seen_slots.add(slot)
             seen_names.add(name_key)
         result[side + "_lineup"] = sorted(clean, key=lambda r: SLOTS.index(r["slot"]))
@@ -120,6 +126,7 @@ def save_matchups(records, season=2026, correct_confirmed=False):
                         new = incoming.get(row["slot"], {})
                         if row["state"] in {"locked", "final"} and (
                             any(row[k] != new.get(k) for k in ("name", "position", "team", "projection"))
+                            or (row.get("player_id") and row["player_id"] != new.get("player_id"))
                             or STATES.index(new.get("state", "not_started")) < STATES.index(row["state"])
                         ):
                             raise ValueError("A recorded locked starter changed. Enable explicit corrections.")
@@ -175,14 +182,17 @@ def fill_actuals_from_history(record, season=2026):
             candidates = [p for p in history
                           if ("DST" if p["position"] in {"DEF", "D/ST"} else p["position"]) == position
                           and (not team or fantasypros_team_key(p["team"]) == team)]
+            if row.get("player_id"):
+                candidates = [p for p in candidates if str(p["player_id"]) == row["player_id"]]
             exact = [p for p in candidates if normalise_name(p["player_name"]) == normalise_name(row["name"])]
-            if exact:
-                candidates = exact
-            elif position != "DST":
-                candidates = [p for p in candidates if normalise_name_without_suffix(p["player_name"])
-                              == normalise_name_without_suffix(row["name"])]
-            elif not team:
-                candidates = []
+            if not row.get("player_id"):
+                if exact:
+                    candidates = exact
+                elif position != "DST":
+                    candidates = [p for p in candidates if normalise_name_without_suffix(p["player_name"])
+                                  == normalise_name_without_suffix(row["name"])]
+                elif not team:
+                    candidates = []
             # No guessing across duplicate identities, and projections never count as actuals.
             row["actual"] = None
             if len(candidates) == 1 and candidates[0]["actual"] is not None:
@@ -195,3 +205,42 @@ def fill_actuals_from_history(record, season=2026):
         draft[side + "_actual"] = (round(sum(r["actual"] for r in rows), 2)
                                    if len(rows) == 9 and all(r["actual"] is not None for r in rows) else None)
     return draft, filled, issues
+
+
+def matchup_player_choices(week, season=2026):
+    """Use this season's imported identities as known at the requested week."""
+    database.initialise_database()
+    with database.connect() as db:
+        season_id = database.get_or_create_season(db, season)
+        rows = db.execute("""SELECT player_id, player_name, position, team, week
+            FROM season_player_week WHERE season_id=? AND week<=?
+            ORDER BY week DESC, player_id""", (season_id, week)).fetchall()
+    choices = {}
+    for row in rows:
+        player_id = str(row["player_id"])
+        if player_id in choices:
+            continue
+        position = "DST" if row["position"] in {"DEF", "D/ST"} else row["position"]
+        if position not in {"QB", "RB", "WR", "TE", "K", "DST"}:
+            continue
+        choices[player_id] = {"player_id": player_id, "name": row["player_name"],
+                              "position": position, "team": row["team"] or ""}
+    return sorted(choices.values(), key=lambda p: (p["name"].casefold(), p["team"], p["player_id"]))
+
+
+def selected_player_choice(row, choices):
+    if not row.get("name"):
+        return ""
+    candidates = [p for p in choices if p["position"] == row["position"]
+                  and fantasypros_team_key(p["team"]) == fantasypros_team_key(row.get("team"))]
+    if row.get("player_id"):
+        candidates = [p for p in candidates if p["player_id"] == row["player_id"]]
+    else:
+        exact = [p for p in candidates if normalise_name(p["name"]) == normalise_name(row["name"])]
+        candidates = exact or [p for p in candidates
+                               if normalise_name_without_suffix(p["name"])
+                               == normalise_name_without_suffix(row["name"])]
+        if not candidates and row["position"] == "DST" and row.get("team"):
+            candidates = [p for p in choices if p["position"] == "DST"
+                          and fantasypros_team_key(p["team"]) == fantasypros_team_key(row["team"])]
+    return candidates[0]["player_id"] if len(candidates) == 1 else "saved"

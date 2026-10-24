@@ -4,7 +4,8 @@ from flask import Blueprint, redirect, render_template, request, url_for
 
 from database import load_team_identity
 from fantasy_calendar import current_fantasy_week
-from matchups import fill_actuals_from_history, SLOTS, load_matchup, matchup_summary, opponent_names, save_matchups
+from matchups import (SLOTS, fill_actuals_from_history, load_matchup, matchup_player_choices,
+                      matchup_summary, opponent_names, save_matchups, selected_player_choice)
 
 blueprint = Blueprint("matchups", __name__)
 SEASON = 2026
@@ -25,6 +26,10 @@ def render_page(week, edit_record=None, error=None, score_preview=None):
         "own_actual": None, "opponent_actual": None,
     }
     edit = edit_record or match
+    choices = matchup_player_choices(week, SEASON)
+    edit = {**edit, **{side + "_lineup": [
+        {**r, "choice": selected_player_choice(r, choices)} for r in edit.get(side + "_lineup", [])]
+        for side in ("own", "opponent")}}
     def rows_for(record):
         return [{"slot": slot, **{side: next((r for r in record.get(side + "_lineup", [])
                                              if r["slot"] == slot), {})
@@ -32,7 +37,7 @@ def render_page(week, edit_record=None, error=None, score_preview=None):
     return render_template("matchup.html", match=matchup_summary(match), edit=edit,
                            rows=rows_for(match), edit_rows=rows_for(edit),
                            names=opponent_names(SEASON), data={"team": load_team_identity(SEASON)},
-                           error=error, score_preview=score_preview, saved=request.args.get("saved"))
+                           player_choices=choices, error=error, score_preview=score_preview, saved=request.args.get("saved"))
 
 
 @blueprint.get("/matchup")
@@ -52,6 +57,7 @@ def save():
         record = {"week": week, "opponent": request.form.get("opponent"),
                   "status": request.form.get("status"),
                   "source": old["source"] if old else "manual_entry"}
+        choices = {p["player_id"]: p for p in matchup_player_choices(week, SEASON)}
         for side in ("own", "opponent"):
             for field in ("projection", "actual"):
                 record[side + "_" + field] = request.form.get(side + "_" + field)
@@ -60,6 +66,36 @@ def save():
                 prefix = side + "_" + slot + "_"
                 row = {key: request.form.get(prefix + key, "")
                        for key in ("name", "position", "team", "projection", "actual", "state")}
+                selection = request.form.get(prefix + "player_id")
+                if selection == "":
+                    record[side + "_actual"] = None
+                    continue
+                if selection == "saved":
+                    previous = next((r for r in (old or {}).get(side + "_lineup", [])
+                                     if r["slot"] == slot), None)
+                    if previous is None:
+                        raise ValueError("Choose an imported player for this starting slot.")
+                    row.update({k: previous[k] for k in ("name", "position", "team")})
+                    if previous.get("player_id"):
+                        row["player_id"] = previous["player_id"]
+                elif selection is not None:
+                    player = choices.get(selection)
+                    allowed = {"RB", "WR", "TE"} if slot == "FLEX" else {slot.rstrip("12")}
+                    if not player or player["position"] not in allowed:
+                        raise ValueError("Choose an eligible player from the imported list.")
+                    previous = next((r for r in (old or {}).get(side + "_lineup", [])
+                                     if r["slot"] == slot), None)
+                    if (previous and row["name"] == previous["name"]
+                            and selected_player_choice(previous, list(choices.values())) == selection):
+                        player = {**player, **{k: previous[k] for k in ("name", "position", "team")}}
+                    if row["name"] != player["name"]:
+                        row.update(projection="", actual="", state="not_started")
+                        record[side + "_actual"] = None
+                    row.update(player)
+                    if (previous and (old or {}).get("status") == "final"
+                            and not previous.get("player_id")
+                            and all(row[k] == previous[k] for k in ("name", "position", "team"))):
+                        row.pop("player_id", None)
                 if not row["name"].strip():
                     if row["projection"].strip() or row["actual"].strip():
                         raise ValueError("Enter a player name for each score you record.")
