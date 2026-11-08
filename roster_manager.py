@@ -1,5 +1,5 @@
 from database import connect, get_or_create_season
-from league_config import FLEX_ELIGIBLE
+from league_config import BUSY_WORKING_ROSTER, FLEX_ELIGIBLE
 
 
 STARTER_SLOTS = {
@@ -411,3 +411,46 @@ def move_roster_player(
             db,
             season_id,
         )
+
+
+def record_ir_change(player_id, direction, season=2026):
+    """Record a move already accepted on Yahoo, including a full-bench IR swap.
+
+    Injury feeds can lag behind Yahoo. This recording operation therefore relies
+    on the user's confirmed Yahoo move, rather than rechecking injury status or
+    game locks. It changes current slots only, never membership or saved history.
+    """
+    if direction not in {"to_ir", "to_bench"}:
+        raise ValueError("Choose a valid IR move.")
+    with connect() as db:
+        season_id = get_or_create_season(db, season)
+        rows = db.execute("SELECT * FROM season_roster WHERE season_id=?", (season_id,)).fetchall()
+        source = next((r for r in rows if r["player_id"] == str(player_id)), None)
+        if source is None:
+            raise ValueError("Player is not on the roster.")
+        ir_players = [r for r in rows if r["roster_slot"] == "IR"]
+        if len(ir_players) > BUSY_WORKING_ROSTER["IR"]:
+            raise ValueError("The recorded roster has too many IR players; reconcile it first.")
+        if direction == "to_ir":
+            if source["roster_slot"] != "BN":
+                raise ValueError("Choose a bench player to move into IR.")
+            if ir_players:
+                outgoing = ir_players[0]
+                db.execute("""UPDATE season_roster SET roster_slot='__SWAP__', slot_index=0
+                    WHERE season_id=? AND player_id=?""", (season_id, source["player_id"]))
+                db.execute("""UPDATE season_roster SET roster_slot='BN', slot_index=?,
+                    updated_at=CURRENT_TIMESTAMP WHERE season_id=? AND player_id=?""",
+                           (source["slot_index"], season_id, outgoing["player_id"]))
+            slot, index = "IR", 1
+        else:
+            if source["roster_slot"] != "IR":
+                raise ValueError("Choose the IR player to move to the bench.")
+            active_count = sum(r["roster_slot"] != "IR" for r in rows)
+            active_limit = sum(n for slot, n in BUSY_WORKING_ROSTER.items() if slot != "IR")
+            if active_count >= active_limit:
+                raise ValueError("The active roster is full. Record an IR swap using a bench player instead.")
+            slot, index = "BN", next_bench_index(db, season_id)
+        db.execute("""UPDATE season_roster SET roster_slot=?, slot_index=?,
+            updated_at=CURRENT_TIMESTAMP WHERE season_id=? AND player_id=?""",
+                   (slot, index, season_id, source["player_id"]))
+        normalise_bench(db, season_id)

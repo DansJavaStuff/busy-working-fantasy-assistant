@@ -1,6 +1,6 @@
 # Busy Working NFL — current handover
 
-Last updated: 24 October 2026 (Europe/London).
+Last updated: 8 November 2026 (Europe/London).
 
 ## Read this first in a new chat
 
@@ -271,6 +271,22 @@ python -m unittest discover -s tests -v
 - Deployment: pull main and restart busy-working, then import the private file.
   Daniel has not yet confirmed this feature on the Pi. See docs/MATCHUPS.md.
 - Yahoo API access is still pending; Daniel reported contacting Yahoo on Reddit.
+
+## Recording Yahoo IR moves — 8 November 2026
+
+- My Team now has explicit recording controls in Injured Reserve. Select a bench
+  player and use "Record Yahoo IR move" to move them into IR; an existing IR
+  occupant takes the vacated bench place atomically, including with a full bench.
+- An expandable action activates the IR player into an empty active-roster place;
+  it rejects activation when the active roster is full and directs users to swap.
+- This records moves already accepted on Yahoo. Imported injury tags may lag, so
+  recording does not reapply injury eligibility or current-week score locks.
+  Current membership/acquisition dates and saved historical records are preserved.
+  The normal lineup-move route retains its existing protections.
+- Validation: all 182 tests pass, including full-bench swaps, activation capacity,
+  empty IR, invalid inputs, season isolation, history preservation and page/routes.
+- Deploy by pulling main and restarting busy-working, then record the IR swap
+  through My Team. The user's Pi database has not been changed by this session.
 
 ## Unfinished work and next development decision
 

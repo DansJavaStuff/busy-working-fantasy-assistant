@@ -462,7 +462,33 @@ Manual snapshot
 
 
     <section class="team-section">
-        <h2>Injured Reserve</h2>
+        <h2 id="injured-reserve">Injured Reserve</h2>
+        <p class="roster-help">Record an IR move you have already completed on Yahoo.
+            This updates the assistant only. Injury status imports may lag behind Yahoo.</p>
+        <form method="post" action="{{ url_for('record_my_team_ir_change') }}">
+            <input type="hidden" name="direction" value="to_ir">
+            <label for="ir-incoming"><strong>Bench player moving into IR</strong></label>
+            <select id="ir-incoming" name="player_id" required>
+                <option value="">Choose bench player…</option>
+                {% for player in data.roster if player.roster_slot == 'BN' %}
+                <option value="{{ player.player_id }}">{{ player.player_name }} · {{ player.position }} · {{ player.status or 'No injury tag' }}</option>
+                {% endfor %}
+            </select>
+            {% if data.ir_players %}
+            <p>{{ data.ir_players[0].player_name }} will move from IR into the selected player's bench place. Nobody is added or dropped.</p>
+            {% else %}<p>The selected player will move from the bench into the empty IR place.</p>{% endif %}
+            <button type="submit">Record Yahoo IR move</button>
+        </form>
+        {% if data.ir_players %}
+        <details><summary>Move IR player to an empty bench place</summary>
+            <p>Use this if Yahoo activated the player without swapping another player into IR. There must be room on the active roster.</p>
+            <form method="post" action="{{ url_for('record_my_team_ir_change') }}">
+                <input type="hidden" name="direction" value="to_bench">
+                <input type="hidden" name="player_id" value="{{ data.ir_players[0].player_id }}">
+                <button type="submit">Record {{ data.ir_players[0].player_name }} to bench</button>
+            </form>
+        </details>
+        {% endif %}
 
         <table class="team-table">
             <thead>

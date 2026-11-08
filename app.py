@@ -61,6 +61,7 @@ from refresh_data import (
 )
 from roster_display import build_roster_slots
 from roster_manager import (
+    record_ir_change,
     move_roster_player,
     replace_roster_player,
 )
@@ -1303,6 +1304,16 @@ def move_my_team_player():
             moved="1",
         )
     )
+
+
+@app.post("/my-team/ir")
+def record_my_team_ir_change():
+    try:
+        record_ir_change(request.form.get("player_id", ""),
+                         request.form.get("direction", ""), season=2026)
+    except ValueError as exc:
+        return redirect(url_for("my_team", move_error=str(exc), _anchor="injured-reserve"))
+    return redirect(url_for("my_team", moved="1", _anchor="injured-reserve"))
 
 
 @app.post("/my-team/transaction")
