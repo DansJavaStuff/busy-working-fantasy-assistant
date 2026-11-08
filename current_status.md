@@ -283,6 +283,8 @@ python -m unittest discover -s tests -v
   recording does not reapply injury eligibility or current-week score locks.
   Current membership/acquisition dates and saved historical records are preserved.
   The normal lineup-move route retains its existing protections.
+- Security scan also required oauthlib 4.0.1 (fix for CVE-2026-49272); install
+  requirements when deploying this update.
 - Validation: all 182 tests pass, including full-bench swaps, activation capacity,
   empty IR, invalid inputs, season isolation, history preservation and page/routes.
 - Deploy by pulling main and restarting busy-working, then record the IR swap
