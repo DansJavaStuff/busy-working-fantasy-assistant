@@ -1,6 +1,6 @@
 # Busy Working NFL — current handover
 
-Last updated: 8 November 2026 (Europe/London).
+Last updated: 11 November 2026 (Europe/London).
 
 ## Read this first in a new chat
 
@@ -289,6 +289,23 @@ python -m unittest discover -s tests -v
   empty IR, invalid inputs, season isolation, history preservation and page/routes.
 - Deploy by pulling main and restarting busy-working, then record the IR swap
   through My Team. The user's Pi database has not been changed by this session.
+
+## Recording drop-only transactions — 11 November 2026
+
+- My Team's existing transaction form now includes "Record drop only". Choose
+  the released player under Drop and leave Add blank. The normal Add/Drop action
+  continues requiring both players; a drop-only request with Add filled is rejected
+  to avoid recording the wrong action. The separate button bypasses only the
+  browser's Add requirement; the server still validates the selected drop.
+- This records a release already completed on Yahoo, removes only the current
+  roster row and renumbers bench slots. Historical rosters and player/week scores
+  remain unchanged. Current roster drops do not submit anything to Yahoo.
+- For a release followed by IR activation: record the drop, then use Injured
+  Reserve's expandable "Move IR player to an empty bench place" action. Refresh
+  recommendations only once the app's roster matches Yahoo.
+- Validation: all 188 tests pass, including drop-only route/form behaviour,
+  repeated/invalid/season-isolated drops, saved-history preservation and the
+  drop-then-IR-activation workflow. No database schema change or new dependency.
 
 ## Unfinished work and next development decision
 
