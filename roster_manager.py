@@ -235,6 +235,19 @@ def replace_roster_player(
         )
 
 
+def drop_roster_player(player_id, season=2026):
+    """Record a Yahoo drop without adding anyone; leave historical records intact."""
+    with connect() as db:
+        season_id = get_or_create_season(db, season)
+        dropped = db.execute("SELECT player_id FROM season_roster WHERE season_id=? AND player_id=?",
+                             (season_id, str(player_id))).fetchone()
+        if dropped is None:
+            raise ValueError("Dropped player is not on the roster.")
+        db.execute("DELETE FROM season_roster WHERE season_id=? AND player_id=?",
+                   (season_id, dropped["player_id"]))
+        normalise_bench(db, season_id)
+
+
 def move_roster_player(
     player_id,
     target_slot,

@@ -61,6 +61,7 @@ from refresh_data import (
 )
 from roster_display import build_roster_slots
 from roster_manager import (
+    drop_roster_player,
     record_ir_change,
     move_roster_player,
     replace_roster_player,
@@ -1327,6 +1328,17 @@ def record_roster_transaction():
         "add_yahoo_player_id",
         "",
     ).strip()
+
+    if request.form.get("action") == "drop_only":
+        try:
+            if not drop_player_id:
+                raise ValueError("Choose a player to drop.")
+            if yahoo_player_id:
+                raise ValueError("Clear the Add selection to record a drop without a replacement.")
+            drop_roster_player(drop_player_id, season=2026)
+        except ValueError as exc:
+            return redirect(url_for("my_team", transaction_error=str(exc)))
+        return redirect(url_for("my_team", transaction="1"))
 
     if not drop_player_id or not yahoo_player_id:
         return redirect(
