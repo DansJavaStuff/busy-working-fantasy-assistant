@@ -467,3 +467,26 @@ def record_ir_change(player_id, direction, season=2026):
             updated_at=CURRENT_TIMESTAMP WHERE season_id=? AND player_id=?""",
                    (slot, index, season_id, source["player_id"]))
         normalise_bench(db, season_id)
+
+
+def add_roster_player(add_player, season=2026):
+    """Record an addition already made on Yahoo into an unused active-roster place."""
+    if any(not add_player.get(k) for k in ("player_id", "player_name", "position")):
+        raise ValueError("Incoming player is missing an identity or position.")
+    if add_player["position"] not in {"QB", "RB", "WR", "TE", "K", "DST"}:
+        raise ValueError("Invalid incoming player position.")
+    with connect() as db:
+        season_id = get_or_create_season(db, season)
+        rows = db.execute("SELECT * FROM season_roster WHERE season_id=?", (season_id,)).fetchall()
+        if any(r["player_id"] == str(add_player["player_id"]) or
+               r["player_name"].casefold() == add_player["player_name"].casefold() for r in rows):
+            raise ValueError("Incoming player is already on the roster.")
+        active_limit = sum(n for slot, n in BUSY_WORKING_ROSTER.items() if slot != "IR")
+        if sum(r["roster_slot"] != "IR" for r in rows) >= active_limit:
+            raise ValueError("The active roster is full. Record an add/drop instead.")
+        db.execute("""INSERT INTO season_roster
+            (season_id,roster_slot,slot_index,player_id,player_name,position,team,bye_week,status,source)
+            VALUES (?,'BN',?,?,?,?,?,?,?,?)""", (season_id, next_bench_index(db, season_id),
+            str(add_player["player_id"]), add_player["player_name"], add_player["position"],
+            add_player.get("team"), add_player.get("bye_week"), add_player.get("status"), "manual_transaction"))
+        normalise_bench(db, season_id)

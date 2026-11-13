@@ -360,6 +360,8 @@ def compare_players(players, week, season=SEASON):
 def stream_move_evidence(move, results):
     """Compare both sides of a stream without changing Yahoo's move score."""
     def lookup(player):
+        if player is None:
+            return {}
         return next((r for r in results if r.get("position") == player.get("position")
                      and normalise_name(r.get("name")) == normalise_name(player.get("name"))
                      and r.get("team") == player.get("team")), {})
@@ -377,7 +379,7 @@ def attach_stream_evidence(moves, week, sleeper_fetch=compare_players):
     streams = [move for move in moves if move.get("streaming")]
     if not streams:
         return moves
-    players = [player for move in streams for player in (move["add"], move["drop"])]
+    players = [player for move in streams for player in (move["add"], move["drop"]) if player is not None]
     try:
         results = sleeper_fetch(players, week=week)
     except Exception:

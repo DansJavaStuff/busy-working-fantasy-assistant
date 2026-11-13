@@ -345,7 +345,7 @@ def _qb_bye_adjustment(
 def is_actionable_waiver(item):
     """Only definite moves belong in the normal claim instructions."""
     return bool(
-        item.get("best_drop")
+        (item.get("best_drop") or (item.get("move") or {}).get("add_only"))
         and item.get("move_label") in {"STRONG MOVE", "CONSIDER", "BYE FIX"}
         and not item.get("speculative")
     )
@@ -421,12 +421,14 @@ def build_available_rankings(
         int(week),
         tuple(
             sorted(
-                str(
+                (str(
                     player.get(
                         "yahoo_player_id",
                         player.get("name", ""),
                     )
-                )
+                ),
+                 player.get("roster_slot") or "", player.get("status") or "",
+                 player.get("current_week_projection"), player.get("next_4_weeks_projection"))
                 for player in roster
             )
         ),
@@ -473,7 +475,7 @@ def build_available_rankings(
         {
             **move,
             "add": enrich_player_game_time(move["add"], season, week),
-            "drop": enrich_player_game_time(move["drop"], season, week),
+            "drop": enrich_player_game_time(move["drop"], season, week) if move.get("drop") else None,
         }
         for move in moves
     ]
@@ -888,6 +890,7 @@ def build_available_rankings(
         if (
             bye_fix
             and best_drop is None
+            and not (move or {}).get("add_only")
         ):
             best_drop = qb_context.get(
                 "bye_conflict_drop"
@@ -977,9 +980,7 @@ def build_available_rankings(
     if waiver_candidates:
         first = waiver_candidates[0]
 
-        focus_drop = first[
-            "best_drop"
-        ]
+        focus_drop = first["best_drop"] or {}
 
         focus_key = (
             str(
@@ -1009,9 +1010,7 @@ def build_available_rankings(
         }
 
         for item in waiver_candidates:
-            drop = item[
-                "best_drop"
-            ]
+            drop = item["best_drop"] or {}
 
             item_key = (
                 str(
@@ -1041,8 +1040,7 @@ def build_available_rankings(
                         item["rank"],
                     "add":
                         item["player"],
-                    "drop":
-                        drop,
+                    "drop": drop or None,
                     "call":
                         item[
                             "move_label"

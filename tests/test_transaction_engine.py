@@ -129,6 +129,9 @@ def base_roster():
             four_week_projection=32.0,
             roster_slot="DST",
         ),
+        player("depth1", "Depth RB", "RB", week_projection=0, four_week_projection=0),
+        player("depth2", "Depth WR", "WR", week_projection=0, four_week_projection=0),
+        player("depth3", "Depth TE", "TE", week_projection=0, four_week_projection=0),
     ]
 
 

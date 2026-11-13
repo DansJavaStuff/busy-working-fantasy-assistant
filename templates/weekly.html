@@ -1003,7 +1003,7 @@ Manual snapshot
         Recommended Moves
     </h2>
     <p class="weekly-card-detail mobile-detail">
-        HOLD means keep your current player; WATCH means monitor the option.
+        HOLD means no immediate move; WATCH means monitor the option.
         DEF/K streams are ranked on this week’s lineup gain only; future projections
         and byes are context. Lineup gains are projected points; bench depth and bye impact are
         separate values used to assess the move.
@@ -1039,13 +1039,9 @@ Manual snapshot
                 </div>
 
                 <div class="transaction-drop">
-                    <span>DROP</span>
-                    <strong>
-                        {{ move.drop.name }}
-                    </strong>
-                    <small>
-                        {{ move.drop.position }}
-                    </small>
+                    <span>{{ 'DROP' if move.drop else 'OPEN ROSTER PLACE' }}</span>
+                    <strong>{{ move.drop.name if move.drop else 'No drop needed' }}</strong>
+                    {% if move.drop %}<small>{{ move.drop.position }}</small>{% endif %}
                 </div>
             </div>
 

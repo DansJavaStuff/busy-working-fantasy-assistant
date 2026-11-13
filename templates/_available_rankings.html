@@ -5,8 +5,8 @@
     </h3>
 
     <p class="weekly-card-detail mobile-detail">
-        These actionable claims address the same roster
-        issue. Yahoo will process them in priority order. After waivers clear,
+        These actionable claims are alternatives for the same roster
+        issue or open place. Yahoo will process them in priority order. After waivers clear,
         refresh the Yahoo data and the assistant will choose the next issue.
         Current waiver priority: #{{ available.waiver_priority or "—" }}.
     </p>
@@ -44,10 +44,10 @@
 
                 <td data-label="Drop">
                     <strong>
-                        {{ claim.drop.name }}
+                        {{ claim.drop.name if claim.drop else 'No drop needed' }}
                     </strong>
                     <div class="weekly-card-detail">
-                        {{ claim.drop.position }}
+                        {{ claim.drop.position if claim.drop else '' }}
                     </div>
                 </td>
 
@@ -72,7 +72,7 @@
                     {% set track_key =
                         (claim.add.yahoo_player_id|string)
                         ~ "::"
-                        ~ (claim.drop.yahoo_player_id|string)
+                        ~ ((claim.drop.yahoo_player_id|string) if claim.drop else '')
                     %}
 
                     {% if track_key in tracked_keys %}
@@ -90,9 +90,9 @@
                         <input type="hidden" name="add_player_id" value="{{ claim.add.yahoo_player_id }}">
                         <input type="hidden" name="add_player_name" value="{{ claim.add.name }}">
                         <input type="hidden" name="add_position" value="{{ claim.add.position }}">
-                        <input type="hidden" name="drop_player_id" value="{{ claim.drop.yahoo_player_id }}">
-                        <input type="hidden" name="drop_player_name" value="{{ claim.drop.name }}">
-                        <input type="hidden" name="drop_position" value="{{ claim.drop.position }}">
+                        <input type="hidden" name="drop_player_id" value="{{ claim.drop.yahoo_player_id if claim.drop else '' }}">
+                        <input type="hidden" name="drop_player_name" value="{{ claim.drop.name if claim.drop else '' }}">
+                        <input type="hidden" name="drop_position" value="{{ claim.drop.position if claim.drop else '' }}">
                         <input type="hidden" name="recommendation_label" value="{{ claim.call }}">
                         <input type="hidden" name="move_type" value="{{ claim.move_type }}">
                         <button
@@ -119,7 +119,7 @@
 {% endif %}
 
 <p class="weekly-card-detail mobile-detail">
-    HOLD means keep your current player; WATCH means monitor the option.
+    HOLD means no immediate move; WATCH means monitor the option.
     The combined move score weights this week's starting-lineup gain,
     the four-week outlook, bench depth and bye coverage; it is not projected points.
     DEF/K streams use this week’s lineup gain only; future averages and byes are context.
@@ -224,8 +224,10 @@
 
             <td data-label="Drop">
                 {% if item.best_drop %}
-                    {{ item.best_drop.name }}
-                    ({{ item.best_drop.position }})
+                    {{ item.best_drop.name if item.best_drop else '' }}
+                    ({{ item.best_drop.position if item.best_drop else '' }})
+                {% elif item.move and item.move.add_only %}
+                    No drop needed
                 {% else %}
                     —
                 {% endif %}
@@ -262,11 +264,11 @@
                 </div>
                 {% endif %}
 
-                {% if item.best_drop %}
+                {% if item.best_drop or (item.move and item.move.add_only) %}
                 {% set item_track_key =
                     (item.player.yahoo_player_id|string)
                     ~ "::"
-                    ~ (item.best_drop.yahoo_player_id|string)
+                    ~ ((item.best_drop.yahoo_player_id|string) if item.best_drop else '')
                 %}
 
                 {% if item_track_key in tracked_keys %}
@@ -290,9 +292,9 @@
                     <input type="hidden" name="add_player_id" value="{{ item.player.yahoo_player_id }}">
                     <input type="hidden" name="add_player_name" value="{{ item.player.name }}">
                     <input type="hidden" name="add_position" value="{{ item.player.position }}">
-                    <input type="hidden" name="drop_player_id" value="{{ item.best_drop.yahoo_player_id }}">
-                    <input type="hidden" name="drop_player_name" value="{{ item.best_drop.name }}">
-                    <input type="hidden" name="drop_position" value="{{ item.best_drop.position }}">
+                    <input type="hidden" name="drop_player_id" value="{{ item.best_drop.yahoo_player_id if item.best_drop else '' }}">
+                    <input type="hidden" name="drop_player_name" value="{{ item.best_drop.name if item.best_drop else '' }}">
+                    <input type="hidden" name="drop_position" value="{{ item.best_drop.position if item.best_drop else '' }}">
                     <input type="hidden" name="recommendation_label" value="{{ item.move_label }}">
                     <input type="hidden" name="move_type" value="{{ item.move_type }}">
                     <button
