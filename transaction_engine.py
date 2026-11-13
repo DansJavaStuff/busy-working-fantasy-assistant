@@ -1,3 +1,5 @@
+from league_config import BUSY_WORKING_ROSTER
+
 FLEX_POSITIONS = {
     "RB",
     "WR",
@@ -745,7 +747,7 @@ def transaction_allowed(
     # IR gets reviewed separately rather than
     # being treated as an ordinary bench drop.
     if (
-        drop_player.get(
+        drop_player is not None and drop_player.get(
             "roster_slot"
         ) == "IR"
     ):
@@ -755,10 +757,8 @@ def transaction_allowed(
         player
         for player in roster
         if (
-            player["yahoo_player_id"]
-            != drop_player[
-                "yahoo_player_id"
-            ]
+            player.get("roster_slot") != "IR"
+            and (drop_player is None or player["yahoo_player_id"] != drop_player["yahoo_player_id"])
         )
     ]
 
@@ -1259,7 +1259,7 @@ def build_reasons(
             f"value by {result['bench_gain']:.2f}."
         )
 
-    if drop_player["position"] == "QB":
+    if drop_player and drop_player["position"] == "QB":
         primary_qb = depth_context.get(
             "primary_qb"
         )
@@ -1418,6 +1418,70 @@ def protects_core_starter(
     )
 
 
+def open_roster_places(roster):
+    limit = sum(n for slot, n in BUSY_WORKING_ROSTER.items() if slot != "IR")
+    return max(0, limit - sum(p.get("roster_slot") != "IR" for p in roster))
+
+
+def _open_slot_metrics(roster, available):
+    """Score an incomplete roster, valuing genuinely empty starting slots at zero."""
+    usable = [p for p in roster if p.get("roster_slot") != "IR" and playable(p)]
+    def lineup_for(field):
+        chosen, used = [], set()
+        for position, count in (("QB", 1), ("RB", 2), ("WR", 2), ("TE", 1), ("K", 1), ("DST", 1)):
+            candidates = sorted((p for p in usable if p["position"] == position),
+                                key=lambda p: projection(p, field), reverse=True)
+            for player in candidates[:count]:
+                chosen.append((position, player))
+                used.add(player["yahoo_player_id"])
+        flex = sorted((p for p in usable if p["position"] in FLEX_POSITIONS
+                       and p["yahoo_player_id"] not in used), key=lambda p: projection(p, field), reverse=True)
+        if flex:
+            chosen.append(("FLEX", flex[0]))
+        return chosen
+    current = lineup_for("current_week_projection")
+    future = lineup_for("next_4_weeks_projection")
+    return {"current_week_total": sum(projection(p, "current_week_projection") for _, p in current),
+            "four_week_weekly": sum(projection(p, "next_4_weeks_projection") for _, p in future) / 4,
+            "bench_value": bench_value(usable, current, available)}
+
+
+def _open_slot_recommendations(roster, available, limit, current_week):
+    active = [p for p in roster if p.get("roster_slot") != "IR"]
+    before = _open_slot_metrics(active, available)
+    before_byes = build_bye_coverage(active, current_week)
+    owned = {p["yahoo_player_id"] for p in roster}
+    results = []
+    seen = set()
+    for player in available:
+        pid = player["yahoo_player_id"]
+        if pid in owned or pid in seen or not playable(player) or not transaction_allowed(active, player, None):
+            continue
+        seen.add(pid)
+        simulated = active + [player]
+        result = score_transaction(before, _open_slot_metrics(simulated, available))
+        complete = has_projection(player, "next_4_weeks_projection")
+        if not complete:
+            result["score"] -= result["four_week_gain"] * .75 + result["bench_gain"] * .20
+            result["four_week_gain"] = result["bench_gain"] = 0.0
+        streaming = player["position"] in {"K", "DST"}
+        if streaming:
+            result["score"] = result["week_gain"]
+        byes = compare_bye_coverage(before_byes, build_bye_coverage(simulated, current_week), current_week)
+        result.update(streaming=streaming, four_week_data_complete=complete,
+                      bye_coverage_gain=byes["gain"], bye_score_adjustment=0.0 if streaming else byes["gain"] * .25)
+        result["score"] += result["bye_score_adjustment"]
+        if result["score"] <= .10:
+            continue
+        reasons = ["Uses an empty roster place; no drop needed."]
+        reasons += build_reasons(result, player, None, {}) + build_bye_reasons(byes)
+        result.update(add=player, drop=None, add_only=True, open_roster_places=open_roster_places(roster),
+                      label=classify(result), move_type="FILL OPEN SPOT", drop_roster_role=None,
+                      bye_context=byes, depth_context={}, reasons=reasons)
+        results.append(result)
+    return sorted(results, key=lambda r: r["score"], reverse=True)[:limit]
+
+
 def build_transaction_recommendations(
     roster,
     available,
@@ -1426,6 +1490,10 @@ def build_transaction_recommendations(
     waiver_priority=None,
     cant_cut_ids=None,
 ):
+    if open_roster_places(roster):
+        return _open_slot_recommendations(roster, available, limit, current_week)
+    roster = [p for p in roster if p.get("roster_slot") != "IR"]
+
     cant_cut_ids = {
         str(player_id)
         for player_id in (

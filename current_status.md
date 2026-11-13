@@ -1,6 +1,6 @@
 # Busy Working NFL — current handover
 
-Last updated: 11 November 2026 (Europe/London).
+Last updated: 13 November 2026 (Europe/London).
 
 ## Read this first in a new chat
 
@@ -306,6 +306,28 @@ python -m unittest discover -s tests -v
 - Validation: all 188 tests pass, including drop-only route/form behaviour,
   repeated/invalid/season-isolated drops, saved-history preservation and the
   drop-then-IR-activation workflow. No database schema change or new dependency.
+
+## Open roster places and add-only pickups — 13 November 2026
+
+- Recommendations previously assumed every pickup needed a drop. They now count
+  active roster places separately from IR (14 active places in this league).
+  With room, Weekly and Available evaluate additions without sacrificing a player,
+  show "No drop needed", and keep add-only waiver tracking/claim alternatives.
+- IR players are excluded from simulated starting lineups and positional caps.
+  Full active rosters retain swap recommendations and Can't Cut protections.
+  Empty starting positions are valued at zero when comparing an incomplete roster.
+- Weekly and Available caches now include roster slots, statuses and projections;
+  moving a player to IR invalidates the recommendations even with identical IDs.
+- My Team now has "Record add only": leave Drop empty, select Add, and record
+  the pickup already completed on Yahoo. The server rejects full rosters,
+  duplicate players and ambiguous requests with both add-only and a drop selected.
+  Saved historical rosters/scores are preserved. No schema or dependency changes.
+- Validation: all 198 tests pass, including IR vacancies, full-roster swaps,
+  incomplete lineups, position limits, both cache invalidations, claim tracking,
+  stream comparisons, add-only recording/capacity and snapshot preservation.
+- Alternative recommendations share the available place; record a successful
+  pickup and refresh before acting on further recommendations. Pi deployment and
+  confirmation of Puka's recorded IR move remain user-operated.
 
 ## Unfinished work and next development decision
 

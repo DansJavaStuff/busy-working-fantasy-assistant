@@ -61,6 +61,7 @@ from refresh_data import (
 )
 from roster_display import build_roster_slots
 from roster_manager import (
+    add_roster_player,
     drop_roster_player,
     record_ir_change,
     move_roster_player,
@@ -1340,13 +1341,16 @@ def record_roster_transaction():
             return redirect(url_for("my_team", transaction_error=str(exc)))
         return redirect(url_for("my_team", transaction="1"))
 
-    if not drop_player_id or not yahoo_player_id:
+    add_only = request.form.get("action") == "add_only"
+    if add_only and drop_player_id:
+        return redirect(url_for("my_team", transaction_error="Clear the Drop selection to record an addition into an open place."))
+    if not yahoo_player_id or (not add_only and not drop_player_id):
         return redirect(
             url_for(
                 "my_team",
                 transaction_error=(
-                    "Choose both a player to drop "
-                    "and a player to add"
+                    "Choose a player to add" if add_only else
+                    "Choose both a player to drop and a player to add"
                 ),
             )
         )
@@ -1387,9 +1391,7 @@ def record_roster_transaction():
     )
 
     try:
-        replace_roster_player(
-            drop_player_id,
-            {
+        incoming_row = {
                 "player_id": local_id,
                 "player_name":
                     incoming["name"],
@@ -1403,9 +1405,11 @@ def record_roster_transaction():
                     incoming.get("status"),
                 "source":
                     "manual_transaction",
-            },
-            season=2026,
-        )
+            }
+        if add_only:
+            add_roster_player(incoming_row, season=2026)
+        else:
+            replace_roster_player(drop_player_id, incoming_row, season=2026)
 
     except ValueError as exc:
         return redirect(

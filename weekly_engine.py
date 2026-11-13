@@ -189,7 +189,7 @@ def cached_transaction_recommendations(
 
     roster_key = tuple(
         sorted(
-            str(
+            (str(
                 player.get(
                     "player_id",
                     player.get(
@@ -200,7 +200,9 @@ def cached_transaction_recommendations(
                         ),
                     ),
                 )
-            )
+            ),
+             player.get("roster_slot") or "", player.get("status") or "",
+             player.get("current_week_projection"), player.get("next_4_weeks_projection"))
             for player in roster
         )
     )
@@ -1156,6 +1158,8 @@ def build_speculative_waiver_moves(
     for transaction in transactions:
         add_player = transaction["add"]
         drop_player = transaction["drop"]
+        if drop_player is None:
+            continue
 
         waiver_date = (
             waiver_available_date(
@@ -1303,7 +1307,7 @@ def add_transaction_deadlines(
         # A player with a current-week actual has already played and is
         # roster-locked for this scoring week. Do not recommend dropping that
         # player as though the move could still affect the current matchup.
-        if has_played(
+        if drop_player is not None and has_played(
             drop_player
         ):
             continue
@@ -1314,7 +1318,7 @@ def add_transaction_deadlines(
         )
 
         drop_game = (
-            drop_player.get("local_game")
+            (drop_player or {}).get("local_game")
             or {}
         )
 
